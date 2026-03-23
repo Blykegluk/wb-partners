@@ -55,6 +55,9 @@ function AppContent() {
 
 function AppWithSociete({ page, setPage }) {
   const { selected, loadingData, loadingSocietes } = useSociete()
+  const [navState, setNavState] = useState(null)
+
+  const navigate = (p, state = null) => { setNavState(state); setPage(p) }
 
   if (loadingSocietes) return <Spinner />
   if (!selected) return <SelectSociete />
@@ -63,7 +66,7 @@ function AppWithSociete({ page, setPage }) {
 
   return (
     <Layout page={page} setPage={setPage}>
-      {loadingData ? <Spinner /> : <PageComponent />}
+      {loadingData ? <Spinner /> : <PageComponent navigate={navigate} navState={navState} setNavState={setNavState} />}
     </Layout>
   )
 }

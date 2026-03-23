@@ -1,11 +1,11 @@
-import { useState, useRef } from 'react'
-import { FolderOpen, Upload, Download, Trash2, File } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { FolderOpen, Upload, Download, Trash2, File, Building2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useSociete } from '../contexts/Societe'
 import { fmtSize, DOC_TYPES } from '../lib/utils'
 import { PageHeader, Card, Modal, Field, Sel, Btn, Empty } from '../components/UI'
 
-export default function Documents() {
+export default function Documents({ navigate, navState, setNavState }) {
   const { biens, documents, selected, canEdit, reload } = useSociete()
   const [filterBien, setFilterBien] = useState('')
   const [filterType, setFilterType] = useState('')
@@ -15,6 +15,16 @@ export default function Documents() {
   const [uploading, setUploading] = useState(false)
   const [drag, setDrag] = useState(false)
   const fileRef = useRef()
+
+  // Handle navState: open modal with pre-filled bien_id
+  useEffect(() => {
+    if (navState?.openNew) {
+      setF({ bien_id: navState.bien_id || '', type: 'bail', nom: '' })
+      setFile(null)
+      setOpen(true)
+      setNavState(null)
+    }
+  }, [navState, setNavState])
 
   const filtered = documents.filter(d =>
     (!filterBien || d.bien_id === filterBien) && (!filterType || d.type === filterType)
@@ -110,7 +120,12 @@ export default function Documents() {
                         <span className="font-semibold text-navy text-sm">{d.nom}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">{bien?.reference || bien?.adresse?.slice(0, 22) || '—'}</td>
+                    <td className="px-4 py-3">
+                      <button onClick={() => navigate('biens')} className="text-sm text-gray-500 hover:text-blue-600 cursor-pointer flex items-center gap-1">
+                        <Building2 size={13} className="text-gray-300" />
+                        {bien?.reference || bien?.adresse?.slice(0, 22) || '—'}
+                      </button>
+                    </td>
                     <td className="px-4 py-3">
                       <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold" style={{ background: ti.color + '18', color: ti.color }}>
                         {ti.l}
@@ -157,7 +172,7 @@ export default function Documents() {
           >
             {file ? (
               <div>
-                <p className="font-semibold text-navy mb-1">📄 {file.name}</p>
+                <p className="font-semibold text-navy mb-1">{file.name}</p>
                 <p className="text-xs text-gray-400">{fmtSize(file.size)}</p>
               </div>
             ) : (

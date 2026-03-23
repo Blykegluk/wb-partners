@@ -1,4 +1,4 @@
-import { AlertTriangle, Send, Check } from 'lucide-react'
+import { AlertTriangle, Send, Check, Building2, Users } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useSociete } from '../contexts/Societe'
 import { fmt, MONTHS, today } from '../lib/utils'
@@ -11,7 +11,7 @@ const PALIERS = [
   { min: 5, label: 'Relance amiable', color: 'bg-yellow-100 text-yellow-700', severity: 1 },
 ]
 
-export default function Relances() {
+export default function Relances({ navigate }) {
   const { transactions, baux, biens, locataires, selected, canEdit, reload } = useSociete()
 
   // Only unpaid transactions
@@ -104,10 +104,18 @@ export default function Relances() {
             <tbody>
               {impayes.map(t => (
                 <tr key={t.id} className="border-t border-gray-50 hover:bg-gray-50/50">
-                  <td className="px-4 py-3 text-sm font-semibold text-navy">
-                    {t.loc?.raison_sociale || `${t.loc?.prenom || ''} ${t.loc?.nom || ''}`.trim() || '—'}
+                  <td className="px-4 py-3">
+                    <button onClick={() => navigate('locataires')} className="text-sm font-semibold text-navy hover:text-blue-600 cursor-pointer flex items-center gap-1">
+                      <Users size={13} className="text-gray-300" />
+                      {t.loc?.raison_sociale || `${t.loc?.prenom || ''} ${t.loc?.nom || ''}`.trim() || '—'}
+                    </button>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{t.bien?.reference || t.bien?.adresse?.slice(0, 20) || '—'}</td>
+                  <td className="px-4 py-3">
+                    <button onClick={() => navigate('biens')} className="text-sm text-gray-500 hover:text-blue-600 cursor-pointer flex items-center gap-1">
+                      <Building2 size={13} className="text-gray-300" />
+                      {t.bien?.reference || t.bien?.adresse?.slice(0, 20) || '—'}
+                    </button>
+                  </td>
                   <td className="px-4 py-3 text-sm text-gray-500">{MONTHS[t.mois]} {t.annee}</td>
                   <td className="px-4 py-3 text-sm font-semibold text-navy">{fmt(t.montant_loyer + t.montant_charges)}</td>
                   <td className="px-4 py-3">

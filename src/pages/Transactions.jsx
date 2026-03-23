@@ -1,11 +1,11 @@
-import { CreditCard } from 'lucide-react'
+import { CreditCard, Building2, Users } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useSociete } from '../contexts/Societe'
 import { fmt, MONTHS, today } from '../lib/utils'
 import { pdfAvisEcheance, pdfFacture, pdfQuittance, pdfRelance, pdfMiseEnDemeure, pdfCommandement } from '../lib/pdf'
 import { PageHeader, Card, Badge, Empty, Btn } from '../components/UI'
 
-export default function Transactions() {
+export default function Transactions({ navigate }) {
   const { transactions, baux, biens, locataires, selected, canEdit, reload } = useSociete()
 
   const markPaid = async (id) => {
@@ -47,10 +47,18 @@ export default function Transactions() {
                 const soc = selected
                 return (
                   <tr key={t.id} className="border-t border-gray-50 hover:bg-gray-50/50">
-                    <td className="px-4 py-3 text-sm font-semibold text-navy">
-                      {loc?.raison_sociale || `${loc?.prenom || ''} ${loc?.nom || ''}`.trim() || '—'}
+                    <td className="px-4 py-3">
+                      <button onClick={() => navigate('locataires')} className="text-sm font-semibold text-navy hover:text-blue-600 cursor-pointer flex items-center gap-1">
+                        <Users size={13} className="text-gray-300" />
+                        {loc?.raison_sociale || `${loc?.prenom || ''} ${loc?.nom || ''}`.trim() || '—'}
+                      </button>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">{bien?.reference || bien?.adresse?.slice(0, 20) || '—'}</td>
+                    <td className="px-4 py-3">
+                      <button onClick={() => navigate('biens')} className="text-sm text-gray-500 hover:text-blue-600 cursor-pointer flex items-center gap-1">
+                        <Building2 size={13} className="text-gray-300" />
+                        {bien?.reference || bien?.adresse?.slice(0, 20) || '—'}
+                      </button>
+                    </td>
                     <td className="px-4 py-3 text-sm text-gray-500">{MONTHS[t.mois]} {t.annee}</td>
                     <td className="px-4 py-3 text-sm font-semibold text-navy">{fmt(t.montant_loyer + t.montant_charges)}</td>
                     <td className="px-4 py-3"><Badge value={t.statut} /></td>

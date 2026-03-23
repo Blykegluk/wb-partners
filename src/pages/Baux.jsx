@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { FileText, Plus, Trash2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { FileText, Plus, Trash2, Building2, Users } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useSociete } from '../contexts/Societe'
 import { fmt, fmtDate } from '../lib/utils'
@@ -12,11 +12,21 @@ const EMPTY = {
   date_revision_anniversaire: '', actif: true,
 }
 
-export default function Baux() {
+export default function Baux({ navigate, navState, setNavState }) {
   const { baux, biens, locataires, transactions, selected, canEdit, reload } = useSociete()
   const [open, setOpen] = useState(false)
   const [edit, setEdit] = useState(null)
   const [f, setF] = useState(EMPTY)
+
+  // Handle navState: open modal with pre-filled bien_id
+  useEffect(() => {
+    if (navState?.openNew) {
+      setEdit(null)
+      setF({ ...EMPTY, bien_id: navState.bien_id || '' })
+      setOpen(true)
+      setNavState(null)
+    }
+  }, [navState, setNavState])
 
   const openNew = () => { setEdit(null); setF(EMPTY); setOpen(true) }
   const openEdit = (b) => { setEdit(b); setF({ ...EMPTY, ...b }); setOpen(true) }
@@ -70,12 +80,18 @@ export default function Baux() {
                 const loc = locataires.find(l => l.id === b.locataire_id)
                 const nimp = transactions.filter(t => t.bail_id === b.id && t.statut === 'impayé').length
                 return (
-                  <tr key={b.id} className="border-t border-gray-50 hover:bg-gray-50/50 cursor-pointer" onClick={() => canEdit && openEdit(b)}>
+                  <tr key={b.id} className="border-t border-gray-50 hover:bg-gray-50/50">
                     <td className="px-4 py-3">
-                      <p className="font-semibold text-navy text-sm">{bien?.reference || bien?.adresse || '—'}</p>
+                      <button onClick={() => navigate('biens')} className="font-semibold text-navy text-sm hover:text-blue-600 cursor-pointer flex items-center gap-1">
+                        <Building2 size={13} className="text-gray-300" />
+                        {bien?.reference || bien?.adresse || '—'}
+                      </button>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600">
-                      {loc?.raison_sociale || `${loc?.prenom || ''} ${loc?.nom || ''}`.trim() || '—'}
+                    <td className="px-4 py-3">
+                      <button onClick={() => navigate('locataires')} className="text-sm text-gray-600 hover:text-blue-600 cursor-pointer flex items-center gap-1">
+                        <Users size={13} className="text-gray-300" />
+                        {loc?.raison_sociale || `${loc?.prenom || ''} ${loc?.nom || ''}`.trim() || '—'}
+                      </button>
                     </td>
                     <td className="px-4 py-3 text-sm font-semibold text-navy">{fmt(b.loyer_ht)}</td>
                     <td className="px-4 py-3 text-sm text-gray-500">{fmt(b.charges)}</td>
@@ -84,14 +100,21 @@ export default function Baux() {
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-500 capitalize">{b.type_bail}</td>
                     <td className="px-4 py-3">
-                      {nimp > 0 && <span className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-xs font-semibold">{nimp} impayé{nimp > 1 ? 's' : ''}</span>}
-                    </td>
-                    <td className="px-4 py-3">
-                      {canEdit && (
-                        <button onClick={e => { e.stopPropagation(); del(b.id) }} className="text-gray-300 hover:text-red-500 cursor-pointer">
-                          <Trash2 size={15} />
+                      {nimp > 0 && (
+                        <button onClick={() => navigate('relances')} className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-xs font-semibold cursor-pointer hover:bg-red-200">
+                          {nimp} impayé{nimp > 1 ? 's' : ''}
                         </button>
                       )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-2">
+                        {canEdit && <button onClick={() => openEdit(b)} className="text-gray-300 hover:text-blue-500 cursor-pointer text-xs font-medium">Modifier</button>}
+                        {canEdit && (
+                          <button onClick={() => del(b.id)} className="text-gray-300 hover:text-red-500 cursor-pointer">
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )
@@ -106,8 +129,15 @@ export default function Baux() {
           <Grid2>
             <Sel label="Bien *" value={f.bien_id} onChange={e => u('bien_id', e.target.value)}
               options={[{ v: '', l: 'Sélectionner un bien' }, ...biens.map(b => ({ v: b.id, l: b.reference || b.adresse }))]} />
-            <Sel label="Locataire *" value={f.locataire_id} onChange={e => u('locataire_id', e.target.value)}
-              options={[{ v: '', l: 'Sélectionner un locataire' }, ...locataires.map(l => ({ v: l.id, l: l.raison_sociale || `${l.prenom} ${l.nom}` }))]} />
+            <div>
+              <Sel label="Locataire *" value={f.locataire_id} onChange={e => u('locataire_id', e.target.value)}
+                options={[{ v: '', l: 'Sélectionner un locataire' }, ...locataires.map(l => ({ v: l.id, l: l.raison_sociale || `${l.prenom} ${l.nom}` }))]} />
+              {locataires.length === 0 && (
+                <button onClick={() => navigate('locataires', { openNew: true })} className="text-xs text-blue-500 hover:underline cursor-pointer -mt-1">
+                  + Créer un locataire d'abord
+                </button>
+              )}
+            </div>
           </Grid2>
 
           <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3 mt-4">Loyers (progressif)</h4>

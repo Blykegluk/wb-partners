@@ -7,7 +7,7 @@ import { rendementBrut } from '../lib/calculs'
 import { pdfPortfolio } from '../lib/pdf'
 import { Badge, Card, Btn } from '../components/UI'
 
-export default function Dashboard() {
+export default function Dashboard({ navigate }) {
   const { biens, locataires, baux, transactions, selected } = useSociete()
 
   const bauxActifs = baux.filter(b => b.actif)
@@ -32,12 +32,12 @@ export default function Dashboard() {
   })
 
   const kpis = [
-    { l: 'Biens', v: biens.length, icon: <Building2 size={18} />, c: 'text-blue-500 bg-blue-50' },
-    { l: 'Locataires', v: locataires.length, icon: <Users size={18} />, c: 'text-purple-500 bg-purple-50' },
-    { l: 'Baux actifs', v: bauxActifs.length, icon: <FileText size={18} />, c: 'text-emerald-500 bg-emerald-50' },
-    { l: 'Total encaissé', v: fmt(totalEnc), icon: <Euro size={18} />, c: 'text-emerald-500 bg-emerald-50' },
-    { l: "Taux d'occupation", v: tauxOcc + '%', icon: <TrendingUp size={18} />, c: 'text-amber-500 bg-amber-50' },
-    { l: 'Impayés', v: fmt(totalImp), icon: <AlertTriangle size={18} />, c: 'text-red-500 bg-red-50' },
+    { l: 'Biens', v: biens.length, icon: <Building2 size={18} />, c: 'text-blue-500 bg-blue-50', page: 'biens' },
+    { l: 'Locataires', v: locataires.length, icon: <Users size={18} />, c: 'text-purple-500 bg-purple-50', page: 'locataires' },
+    { l: 'Baux actifs', v: bauxActifs.length, icon: <FileText size={18} />, c: 'text-emerald-500 bg-emerald-50', page: 'baux' },
+    { l: 'Total encaissé', v: fmt(totalEnc), icon: <Euro size={18} />, c: 'text-emerald-500 bg-emerald-50', page: 'finances' },
+    { l: "Taux d'occupation", v: tauxOcc + '%', icon: <TrendingUp size={18} />, c: 'text-amber-500 bg-amber-50', page: 'biens' },
+    { l: 'Impayés', v: fmt(totalImp), icon: <AlertTriangle size={18} />, c: 'text-red-500 bg-red-50', page: 'relances' },
   ]
 
   return (
@@ -48,7 +48,7 @@ export default function Dashboard() {
       {/* KPIs */}
       <div className="grid grid-cols-3 gap-4 mb-8">
         {kpis.map((k, i) => (
-          <Card key={i} className="p-6">
+          <Card key={i} className="p-6 cursor-pointer hover:border-blue-200 hover:shadow-md transition-all" onClick={() => navigate(k.page)}>
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-sm text-gray-400 mb-2 font-medium">{k.l}</p>
@@ -72,12 +72,17 @@ export default function Dashboard() {
       {/* Alertes révision */}
       {alertesRevision.length > 0 && (
         <Card className="p-6 border-amber-200 mb-5">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="text-base">📅</span>
-            <h3 className="text-sm font-bold text-navy">Révisions de loyer à venir ({alertesRevision.length})</h3>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-base">📅</span>
+              <h3 className="text-sm font-bold text-navy">Révisions de loyer à venir ({alertesRevision.length})</h3>
+            </div>
+            <button onClick={() => navigate('revisions')} className="text-xs text-blue-500 hover:underline cursor-pointer font-medium">
+              Gérer les révisions →
+            </button>
           </div>
           {alertesRevision.map(a => (
-            <div key={a.id} className="flex justify-between items-center py-3 border-b border-gray-50 last:border-0">
+            <div key={a.id} onClick={() => navigate('revisions')} className="flex justify-between items-center py-3 border-b border-gray-50 last:border-0 cursor-pointer hover:bg-gray-50 -mx-2 px-2 rounded">
               <div>
                 <p className="font-semibold text-navy text-sm">{a.loc?.raison_sociale || `${a.loc?.prenom} ${a.loc?.nom}` || '—'}</p>
                 <p className="text-xs text-gray-400">{a.bien?.adresse} — Indice {a.indice_revision || 'ILC'}</p>
@@ -96,16 +101,21 @@ export default function Dashboard() {
       {/* Alertes impayés */}
       {alertes.length > 0 && (
         <Card className="p-6 border-red-200">
-          <div className="flex items-center gap-2 mb-4">
-            <AlertTriangle size={16} className="text-red-500" />
-            <h3 className="text-sm font-bold text-navy">Alertes impayés ({alertes.length})</h3>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={16} className="text-red-500" />
+              <h3 className="text-sm font-bold text-navy">Alertes impayés ({alertes.length})</h3>
+            </div>
+            <button onClick={() => navigate('relances')} className="text-xs text-blue-500 hover:underline cursor-pointer font-medium">
+              Gérer les relances →
+            </button>
           </div>
           {alertes.slice(0, 6).map(a => {
             const bail = baux.find(b => b.id === a.bail_id)
             const loc = bail ? locataires.find(l => l.id === bail.locataire_id) : null
             const bien = bail ? biens.find(b => b.id === bail.bien_id) : null
             return (
-              <div key={a.id} className="flex justify-between items-center py-3 border-b border-gray-50 last:border-0">
+              <div key={a.id} onClick={() => navigate('relances')} className="flex justify-between items-center py-3 border-b border-gray-50 last:border-0 cursor-pointer hover:bg-gray-50 -mx-2 px-2 rounded">
                 <div>
                   <p className="font-semibold text-navy text-sm">{loc?.raison_sociale || `${loc?.prenom} ${loc?.nom}` || '—'}</p>
                   <p className="text-xs text-gray-400">{bien?.adresse} — {MONTHS[a.mois]} {a.annee}</p>

@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { Building2, Plus, Trash2, ExternalLink, Upload, MapPin, Zap } from 'lucide-react'
+import { Building2, Plus, Trash2, ExternalLink, Upload, MapPin, Zap, FileText, Users, FolderOpen, ArrowRight } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useSociete } from '../contexts/Societe'
-import { fmt, fmtDate, googleMapsUrl } from '../lib/utils'
+import { fmt, fmtDate, googleMapsUrl, DOC_TYPES } from '../lib/utils'
 import { rendementBrut, rendementNet, cashflowMensuel } from '../lib/calculs'
 import Timeline from '../components/Timeline'
 import { extractFromPDF, fileToBase64 } from '../lib/extraction'
-import { PageHeader, Card, Modal, Field, Sel, Check, Grid2, Grid3, Btn, Empty, AddressField } from '../components/UI'
+import { PageHeader, Card, Modal, Field, Sel, Check, Grid2, Grid3, Btn, Badge, Empty, AddressField } from '../components/UI'
 
 const EMPTY_BIEN = {
   reference: '', adresse: '', ville: '', code_postal: '', latitude: null, longitude: null,
@@ -17,8 +17,8 @@ const EMPTY_BIEN = {
   date_acquisition: '', presence_extraction: false, taxe_fonciere: '', statut_bien: 'Actif',
 }
 
-export default function Biens() {
-  const { biens, selected, canEdit, reload } = useSociete()
+export default function Biens({ navigate }) {
+  const { biens, baux, locataires, documents, transactions, selected, canEdit, reload } = useSociete()
   const [open, setOpen] = useState(false)
   const [edit, setEdit] = useState(null)
   const [f, setF] = useState(EMPTY_BIEN)
@@ -114,6 +114,14 @@ export default function Biens() {
   const rn = (b) => { const r = rendementNet(b); return r !== null ? (r * 100).toFixed(1) + '%' : '—' }
   const cf = (b) => cashflowMensuel(b)
 
+  // ── Related data helpers ──────────────────────────────────
+  const getBienBaux = (bienId) => baux.filter(ba => ba.bien_id === bienId)
+  const getBienDocs = (bienId) => documents.filter(d => d.bien_id === bienId)
+  const getBienImpayes = (bienId) => {
+    const bailIds = getBienBaux(bienId).map(ba => ba.id)
+    return transactions.filter(t => bailIds.includes(t.bail_id) && t.statut === 'impayé')
+  }
+
   return (
     <div>
       <PageHeader title="Biens immobiliers" sub="Gérez votre patrimoine">
@@ -124,7 +132,11 @@ export default function Biens() {
         <Empty icon={<Building2 size={40} />} text="Aucun bien. Ajoutez votre premier bien immobilier." />
       ) : (
         <div className="space-y-3">
-          {biens.map(b => (
+          {biens.map(b => {
+            const bienBaux = getBienBaux(b.id)
+            const bienDocs = getBienDocs(b.id)
+            const bienImpayes = getBienImpayes(b.id)
+            return (
             <Card key={b.id} className="p-5">
               <div className="flex justify-between items-start">
                 <div className="flex-1 cursor-pointer" onClick={() => setDetail(detail?.id === b.id ? null : b)}>
@@ -132,6 +144,9 @@ export default function Biens() {
                     <h3 className="font-bold text-navy">{b.reference || b.adresse}</h3>
                     <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{b.type}</span>
                     {b.activite && <span className="text-xs text-gray-400">{b.activite}</span>}
+                    {b.statut_bien && b.statut_bien !== 'Actif' && (
+                      <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-semibold">{b.statut_bien}</span>
+                    )}
                   </div>
                   <div className="flex items-center gap-4 text-sm text-gray-500">
                     <span className="flex items-center gap-1">
@@ -142,6 +157,20 @@ export default function Biens() {
                       </a>
                     </span>
                     <span>{b.surface_rdc || 0} m² RDC{b.surface_sous_sol ? ` + ${b.surface_sous_sol} m² SS` : ''}</span>
+                  </div>
+                  {/* Quick summary badges */}
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-[11px] text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">
+                      {bienBaux.filter(ba => ba.actif).length} bail{bienBaux.filter(ba => ba.actif).length > 1 ? 'x' : ''} actif{bienBaux.filter(ba => ba.actif).length > 1 ? 's' : ''}
+                    </span>
+                    <span className="text-[11px] text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">
+                      {bienDocs.length} doc{bienDocs.length > 1 ? 's' : ''}
+                    </span>
+                    {bienImpayes.length > 0 && (
+                      <span className="text-[11px] text-red-600 bg-red-50 px-2 py-0.5 rounded-full font-semibold">
+                        {bienImpayes.length} impayé{bienImpayes.length > 1 ? 's' : ''}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-6 text-right">
@@ -184,10 +213,134 @@ export default function Biens() {
                   <div><p className="text-gray-400 text-xs mb-1">Rdt net</p><p className="font-bold text-blue-600">{rn(b)}</p></div>
                   <div><p className="text-gray-400 text-xs mb-1">Cashflow/mois</p><p className={`font-bold ${cf(b) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>{fmt(cf(b))}</p></div>
                 </div>
+
+                {/* ── Baux liés ─────────────────────────────────── */}
+                <div className="mt-5 pt-4 border-t border-gray-100">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide flex items-center gap-1.5">
+                      <FileText size={13} /> Baux ({bienBaux.length})
+                    </h4>
+                    <div className="flex gap-2">
+                      {canEdit && (
+                        <button onClick={() => navigate('baux', { openNew: true, bien_id: b.id })}
+                          className="text-xs text-blue-500 hover:text-blue-700 font-semibold cursor-pointer flex items-center gap-1">
+                          <Plus size={12} /> Nouveau bail
+                        </button>
+                      )}
+                      {bienBaux.length > 0 && (
+                        <button onClick={() => navigate('baux')}
+                          className="text-xs text-gray-400 hover:text-navy font-medium cursor-pointer flex items-center gap-1">
+                          Voir tout <ArrowRight size={11} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {bienBaux.length === 0 ? (
+                    <p className="text-sm text-gray-300 italic">Aucun bail — {canEdit && <button onClick={() => navigate('baux', { openNew: true, bien_id: b.id })} className="text-blue-500 hover:underline cursor-pointer">créer un bail</button>}</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {bienBaux.map(ba => {
+                        const loc = locataires.find(l => l.id === ba.locataire_id)
+                        const nimp = transactions.filter(t => t.bail_id === ba.id && t.statut === 'impayé').length
+                        return (
+                          <div key={ba.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                            <div className="flex items-center gap-3">
+                              <Users size={14} className="text-gray-400" />
+                              <div>
+                                <button onClick={() => navigate('locataires')} className="text-sm font-semibold text-navy hover:text-blue-600 cursor-pointer">
+                                  {loc?.raison_sociale || `${loc?.prenom || ''} ${loc?.nom || ''}`.trim() || '—'}
+                                </button>
+                                <p className="text-[11px] text-gray-400">
+                                  {fmtDate(ba.date_debut)} → {ba.date_fin ? fmtDate(ba.date_fin) : '∞'}
+                                  {ba.type_bail && <span className="ml-2 capitalize">{ba.type_bail}</span>}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              {nimp > 0 && (
+                                <button onClick={() => navigate('relances')} className="bg-red-100 text-red-600 px-2 py-0.5 rounded-full text-[11px] font-semibold cursor-pointer hover:bg-red-200">
+                                  {nimp} impayé{nimp > 1 ? 's' : ''}
+                                </button>
+                              )}
+                              <span className="text-sm font-semibold text-navy">{fmt(ba.loyer_ht)}/mois</span>
+                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${ba.actif ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
+                                {ba.actif ? 'Actif' : 'Inactif'}
+                              </span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Documents liés ────────────────────────────── */}
+                <div className="mt-5 pt-4 border-t border-gray-100">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide flex items-center gap-1.5">
+                      <FolderOpen size={13} /> Documents ({bienDocs.length})
+                    </h4>
+                    <div className="flex gap-2">
+                      {canEdit && (
+                        <button onClick={() => navigate('documents', { openNew: true, bien_id: b.id })}
+                          className="text-xs text-blue-500 hover:text-blue-700 font-semibold cursor-pointer flex items-center gap-1">
+                          <Plus size={12} /> Ajouter
+                        </button>
+                      )}
+                      {bienDocs.length > 0 && (
+                        <button onClick={() => navigate('documents')}
+                          className="text-xs text-gray-400 hover:text-navy font-medium cursor-pointer flex items-center gap-1">
+                          Voir tout <ArrowRight size={11} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {bienDocs.length === 0 ? (
+                    <p className="text-sm text-gray-300 italic">Aucun document — {canEdit && <button onClick={() => navigate('documents', { openNew: true, bien_id: b.id })} className="text-blue-500 hover:underline cursor-pointer">uploader un document</button>}</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {bienDocs.slice(0, 6).map(d => {
+                        const ti = DOC_TYPES.find(t => t.v === d.type) || { l: d.type, color: '#64748b' }
+                        return (
+                          <a key={d.id} href={d.fichier_url} target="_blank" rel="noreferrer"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 text-xs no-underline transition-colors">
+                            <span className="w-2 h-2 rounded-full" style={{ background: ti.color }} />
+                            <span className="text-navy font-medium">{d.nom}</span>
+                            <span className="text-gray-300">{ti.l}</span>
+                          </a>
+                        )
+                      })}
+                      {bienDocs.length > 6 && (
+                        <button onClick={() => navigate('documents')} className="text-xs text-blue-500 hover:underline cursor-pointer px-2 py-1.5">
+                          +{bienDocs.length - 6} autres
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Quick actions ─────────────────────────────── */}
+                {canEdit && (
+                  <div className="mt-5 pt-4 border-t border-gray-100 flex gap-2">
+                    <Btn className="!text-xs !px-3 !py-1.5" onClick={() => navigate('baux', { openNew: true, bien_id: b.id })}>
+                      <Plus size={13} /> Nouveau bail
+                    </Btn>
+                    <Btn className="!text-xs !px-3 !py-1.5" variant="ghost" onClick={() => navigate('locataires', { openNew: true })}>
+                      <Plus size={13} /> Nouveau locataire
+                    </Btn>
+                    <Btn className="!text-xs !px-3 !py-1.5" variant="ghost" onClick={() => navigate('documents', { openNew: true, bien_id: b.id })}>
+                      <Upload size={13} /> Uploader un document
+                    </Btn>
+                    <Btn className="!text-xs !px-3 !py-1.5" variant="ghost" onClick={() => navigate('finances')}>
+                      Échéancier <ArrowRight size={11} />
+                    </Btn>
+                  </div>
+                )}
+
                 <Timeline bienId={b.id} />
               </>)}
             </Card>
-          ))}
+          )})}
         </div>
       )}
 
