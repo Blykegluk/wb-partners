@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Building2, Plus, Trash2, ExternalLink, Upload, MapPin, Zap, FileText, Users, FolderOpen, ArrowRight } from 'lucide-react'
+import { Building2, Plus, Trash2, ExternalLink, Upload, MapPin, Zap, FileText, Users, FolderOpen, ArrowRight, Link } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useSociete } from '../contexts/Societe'
 import { fmt, fmtDate, googleMapsUrl, DOC_TYPES } from '../lib/utils'
@@ -94,6 +94,55 @@ export default function Biens({ navigate }) {
   const del = async (id) => {
     if (!confirm('Supprimer ce bien et toutes ses données associées ?')) return
     await supabase.from('biens').delete().eq('id', id)
+    reload()
+  }
+
+  // ── Inline bail creation / linking ──────────────────────────
+  const EMPTY_BAIL = {
+    bien_id: '', locataire_id: '', date_debut: '', date_fin: '',
+    loyer_ht: '', loyer_an1: '', loyer_an2: '', charges: '', depot: '',
+    type_bail: 'commercial', utilisation: '', indice_revision: 'ILC',
+    date_revision_anniversaire: '', actif: true,
+  }
+  const EMPTY_LOC = { raison_sociale: '', prenom: '', nom: '', email: '', telephone: '', adresse: '', code_postal: '', ville: '' }
+
+  const [bailModal, setBailModal] = useState(null) // null = closed, { bienId, mode: 'new'|'link' }
+  const [bf, setBf] = useState(EMPTY_BAIL)
+  const [newLocModal, setNewLocModal] = useState(false)
+  const [lf, setLf] = useState(EMPTY_LOC)
+
+  const openBailNew = (bienId) => {
+    setBf({ ...EMPTY_BAIL, bien_id: bienId })
+    setBailModal({ bienId, mode: 'new' })
+  }
+  const openBailLink = (bienId) => {
+    setBailModal({ bienId, mode: 'link' })
+  }
+
+  const saveBail = async () => {
+    const data = { ...bf }
+    for (const k of ['loyer_ht','loyer_an1','loyer_an2','charges','depot']) {
+      data[k] = data[k] === '' || data[k] === null ? null : Number(data[k])
+    }
+    data.actif = Boolean(data.actif)
+    delete data.id; delete data.created_at
+    await supabase.from('baux').insert({ ...data, societe_id: selected.id })
+    setBailModal(null)
+    reload()
+  }
+
+  const linkBail = async (bailId, bienId) => {
+    await supabase.from('baux').update({ bien_id: bienId }).eq('id', bailId)
+    setBailModal(null)
+    reload()
+  }
+
+  const saveNewLoc = async () => {
+    const data = { ...lf }
+    delete data.id; delete data.created_at; delete data.societe_id
+    const { data: inserted } = await supabase.from('locataires').insert({ ...data, societe_id: selected.id }).select().single()
+    if (inserted) setBf(p => ({ ...p, locataire_id: inserted.id }))
+    setNewLocModal(false)
     reload()
   }
 
@@ -247,9 +296,15 @@ export default function Biens({ navigate }) {
                     </h4>
                     <div className="flex gap-2">
                       {canEdit && (
-                        <button onClick={() => navigate('baux', { openNew: true, bien_id: b.id })}
+                        <button onClick={() => openBailNew(b.id)}
                           className="text-xs text-blue-500 hover:text-blue-700 font-semibold cursor-pointer flex items-center gap-1">
                           <Plus size={12} /> Nouveau bail
+                        </button>
+                      )}
+                      {canEdit && baux.filter(ba => ba.bien_id !== b.id).length > 0 && (
+                        <button onClick={() => openBailLink(b.id)}
+                          className="text-xs text-emerald-500 hover:text-emerald-700 font-semibold cursor-pointer flex items-center gap-1">
+                          <Link size={12} /> Rattacher un bail
                         </button>
                       )}
                       {bienBaux.length > 0 && (
@@ -261,7 +316,13 @@ export default function Biens({ navigate }) {
                     </div>
                   </div>
                   {bienBaux.length === 0 ? (
-                    <p className="text-sm text-gray-300 italic">Aucun bail — {canEdit && <button onClick={() => navigate('baux', { openNew: true, bien_id: b.id })} className="text-blue-500 hover:underline cursor-pointer">créer un bail</button>}</p>
+                    <p className="text-sm text-gray-300 italic">Aucun bail — {canEdit && (
+                      <>
+                        <button onClick={() => openBailNew(b.id)} className="text-blue-500 hover:underline cursor-pointer">créer un bail</button>
+                        {' ou '}
+                        <button onClick={() => openBailLink(b.id)} className="text-emerald-500 hover:underline cursor-pointer">rattacher un existant</button>
+                      </>
+                    )}</p>
                   ) : (
                     <div className="space-y-2">
                       {bienBaux.map(ba => {
@@ -346,12 +407,12 @@ export default function Biens({ navigate }) {
 
                 {/* ── Quick actions ─────────────────────────────── */}
                 {canEdit && (
-                  <div className="mt-5 pt-4 border-t border-gray-100 flex gap-2">
-                    <Btn className="!text-xs !px-3 !py-1.5" onClick={() => navigate('baux', { openNew: true, bien_id: b.id })}>
+                  <div className="mt-5 pt-4 border-t border-gray-100 flex gap-2 flex-wrap">
+                    <Btn className="!text-xs !px-3 !py-1.5" onClick={() => openBailNew(b.id)}>
                       <Plus size={13} /> Nouveau bail
                     </Btn>
-                    <Btn className="!text-xs !px-3 !py-1.5" variant="ghost" onClick={() => navigate('locataires', { openNew: true })}>
-                      <Plus size={13} /> Nouveau locataire
+                    <Btn className="!text-xs !px-3 !py-1.5" variant="ghost" onClick={() => openBailLink(b.id)}>
+                      <Link size={13} /> Rattacher un bail
                     </Btn>
                     <Btn className="!text-xs !px-3 !py-1.5" variant="ghost" onClick={() => navigate('documents', { openNew: true, bien_id: b.id })}>
                       <Upload size={13} /> Uploader un document
@@ -566,6 +627,117 @@ export default function Biens({ navigate }) {
           <div className="flex justify-end gap-3 mt-6">
             <Btn variant="ghost" onClick={() => setOpen(false)}>Annuler</Btn>
             <Btn onClick={save}>{edit ? 'Enregistrer' : 'Ajouter'}</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Modal Nouveau bail (inline) ──────────────────── */}
+      {bailModal?.mode === 'new' && (
+        <Modal title="Nouveau bail" onClose={() => setBailModal(null)} width="max-w-2xl">
+          <Grid2>
+            <div>
+              <label className="block text-xs font-semibold text-navy mb-1">Bien</label>
+              <div className="px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-medium text-navy">
+                {biens.find(x => x.id === bailModal.bienId)?.reference || biens.find(x => x.id === bailModal.bienId)?.adresse || '—'}
+              </div>
+            </div>
+            <div>
+              <Sel label="Locataire *" value={bf.locataire_id} onChange={e => setBf(p => ({ ...p, locataire_id: e.target.value }))}
+                options={[{ v: '', l: 'Sélectionner un locataire' }, ...locataires.map(l => ({ v: l.id, l: l.raison_sociale || `${l.prenom} ${l.nom}` }))]} />
+              <button onClick={() => { setLf(EMPTY_LOC); setNewLocModal(true) }}
+                className="text-xs text-blue-500 hover:underline cursor-pointer mt-1 flex items-center gap-1">
+                <Plus size={11} /> Créer un nouveau locataire
+              </button>
+            </div>
+          </Grid2>
+
+          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3 mt-4">Loyers</h4>
+          <Grid3>
+            <Field label="Loyer HT *" type="number" value={bf.loyer_ht} onChange={e => setBf(p => ({ ...p, loyer_ht: e.target.value }))} />
+            <Field label="Loyer An 1" type="number" placeholder="Si progressif" value={bf.loyer_an1 || ''} onChange={e => setBf(p => ({ ...p, loyer_an1: e.target.value }))} />
+            <Field label="Loyer An 2" type="number" placeholder="Si progressif" value={bf.loyer_an2 || ''} onChange={e => setBf(p => ({ ...p, loyer_an2: e.target.value }))} />
+          </Grid3>
+          <Grid3>
+            <Field label="Charges (€/mois)" type="number" value={bf.charges} onChange={e => setBf(p => ({ ...p, charges: e.target.value }))} />
+            <Field label="Dépôt de garantie (€)" type="number" value={bf.depot} onChange={e => setBf(p => ({ ...p, depot: e.target.value }))} />
+            <Sel label="Type de bail" value={bf.type_bail} onChange={e => setBf(p => ({ ...p, type_bail: e.target.value }))}
+              options={[{v:'commercial',l:'Commercial'},{v:'professionnel',l:'Professionnel'},{v:'habitation',l:'Habitation'}]} />
+          </Grid3>
+
+          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3 mt-4">Dates & révision</h4>
+          <Grid3>
+            <Field label="Date début" type="date" value={bf.date_debut || ''} onChange={e => setBf(p => ({ ...p, date_debut: e.target.value }))} />
+            <Field label="Date fin" type="date" value={bf.date_fin || ''} onChange={e => setBf(p => ({ ...p, date_fin: e.target.value }))} />
+            <Field label="Date révision" type="date" value={bf.date_revision_anniversaire || ''} onChange={e => setBf(p => ({ ...p, date_revision_anniversaire: e.target.value }))} />
+          </Grid3>
+          <Grid2>
+            <Sel label="Indice de révision" value={bf.indice_revision} onChange={e => setBf(p => ({ ...p, indice_revision: e.target.value }))}
+              options={[{v:'ILC',l:'ILC'},{v:'ICC',l:'ICC'},{v:'IRL',l:'IRL'}]} />
+            <Field label="Utilisation" placeholder="ex: Restauration" value={bf.utilisation} onChange={e => setBf(p => ({ ...p, utilisation: e.target.value }))} />
+          </Grid2>
+
+          <div className="flex justify-end gap-3 mt-6">
+            <Btn variant="ghost" onClick={() => setBailModal(null)}>Annuler</Btn>
+            <Btn onClick={saveBail} disabled={!bf.locataire_id || !bf.loyer_ht}>Créer le bail</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Modal Rattacher bail existant ─────────────────── */}
+      {bailModal?.mode === 'link' && (() => {
+        const otherBaux = baux.filter(ba => ba.bien_id !== bailModal.bienId)
+        return (
+          <Modal title="Rattacher un bail existant" onClose={() => setBailModal(null)} width="max-w-lg">
+            {otherBaux.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">Aucun bail disponible à rattacher.</p>
+            ) : (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {otherBaux.map(ba => {
+                  const loc = locataires.find(l => l.id === ba.locataire_id)
+                  const bien = biens.find(x => x.id === ba.bien_id)
+                  return (
+                    <div key={ba.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                      <div>
+                        <p className="text-sm font-semibold text-navy">
+                          {loc?.raison_sociale || `${loc?.prenom || ''} ${loc?.nom || ''}`.trim() || '—'}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {bien?.reference || bien?.adresse || 'Sans bien'} — {fmt(ba.loyer_ht)}/mois — {fmtDate(ba.date_debut)} → {ba.date_fin ? fmtDate(ba.date_fin) : '∞'}
+                        </p>
+                      </div>
+                      <Btn className="!text-xs !px-3 !py-1.5" onClick={() => linkBail(ba.id, bailModal.bienId)}>
+                        <Link size={12} className="mr-1" /> Rattacher
+                      </Btn>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            <div className="flex justify-end mt-4">
+              <Btn variant="ghost" onClick={() => setBailModal(null)}>Fermer</Btn>
+            </div>
+          </Modal>
+        )
+      })()}
+
+      {/* ── Modal Nouveau locataire (depuis bail) ────────── */}
+      {newLocModal && (
+        <Modal title="Nouveau locataire" onClose={() => setNewLocModal(false)} width="max-w-lg">
+          <Grid2>
+            <Field label="Raison sociale" value={lf.raison_sociale} onChange={e => setLf(p => ({ ...p, raison_sociale: e.target.value }))} />
+            <div />
+          </Grid2>
+          <Grid2>
+            <Field label="Prénom" value={lf.prenom} onChange={e => setLf(p => ({ ...p, prenom: e.target.value }))} />
+            <Field label="Nom" value={lf.nom} onChange={e => setLf(p => ({ ...p, nom: e.target.value }))} />
+          </Grid2>
+          <Grid2>
+            <Field label="Email" type="email" value={lf.email} onChange={e => setLf(p => ({ ...p, email: e.target.value }))} />
+            <Field label="Téléphone" value={lf.telephone} onChange={e => setLf(p => ({ ...p, telephone: e.target.value }))} />
+          </Grid2>
+          <div className="flex justify-end gap-3 mt-6">
+            <Btn variant="ghost" onClick={() => setNewLocModal(false)}>Annuler</Btn>
+            <Btn onClick={saveNewLoc} disabled={!lf.raison_sociale && !lf.nom}>Créer</Btn>
           </div>
         </Modal>
       )}
