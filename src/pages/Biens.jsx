@@ -111,12 +111,15 @@ export default function Biens({ navigate }) {
   const [newLocModal, setNewLocModal] = useState(false)
   const [lf, setLf] = useState(EMPTY_LOC)
 
-  const openBailNew = (bienId) => {
-    setBf({ ...EMPTY_BAIL, bien_id: bienId })
+  const openBailNew = (bienId, locataireId = '') => {
+    setBf({ ...EMPTY_BAIL, bien_id: bienId, locataire_id: locataireId })
     setBailModal({ bienId, mode: 'new' })
   }
   const openBailLink = (bienId) => {
     setBailModal({ bienId, mode: 'link' })
+  }
+  const openLocLink = (bienId) => {
+    setBailModal({ bienId, mode: 'loc' })
   }
 
   const saveBail = async () => {
@@ -301,6 +304,12 @@ export default function Biens({ navigate }) {
                           <Plus size={12} /> Nouveau bail
                         </button>
                       )}
+                      {canEdit && (
+                        <button onClick={() => openLocLink(b.id)}
+                          className="text-xs text-purple-500 hover:text-purple-700 font-semibold cursor-pointer flex items-center gap-1">
+                          <Users size={12} /> Rattacher un locataire
+                        </button>
+                      )}
                       {canEdit && baux.filter(ba => ba.bien_id !== b.id).length > 0 && (
                         <button onClick={() => openBailLink(b.id)}
                           className="text-xs text-emerald-500 hover:text-emerald-700 font-semibold cursor-pointer flex items-center gap-1">
@@ -319,8 +328,10 @@ export default function Biens({ navigate }) {
                     <p className="text-sm text-gray-300 italic">Aucun bail — {canEdit && (
                       <>
                         <button onClick={() => openBailNew(b.id)} className="text-blue-500 hover:underline cursor-pointer">créer un bail</button>
+                        {', '}
+                        <button onClick={() => openLocLink(b.id)} className="text-purple-500 hover:underline cursor-pointer">rattacher un locataire</button>
                         {' ou '}
-                        <button onClick={() => openBailLink(b.id)} className="text-emerald-500 hover:underline cursor-pointer">rattacher un existant</button>
+                        <button onClick={() => openBailLink(b.id)} className="text-emerald-500 hover:underline cursor-pointer">rattacher un bail</button>
                       </>
                     )}</p>
                   ) : (
@@ -410,6 +421,9 @@ export default function Biens({ navigate }) {
                   <div className="mt-5 pt-4 border-t border-gray-100 flex gap-2 flex-wrap">
                     <Btn className="!text-xs !px-3 !py-1.5" onClick={() => openBailNew(b.id)}>
                       <Plus size={13} /> Nouveau bail
+                    </Btn>
+                    <Btn className="!text-xs !px-3 !py-1.5" variant="ghost" onClick={() => openLocLink(b.id)}>
+                      <Users size={13} /> Rattacher un locataire
                     </Btn>
                     <Btn className="!text-xs !px-3 !py-1.5" variant="ghost" onClick={() => openBailLink(b.id)}>
                       <Link size={13} /> Rattacher un bail
@@ -716,6 +730,56 @@ export default function Biens({ navigate }) {
             <div className="flex justify-end mt-4">
               <Btn variant="ghost" onClick={() => setBailModal(null)}>Fermer</Btn>
             </div>
+          </Modal>
+        )
+      })()}
+
+      {/* ── Modal Rattacher un locataire ─────────────────── */}
+      {bailModal?.mode === 'loc' && (() => {
+        // Locataires not already linked to this bien via a bail
+        const linkedLocIds = new Set(baux.filter(ba => ba.bien_id === bailModal.bienId).map(ba => ba.locataire_id))
+        const availableLocs = locataires.filter(l => !linkedLocIds.has(l.id))
+        return (
+          <Modal title="Rattacher un locataire" onClose={() => setBailModal(null)} width="max-w-lg">
+            <p className="text-xs text-gray-400 mb-4">Sélectionnez un locataire existant pour créer un bail avec ce bien.</p>
+            {availableLocs.length === 0 ? (
+              <div className="text-center py-4">
+                <p className="text-sm text-gray-400 mb-3">Tous les locataires sont déjà rattachés à ce bien.</p>
+                <Btn className="!text-xs" onClick={() => { setBailModal(null); setLf(EMPTY_LOC); setNewLocModal(true) }}>
+                  <Plus size={12} className="mr-1" /> Créer un nouveau locataire
+                </Btn>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {availableLocs.map(l => {
+                    const locBaux = baux.filter(ba => ba.locataire_id === l.id)
+                    return (
+                      <div key={l.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                        <div>
+                          <p className="text-sm font-semibold text-navy">
+                            {l.raison_sociale || `${l.prenom || ''} ${l.nom || ''}`.trim() || '—'}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            {l.email || '—'} {locBaux.length > 0 ? `· ${locBaux.length} bail${locBaux.length > 1 ? 'x' : ''}` : '· Aucun bail'}
+                          </p>
+                        </div>
+                        <Btn className="!text-xs !px-3 !py-1.5" onClick={() => openBailNew(bailModal.bienId, l.id)}>
+                          <ArrowRight size={12} className="mr-1" /> Créer un bail
+                        </Btn>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="flex justify-between items-center mt-4 pt-3 border-t border-gray-100">
+                  <button onClick={() => { setBailModal(null); setLf(EMPTY_LOC); setNewLocModal(true) }}
+                    className="text-xs text-blue-500 hover:underline cursor-pointer flex items-center gap-1">
+                    <Plus size={11} /> Créer un nouveau locataire
+                  </button>
+                  <Btn variant="ghost" onClick={() => setBailModal(null)}>Fermer</Btn>
+                </div>
+              </>
+            )}
           </Modal>
         )
       })()}
