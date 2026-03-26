@@ -12,24 +12,45 @@ const EMPTY_BIEN = {
   reference: '', adresse: '', ville: '', code_postal: '', latitude: null, longitude: null,
   surface_rdc: '', surface_sous_sol: '', type: 'Commercial', activite: '',
   type_bail: 'commercial', attribution_charges: '', indexation: 'ILC',
-  prix_achat: '', apport: '', montant_emprunt: '', duree_credit: '', decalage_pret: '',
+  prix_achat: '', frais_notaire_pct: '', frais_notaire: '', apport: '', montant_emprunt: '', duree_credit: '', decalage_pret: '',
   loyer_mensuel: '', charges: '', annuites: '',
   date_acquisition: '', presence_extraction: false, taxe_fonciere: '', statut_bien: 'Actif',
 }
+
+// Local UI state defaults (not saved to DB)
+const EMPTY_UI = { apport_mode: 'euro', apport_pct: '', duree_mode: 'annees', duree_annees: '' }
 
 export default function Biens({ navigate }) {
   const { biens, baux, locataires, documents, transactions, selected, canEdit, reload } = useSociete()
   const [open, setOpen] = useState(false)
   const [edit, setEdit] = useState(null)
   const [f, setF] = useState(EMPTY_BIEN)
+  const [ui, setUi] = useState(EMPTY_UI)
   const [detail, setDetail] = useState(null)
   const [extracting, setExtracting] = useState(false)
   const [extractError, setExtractError] = useState('')
 
-  const openNew = () => { setEdit(null); setF(EMPTY_BIEN); setExtractError(''); setOpen(true) }
-  const openEdit = (b) => { setEdit(b); setF({ ...EMPTY_BIEN, ...b }); setExtractError(''); setOpen(true) }
+  const openNew = () => { setEdit(null); setF(EMPTY_BIEN); setUi(EMPTY_UI); setExtractError(''); setOpen(true) }
+  const openEdit = (b) => {
+    setEdit(b)
+    setF({ ...EMPTY_BIEN, ...b })
+    const da = b.duree_credit ? Math.round(b.duree_credit / 12) : ''
+    setUi({ ...EMPTY_UI, duree_annees: da, duree_mode: 'annees' })
+    setExtractError('')
+    setOpen(true)
+  }
   const u = (k, v) => setF(p => ({ ...p, [k]: v }))
   const num = (k, v) => u(k, v === '' ? '' : v)
+
+  // ── Live computed values ────────────────────────────────
+  const prixAchat = Number(f.prix_achat) || 0
+  const fraisNotaire = f.frais_notaire !== '' ? Number(f.frais_notaire) || 0
+    : f.frais_notaire_pct !== '' ? Math.round(prixAchat * (Number(f.frais_notaire_pct) / 100)) : 0
+  const coutTotal = prixAchat + fraisNotaire
+  const apportCalc = ui.apport_mode === 'pct'
+    ? Math.round(prixAchat * (Number(ui.apport_pct) / 100))
+    : Number(f.apport) || 0
+  const empruntCalc = Math.max(0, coutTotal - apportCalc)
 
   const [saveError, setSaveError] = useState('')
 
@@ -41,8 +62,12 @@ export default function Biens({ navigate }) {
     }
 
     const data = { ...f }
+    // Write back computed values
+    data.apport = apportCalc || null
+    data.montant_emprunt = empruntCalc || null
+    data.frais_notaire = fraisNotaire || null
     // Convert numeric fields
-    for (const k of ['surface_rdc','surface_sous_sol','prix_achat','apport','montant_emprunt','duree_credit','decalage_pret','loyer_mensuel','charges','annuites','taxe_fonciere','latitude','longitude']) {
+    for (const k of ['surface_rdc','surface_sous_sol','prix_achat','apport','montant_emprunt','duree_credit','decalage_pret','loyer_mensuel','charges','annuites','taxe_fonciere','latitude','longitude','frais_notaire','frais_notaire_pct']) {
       data[k] = data[k] === '' || data[k] === null || data[k] === undefined ? null : Number(data[k])
     }
     // Clean boolean
@@ -402,20 +427,131 @@ export default function Biens({ navigate }) {
 
           {/* Financier */}
           <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3 mt-6">Financier</h4>
+
+          {/* Prix + Frais de notaire */}
           <Grid3>
-            <Field label="Prix d'achat (€)" type="number" value={f.prix_achat} onChange={e => num('prix_achat', e.target.value)} />
-            <Field label="Apport (€)" type="number" value={f.apport} onChange={e => num('apport', e.target.value)} />
-            <Field label="Emprunt (€)" type="number" value={f.montant_emprunt} onChange={e => num('montant_emprunt', e.target.value)} />
+            <Field label="Prix d'achat (€)" type="number" value={f.prix_achat} onChange={e => {
+              const v = e.target.value
+              setF(p => ({ ...p, prix_achat: v === '' ? '' : v, frais_notaire: p.frais_notaire_pct !== '' ? Math.round((Number(v) || 0) * (Number(p.frais_notaire_pct) / 100)) : p.frais_notaire }))
+            }} />
+            <div>
+              <label className="block text-xs font-semibold text-navy mb-1">Frais de notaire</label>
+              <div className="flex gap-1.5 mb-2">
+                {[2.5, 7.5].map(pct => (
+                  <button key={pct} type="button"
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${Number(f.frais_notaire_pct) === pct ? 'bg-navy text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                    onClick={() => {
+                      const fn = Math.round(prixAchat * (pct / 100))
+                      setF(p => ({ ...p, frais_notaire_pct: pct, frais_notaire: fn }))
+                    }}>
+                    {pct}%
+                  </button>
+                ))}
+                <button type="button"
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${f.frais_notaire_pct === '' && f.frais_notaire !== '' ? 'bg-navy text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                  onClick={() => setF(p => ({ ...p, frais_notaire_pct: '' }))}>
+                  Manuel
+                </button>
+              </div>
+              <input type="number" placeholder="Montant (€)"
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm"
+                value={f.frais_notaire_pct !== '' ? fraisNotaire : f.frais_notaire}
+                onChange={e => setF(p => ({ ...p, frais_notaire: e.target.value === '' ? '' : e.target.value, frais_notaire_pct: '' }))}
+                readOnly={f.frais_notaire_pct !== ''} />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-navy mb-1">Coût total</label>
+              <div className="px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-bold text-navy mt-5">
+                {fmt(coutTotal)}
+              </div>
+            </div>
           </Grid3>
+
+          {/* Apport + Emprunt */}
           <Grid3>
-            <Field label="Durée crédit (mois)" type="number" value={f.duree_credit} onChange={e => num('duree_credit', e.target.value)} />
-            <Field label="Différé prêt (mois)" type="number" value={f.decalage_pret} onChange={e => num('decalage_pret', e.target.value)} />
+            <div>
+              <label className="block text-xs font-semibold text-navy mb-1">Apport</label>
+              <div className="flex gap-1.5 mb-2">
+                <button type="button"
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${ui.apport_mode === 'euro' ? 'bg-navy text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                  onClick={() => { setUi(p => ({ ...p, apport_mode: 'euro' })); setF(p => ({ ...p, apport: apportCalc || '' })) }}>
+                  €
+                </button>
+                <button type="button"
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${ui.apport_mode === 'pct' ? 'bg-navy text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                  onClick={() => {
+                    const pct = prixAchat && f.apport ? Math.round((Number(f.apport) / prixAchat) * 100 * 10) / 10 : ''
+                    setUi(p => ({ ...p, apport_mode: 'pct', apport_pct: pct }))
+                  }}>
+                  % du prix
+                </button>
+              </div>
+              {ui.apport_mode === 'euro' ? (
+                <input type="number" placeholder="Montant (€)"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm"
+                  value={f.apport} onChange={e => num('apport', e.target.value)} />
+              ) : (
+                <input type="number" placeholder="% du prix d'achat" step="0.1"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm"
+                  value={ui.apport_pct} onChange={e => setUi(p => ({ ...p, apport_pct: e.target.value }))} />
+              )}
+              {ui.apport_mode === 'pct' && prixAchat > 0 && ui.apport_pct !== '' && (
+                <p className="text-xs text-gray-400 mt-1">= {fmt(apportCalc)}</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-navy mb-1">Emprunt</label>
+              <div className="px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-bold text-navy mt-5">
+                {fmt(empruntCalc)}
+              </div>
+            </div>
             <Field label="Annuités (€/mois)" type="number" value={f.annuites} onChange={e => num('annuites', e.target.value)} />
+          </Grid3>
+
+          {/* Durée + Revenus */}
+          <Grid3>
+            <div>
+              <label className="block text-xs font-semibold text-navy mb-1">Durée crédit</label>
+              <div className="flex gap-1.5 mb-2">
+                <button type="button"
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${ui.duree_mode === 'annees' ? 'bg-navy text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                  onClick={() => {
+                    const a = f.duree_credit ? Math.round(Number(f.duree_credit) / 12) : ''
+                    setUi(p => ({ ...p, duree_mode: 'annees', duree_annees: a }))
+                  }}>
+                  Années
+                </button>
+                <button type="button"
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${ui.duree_mode === 'mois' ? 'bg-navy text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                  onClick={() => setUi(p => ({ ...p, duree_mode: 'mois' }))}>
+                  Mois
+                </button>
+              </div>
+              {ui.duree_mode === 'annees' ? (
+                <>
+                  <input type="number" placeholder="Durée (années)"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm"
+                    value={ui.duree_annees}
+                    onChange={e => {
+                      const a = e.target.value
+                      setUi(p => ({ ...p, duree_annees: a }))
+                      u('duree_credit', a === '' ? '' : Number(a) * 12)
+                    }} />
+                  {ui.duree_annees !== '' && <p className="text-xs text-gray-400 mt-1">= {Number(ui.duree_annees) * 12} mois</p>}
+                </>
+              ) : (
+                <input type="number" placeholder="Durée (mois)"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm"
+                  value={f.duree_credit} onChange={e => num('duree_credit', e.target.value)} />
+              )}
+            </div>
+            <Field label="Différé prêt (mois)" type="number" value={f.decalage_pret} onChange={e => num('decalage_pret', e.target.value)} />
+            <Field label="Taxe foncière (€/an)" type="number" value={f.taxe_fonciere} onChange={e => num('taxe_fonciere', e.target.value)} />
           </Grid3>
           <Grid3>
             <Field label="Loyer mensuel (€)" type="number" value={f.loyer_mensuel} onChange={e => num('loyer_mensuel', e.target.value)} />
             <Field label="Charges (€/mois)" type="number" value={f.charges} onChange={e => num('charges', e.target.value)} />
-            <Field label="Taxe foncière (€/an)" type="number" value={f.taxe_fonciere} onChange={e => num('taxe_fonciere', e.target.value)} />
+            <div />
           </Grid3>
 
           {/* Autres */}
