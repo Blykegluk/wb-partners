@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './Auth'
 
@@ -10,6 +10,7 @@ export function SocieteProvider({ children }) {
   const [selected, setSelected] = useState(null)
   const [role, setRole] = useState(null)
   const [loadingSocietes, setLoadingSocietes] = useState(true)
+  const hasLoadedSocietes = useRef(false)
 
   // Data scoped to selected société
   const [biens, setBiens] = useState([])
@@ -21,11 +22,13 @@ export function SocieteProvider({ children }) {
   const [revisions, setRevisions] = useState([])
   const [evenements, setEvenements] = useState([])
   const [loadingData, setLoadingData] = useState(false)
+  const hasLoadedData = useRef(false)
 
   // Load sociétés list
   const loadSocietes = useCallback(async () => {
     if (!user) return
-    setLoadingSocietes(true)
+    // Only show spinner on first load, not on background refreshes
+    if (!hasLoadedSocietes.current) setLoadingSocietes(true)
 
     // Owned
     const { data: owned } = await supabase
@@ -48,6 +51,7 @@ export function SocieteProvider({ children }) {
     const map = new Map()
     all.forEach(s => { if (!map.has(s.id)) map.set(s.id, s) })
     setSocietes(Array.from(map.values()))
+    hasLoadedSocietes.current = true
     setLoadingSocietes(false)
   }, [user])
 
@@ -57,12 +61,14 @@ export function SocieteProvider({ children }) {
   const selectSociete = useCallback((soc) => {
     setSelected(soc)
     setRole(soc?._role || null)
+    hasLoadedData.current = false
   }, [])
 
   // Load all data for selected société
   const reload = useCallback(async () => {
     if (!selected) return
-    setLoadingData(true)
+    // Only show spinner on first load, not on background refreshes
+    if (!hasLoadedData.current) setLoadingData(true)
     const sid = selected.id
 
     const [b, l, ba, d, m, rev, evt] = await Promise.all([
@@ -97,6 +103,7 @@ export function SocieteProvider({ children }) {
       setTransactions([])
     }
 
+    hasLoadedData.current = true
     setLoadingData(false)
   }, [selected])
 
