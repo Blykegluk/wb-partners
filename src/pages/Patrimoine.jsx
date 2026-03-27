@@ -494,15 +494,25 @@ export default function Patrimoine({ navigate }) {
                       <th className="px-4 py-3 text-xs font-bold text-gray-400 uppercase tracking-wide text-right">Montant total</th>
                       <th className="px-4 py-3 text-xs font-bold text-gray-400 uppercase tracking-wide text-right">Refacturable</th>
                       <th className="px-4 py-3 text-xs font-bold text-gray-400 uppercase tracking-wide text-right">Non refacturable</th>
+                      {canEdit && <th className="px-4 py-3"></th>}
                     </tr>
                   </thead>
                   <tbody>
                     {bienCharges.map(ac => (
-                      <tr key={ac.id} className="border-t border-gray-50">
+                      <tr key={ac.id} className="border-t border-gray-50 hover:bg-gray-50/50">
                         <td className="px-4 py-3 text-sm text-navy font-medium">{ac.periode || 'Sans période'}</td>
                         <td className="px-4 py-3 text-sm font-semibold text-navy text-right">{fmt(ac.montant_total)}</td>
                         <td className="px-4 py-3 text-sm text-emerald-600 text-right">{fmt(ac.charges_refacturables)}</td>
                         <td className="px-4 py-3 text-sm text-red-500 text-right">{fmt(ac.charges_non_refacturables)}</td>
+                        {canEdit && (
+                          <td className="px-4 py-3 text-right">
+                            <button onClick={async () => {
+                              if (!confirm('Supprimer cet appel de charges ?')) return
+                              await supabase.from('appels_charges').delete().eq('id', ac.id)
+                              reload()
+                            }} className="text-gray-300 hover:text-red-500 cursor-pointer"><Trash2 size={14} /></button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
