@@ -3,11 +3,14 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/Auth'
 import { useSociete } from '../contexts/Societe'
 import { PageHeader, Card, Modal, Field, Sel, Grid2, Btn, Badge, Empty } from '../components/UI'
-import { CheckCircle, UserPlus, Trash2, Shield } from 'lucide-react'
+import { CheckCircle, UserPlus, Trash2, Shield, Landmark, RefreshCw, Unlink } from 'lucide-react'
+
+const FUNCTIONS_URL_TOP = import.meta.env.VITE_SUPABASE_URL + '/functions/v1'
 
 const TABS = [
   { key: 'societe', label: 'Société' },
   { key: 'membres', label: 'Membres' },
+  { key: 'banque', label: 'Banque' },
 ]
 
 export default function Parametres() {
@@ -33,6 +36,9 @@ export default function Parametres() {
       </div>
       <div style={{ display: tab === 'membres' ? 'block' : 'none' }}>
         <MembresTab />
+      </div>
+      <div style={{ display: tab === 'banque' ? 'block' : 'none' }}>
+        <BanqueTab />
       </div>
     </div>
   )
@@ -321,5 +327,215 @@ function MembresTab() {
         </Modal>
       )}
     </div>
+  )
+}
+
+// ── Banque tab ──────────────────────────────────────────
+const FR_BANKS = [
+  { id: 'BNP_BNPAFRPP', name: 'BNP Paribas' },
+  { id: 'SOCIETE_GENERALE_SOGEFRPP', name: 'Société Générale' },
+  { id: 'CREDIT_AGRICOLE_AGRIFRPP', name: 'Crédit Agricole' },
+  { id: 'CREDIT_MUTUEL_CMCIFRPP', name: 'Crédit Mutuel' },
+  { id: 'LA_BANQUE_POSTALE_PSSTFRPP', name: 'La Banque Postale' },
+  { id: 'CIC_CMCIFRPP', name: 'CIC' },
+  { id: 'LCLFR', name: 'LCL' },
+  { id: 'CAISSE_D_EPARGNE_CEPAFRPP', name: 'Caisse d\'Épargne' },
+  { id: 'BOURSORAMA_BOUSFRPP', name: 'Boursorama' },
+  { id: 'QONTO_QNTOFRP1', name: 'Qonto' },
+  { id: 'SHINE_SABORFRP1', name: 'Shine' },
+  { id: 'REVOLUT_REVOLT21', name: 'Revolut' },
+  { id: 'N26_NTSBDEB1', name: 'N26' },
+]
+
+function BanqueTab() {
+  const { selected, isAdmin } = useSociete()
+  const [conn, setConn] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState(null)
+  const [error, setError] = useState('')
+  const [selectedBank, setSelectedBank] = useState('')
+
+  useEffect(() => {
+    if (selected) {
+      supabase.from('bank_connections').select('*').eq('societe_id', selected.id).single()
+        .then(({ data }) => { setConn(data); setLoading(false) })
+    }
+  }, [selected])
+
+  const getToken = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    return session?.access_token
+  }
+
+  const connectBank = async () => {
+    if (!selectedBank) { setError('Sélectionnez une banque.'); return }
+    setError('')
+    setLoading(true)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${FUNCTIONS_URL_TOP}/bank-link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          societe_id: selected.id,
+          institution_id: selectedBank,
+          redirect_url: window.location.origin + window.location.pathname,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      // Redirect user to bank authorization page
+      window.location.href = data.link
+    } catch (e) {
+      setError(e.message)
+      setLoading(false)
+    }
+  }
+
+  const checkCallback = async () => {
+    if (!conn?.requisition_id) return
+    setLoading(true)
+    try {
+      const token = await getToken()
+      const res = await fetch(`${FUNCTIONS_URL_TOP}/bank-callback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ requisition_id: conn.requisition_id }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      if (data.status === 'connected') {
+        setConn(prev => ({ ...prev, ...data, status: 'connected' }))
+      }
+    } catch (e) { setError(e.message) }
+    setLoading(false)
+  }
+
+  const syncTransactions = async () => {
+    setSyncing(true)
+    setSyncResult(null)
+    setError('')
+    try {
+      const token = await getToken()
+      const res = await fetch(`${FUNCTIONS_URL_TOP}/bank-sync`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ societe_id: selected.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setSyncResult(data)
+      setConn(prev => ({ ...prev, last_sync: new Date().toISOString() }))
+    } catch (e) { setError(e.message) }
+    setSyncing(false)
+  }
+
+  const disconnect = async () => {
+    if (!confirm('Déconnecter le compte bancaire ?')) return
+    await supabase.from('bank_connections').delete().eq('societe_id', selected.id)
+    setConn(null)
+    setSyncResult(null)
+  }
+
+  if (loading && !conn) return <Card className="p-8 text-center"><p className="text-gray-400 text-sm">Chargement...</p></Card>
+
+  // Connected state
+  if (conn?.status === 'connected') {
+    return (
+      <div>
+        <Card className="p-6 mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center">
+                <Landmark size={24} className="text-emerald-600" />
+              </div>
+              <div>
+                <p className="font-bold text-navy">{conn.institution_name || 'Banque connectée'}</p>
+                <p className="text-xs text-gray-400">
+                  Compte connecté
+                  {conn.last_sync && <> · Dernière sync : {new Date(conn.last_sync).toLocaleDateString('fr-FR')} {new Date(conn.last_sync).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</>}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Btn onClick={syncTransactions} disabled={syncing}>
+                <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
+                {syncing ? 'Synchronisation...' : 'Synchroniser'}
+              </Btn>
+              {isAdmin && (
+                <Btn variant="ghost" onClick={disconnect}><Unlink size={14} /> Déconnecter</Btn>
+              )}
+            </div>
+          </div>
+        </Card>
+
+        {syncResult && (
+          <Card className="p-6 border-emerald-200">
+            <h4 className="text-sm font-bold text-navy mb-3">Résultat de la synchronisation</h4>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div className="bg-blue-50 rounded-lg p-3">
+                <p className="text-2xl font-bold text-blue-600">{syncResult.bank_transactions}</p>
+                <p className="text-xs text-gray-400">Transactions bancaires</p>
+              </div>
+              <div className="bg-emerald-50 rounded-lg p-3">
+                <p className="text-2xl font-bold text-emerald-600">{syncResult.matched}</p>
+                <p className="text-xs text-gray-400">Loyers matchés</p>
+              </div>
+              <div className="bg-amber-50 rounded-lg p-3">
+                <p className="text-2xl font-bold text-amber-600">{(syncResult.total_pending || 0) - syncResult.matched}</p>
+                <p className="text-xs text-gray-400">En attente</p>
+              </div>
+            </div>
+            {syncResult.details?.length > 0 && (
+              <div className="mt-4 space-y-1">
+                {syncResult.details.map((d, i) => (
+                  <div key={i} className="flex justify-between items-center py-1.5 px-3 bg-emerald-50 rounded text-sm">
+                    <span className="text-emerald-700 font-medium">{d.amount}€ — {d.date}</span>
+                    <span className="text-emerald-500 text-xs">Ref: {d.bank_ref}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
+
+        {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
+      </div>
+    )
+  }
+
+  // Pending state (waiting for bank auth callback)
+  if (conn?.status === 'pending') {
+    return (
+      <Card className="p-8 text-center">
+        <Landmark size={40} className="text-amber-400 mx-auto mb-4" />
+        <p className="font-semibold text-navy mb-2">Autorisation en attente</p>
+        <p className="text-sm text-gray-400 mb-4">Vous avez initié une connexion bancaire. Si vous avez autorisé l'accès, cliquez ci-dessous.</p>
+        <Btn onClick={checkCallback}>Vérifier la connexion</Btn>
+        {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
+      </Card>
+    )
+  }
+
+  // Not connected
+  return (
+    <Card className="p-8">
+      <div className="text-center mb-6">
+        <Landmark size={40} className="text-gray-300 mx-auto mb-4" />
+        <p className="font-semibold text-navy mb-1">Connecter un compte bancaire</p>
+        <p className="text-sm text-gray-400">Vérifiez automatiquement si les loyers sont perçus en connectant le compte bancaire de la société.</p>
+      </div>
+
+      <div className="max-w-md mx-auto">
+        <Sel label="Banque" value={selectedBank} onChange={e => setSelectedBank(e.target.value)}
+          options={[{ v: '', l: 'Sélectionner votre banque' }, ...FR_BANKS.map(b => ({ v: b.id, l: b.name }))]} />
+        {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
+        <Btn onClick={connectBank} disabled={!selectedBank || loading} className="w-full justify-center mt-2">
+          <Landmark size={15} /> {loading ? 'Connexion...' : 'Connecter ma banque'}
+        </Btn>
+        <p className="text-xs text-gray-300 text-center mt-4">Connexion sécurisée via GoCardless (Open Banking / DSP2). Aucun mot de passe bancaire n'est stocké.</p>
+      </div>
+    </Card>
   )
 }
