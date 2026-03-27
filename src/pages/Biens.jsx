@@ -29,8 +29,9 @@ export default function Biens({ navigate }) {
   const [detail, setDetail] = useState(null)
   const [extracting, setExtracting] = useState(false)
   const [extractError, setExtractError] = useState('')
+  const [extractSuccess, setExtractSuccess] = useState('')
 
-  const openNew = () => { setEdit(null); setF(EMPTY_BIEN); setUi(EMPTY_UI); setExtractError(''); setOpen(true) }
+  const openNew = () => { setEdit(null); setF(EMPTY_BIEN); setUi(EMPTY_UI); setExtractError(''); setExtractSuccess(''); setOpen(true) }
   const openEdit = (b) => {
     setEdit(b)
     setF({ ...EMPTY_BIEN, ...b })
@@ -153,11 +154,14 @@ export default function Biens({ navigate }) {
   const handleExtract = async (file) => {
     setExtracting(true)
     setExtractError('')
+    setExtractSuccess('')
     try {
       const base64 = await fileToBase64(file)
       const result = await extractFromPDF(base64, file.type || 'application/pdf')
 
-      if (result.type === 'bail') {
+      if (!result || !result.type) {
+        setExtractError('Le document n\'a pas pu être analysé. Vérifiez qu\'il s\'agit d\'un bail ou d\'un tableau d\'amortissement lisible.')
+      } else if (result.type === 'bail') {
         setF(p => ({
           ...p,
           adresse: result.adresse || p.adresse,
@@ -172,6 +176,7 @@ export default function Biens({ navigate }) {
           attribution_charges: result.attribution_charges || p.attribution_charges,
           activite: result.activite || p.activite,
         }))
+        setExtractSuccess('Bail analysé — champs pré-remplis.')
       } else if (result.type === 'amortissement') {
         setF(p => ({
           ...p,
@@ -180,6 +185,9 @@ export default function Biens({ navigate }) {
           annuites: result.annuites ?? p.annuites,
           decalage_pret: result.decalage_pret ?? p.decalage_pret,
         }))
+        setExtractSuccess('Tableau d\'amortissement analysé — champs pré-remplis.')
+      } else {
+        setExtractError(`Type de document non reconnu : "${result.type}". Uploadez un bail ou un tableau d'amortissement.`)
       }
     } catch (err) {
       setExtractError(err.message)
@@ -464,6 +472,7 @@ export default function Biens({ navigate }) {
                 </label>
               </div>
               {extractError && <p className="text-red-500 text-xs mt-2">{extractError}</p>}
+              {extractSuccess && <p className="text-emerald-600 text-xs mt-2 font-medium">{extractSuccess}</p>}
             </div>
           )}
 
