@@ -90,8 +90,9 @@ Deno.serve(async (req) => {
     const { fileBase64, mimeType } = await req.json();
     if (!fileBase64) throw new Error("fileBase64 is required");
 
-    // PDFs are trimmed to ≤95 pages client-side before reaching here
-    const model = "claude-sonnet-4-20250514";
+    // Use Haiku: faster, cheaper, respects lower rate limits
+    // PDFs are trimmed to ≤25 pages client-side before reaching here
+    const model = "claude-haiku-4-5-20251001";
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",

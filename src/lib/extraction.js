@@ -2,7 +2,7 @@ import { PDFDocument } from 'pdf-lib'
 import { supabase } from './supabase'
 
 const FUNCTIONS_URL = import.meta.env.VITE_SUPABASE_URL + '/functions/v1'
-const MAX_PDF_PAGES = 90
+const MAX_PDF_PAGES = 25
 
 /**
  * Decode base64 to Uint8Array using fetch (memory-efficient, no atob limit)
