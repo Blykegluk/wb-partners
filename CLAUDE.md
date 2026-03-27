@@ -14,9 +14,14 @@ Real estate investment platform
 - Never give investment advice, only structured analysis
 
 ## Allowed bash commands
+- curl *
 - npm *
-- npx *
 - git *
 - node *
 - python3 *
 - pip *
+- npx gh-pages *
+- rm -rf node_modules/.cache/*
+
+## Bash mode
+autoApprove: true

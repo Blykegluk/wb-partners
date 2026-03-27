@@ -1,7 +1,6 @@
 import {
-  Building2, Users, FileText, CreditCard, Settings, LogOut,
-  LayoutDashboard, FolderOpen, Calendar, UserPlus, ChevronDown,
-  Calculator, Receipt, Wallet, RefreshCw, AlertTriangle, Map,
+  Building2, Settings, LogOut, LayoutDashboard, ChevronDown,
+  Calculator, Wallet, CreditCard, BarChart3,
 } from 'lucide-react'
 import { useAuth } from '../contexts/Auth'
 import { useSociete } from '../contexts/Societe'
@@ -9,32 +8,22 @@ import { Badge } from './UI'
 
 const NAV = [
   { k: 'dashboard', l: 'Tableau de bord', I: LayoutDashboard },
-  { k: 'biens', l: 'Biens', I: Building2 },
-  { k: 'locataires', l: 'Locataires', I: Users },
-  { k: 'baux', l: 'Baux', I: FileText },
-  { k: 'finances', l: 'Finances', I: Calendar },
-  { k: 'transactions', l: 'Transactions', I: CreditCard },
-  { k: 'documents', l: 'Coffre-fort', I: FolderOpen },
-  { sep: true, l: 'Outils' },
-  { k: 'simulateur', l: 'Simulateur', I: Calculator },
-  { k: 'fiscal', l: 'Fiscal', I: Receipt },
-  { k: 'tresorerie', l: 'Trésorerie', I: Wallet },
-  { sep: true, l: 'Gestion' },
-  { k: 'revisions', l: 'Révisions loyer', I: RefreshCw },
-  { k: 'relances', l: 'Relances', I: AlertTriangle },
-  { k: 'carte', l: 'Carte', I: Map },
+  { k: 'patrimoine', l: 'Patrimoine', I: Building2 },
+  { k: 'finances', l: 'Finances', I: CreditCard },
+  { k: 'analyse', l: 'Analyse', I: BarChart3 },
+  { k: 'outils', l: 'Outils', I: Calculator },
 ]
 
 export default function Layout({ page, setPage, children }) {
   const { signOut, user } = useAuth()
-  const { selected, selectSociete, societes, role, transactions } = useSociete()
+  const { selected, selectSociete, role, transactions } = useSociete()
 
   const impCount = transactions.filter(t => t.statut === 'impayé').length
 
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
-      <aside className="w-60 bg-navy-dark flex flex-col shrink-0">
+      <aside className="w-56 bg-navy-dark flex flex-col shrink-0">
         {/* Logo */}
         <div className="px-5 py-6 border-b border-white/10">
           <h1 className="text-white font-black text-lg tracking-[3px]">WB Partners</h1>
@@ -53,28 +42,21 @@ export default function Layout({ page, setPage, children }) {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-          {NAV.map((item) => {
-            if (item.sep) return (
-              <p key={item.l} className="text-[10px] uppercase tracking-widest text-white/25 font-bold px-3 pt-4 pb-1">{item.l}</p>
-            )
-            const { k, l, I } = item
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          {NAV.map(({ k, l, I }) => {
             const active = page === k
             return (
               <button
                 key={k}
                 onClick={() => setPage(k)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer transition-colors ${
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm cursor-pointer transition-colors ${
                   active ? 'bg-blue-500/20 text-blue-400 font-semibold' : 'text-white/50 hover:text-white/70 hover:bg-white/5'
                 }`}
               >
                 <I size={16} />
                 {l}
-                {k === 'transactions' && impCount > 0 && (
+                {k === 'finances' && impCount > 0 && (
                   <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{impCount}</span>
-                )}
-                {k === 'relances' && impCount > 0 && (
-                  <span className="ml-auto bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{impCount}</span>
                 )}
               </button>
             )
@@ -83,14 +65,6 @@ export default function Layout({ page, setPage, children }) {
 
         {/* Bottom */}
         <div className="px-3 pb-4 space-y-1">
-          <button
-            onClick={() => setPage('membres')}
-            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer transition-colors ${
-              page === 'membres' ? 'bg-blue-500/20 text-blue-400' : 'text-white/45 hover:text-white/70 hover:bg-white/5'
-            }`}
-          >
-            <UserPlus size={16} />Membres
-          </button>
           <button
             onClick={() => setPage('parametres')}
             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer transition-colors ${

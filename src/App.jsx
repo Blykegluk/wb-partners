@@ -6,37 +6,19 @@ import Layout from './components/Layout'
 import Login from './pages/Login'
 import SelectSociete from './pages/SelectSociete'
 import Dashboard from './pages/Dashboard'
-import Biens from './pages/Biens'
-import Locataires from './pages/Locataires'
-import Baux from './pages/Baux'
-import Finances from './pages/Finances'
-import Transactions from './pages/Transactions'
-import Documents from './pages/Documents'
+import Patrimoine from './pages/Patrimoine'
+import FinancesHub from './pages/FinancesHub'
+import Analyse from './pages/Analyse'
+import Outils from './pages/Outils'
 import Parametres from './pages/Parametres'
-import Membres from './pages/Membres'
-import Simulateur from './pages/Simulateur'
-import Fiscal from './pages/Fiscal'
-import Tresorerie from './pages/Tresorerie'
-import Revisions from './pages/Revisions'
-import Relances from './pages/Relances'
-import Carte from './pages/Carte'
 
 const PAGES = {
   dashboard: Dashboard,
-  biens: Biens,
-  locataires: Locataires,
-  baux: Baux,
-  finances: Finances,
-  transactions: Transactions,
-  documents: Documents,
+  patrimoine: Patrimoine,
+  finances: FinancesHub,
+  analyse: Analyse,
+  outils: Outils,
   parametres: Parametres,
-  membres: Membres,
-  simulateur: Simulateur,
-  fiscal: Fiscal,
-  tresorerie: Tresorerie,
-  revisions: Revisions,
-  relances: Relances,
-  carte: Carte,
 }
 
 function AppContent() {
