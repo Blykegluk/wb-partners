@@ -4,7 +4,11 @@ const GEMINI_KEY = Deno.env.get("GEMINI_KEY");
 
 const EXTRACT_PROMPT = `Tu es un expert en immobilier commercial français. Analyse ce document et extrais les informations au format JSON strict.
 
-Identifie d'abord le TYPE parmi : bail, amortissement, appel_charges, quittance, autre.
+IMPORTANT: Identifie d'abord le TYPE du document parmi : bail, amortissement, appel_charges, quittance, autre.
+ATTENTION à bien distinguer :
+- "quittance" = quittance de LOYER émise par un bailleur à un locataire, confirmant le paiement d'un loyer. Mentionne généralement "quittance", un locataire, un loyer mensuel, une période (mois).
+- "appel_charges" = appel de fonds/charges de COPROPRIÉTÉ émis par un syndic. Mentionne généralement "syndic", "copropriété", "charges de copropriété", des postes détaillés (entretien, ascenseur, etc.)
+Ne confonds PAS les deux.
 
 ══ Si BAIL ou AVENANT :
 {

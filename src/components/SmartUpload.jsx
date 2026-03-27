@@ -18,6 +18,29 @@ export default function SmartUpload({ onClose, bienId: initialBienId }) {
   const [saving, setSaving] = useState(false)
   const [trimInfo, setTrimInfo] = useState(null)
 
+  // Change detected type
+  const TYPE_MAP = { bail: 'confirm_bail', amortissement: 'confirm_amort', appel_charges: 'confirm_charges', quittance: 'confirm_quittance', autre: 'confirm_generic' }
+  const changeType = (newType) => {
+    setResult(prev => ({ ...prev, type: newType }))
+    setStep(TYPE_MAP[newType] || 'confirm_generic')
+  }
+
+  // Type correction selector (shown on all confirm screens)
+  const TypeCorrector = () => (
+    <div className="flex items-center gap-2 mb-4 text-xs">
+      <span className="text-gray-400">Type détecté :</span>
+      <select value={result?.type || 'autre'} onChange={e => changeType(e.target.value)}
+        className="border border-gray-200 rounded-lg px-2 py-1 text-xs font-semibold text-navy cursor-pointer">
+        <option value="bail">Bail</option>
+        <option value="amortissement">Tableau d'amortissement</option>
+        <option value="appel_charges">Appel de charges</option>
+        <option value="quittance">Quittance de loyer</option>
+        <option value="autre">Autre</option>
+      </select>
+      <span className="text-gray-300">— corrigez si nécessaire</span>
+    </div>
+  )
+
   // Bail linking state
   const [bienChoice, setBienChoice] = useState(initialBienId || '')
   const [createBien, setCreateBien] = useState(false)
@@ -310,6 +333,7 @@ export default function SmartUpload({ onClose, bienId: initialBienId }) {
         const addrLabel = [d.adresse, d.code_postal, d.ville].filter(Boolean).join(', ')
         return (
           <>
+            <TypeCorrector />
             {trimInfo && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3 text-xs text-amber-700">
                 Document volumineux ({trimInfo.totalPages} pages). Seules les {trimInfo.sentPages} premières pages ont été analysées. Vérifiez que toutes les données sont correctes.
@@ -366,6 +390,7 @@ export default function SmartUpload({ onClose, bienId: initialBienId }) {
         const rv = (k, v) => setResult(p => ({ ...p, [k]: v }))
         return (
         <>
+          <TypeCorrector />
           <p className="text-xs text-gray-400 mb-3">Vérifiez et corrigez les données extraites avant validation.</p>
           <Grid2>
             <Field label="Montant emprunt (€)" type="number" value={result.montant_emprunt ?? ''} onChange={e => rv('montant_emprunt', e.target.value === '' ? null : Number(e.target.value))} />
@@ -394,6 +419,7 @@ export default function SmartUpload({ onClose, bienId: initialBienId }) {
         const nonRef = lignes.filter(l => !l.refacturable).reduce((s, l) => s + (l.montant || 0), 0)
         return (
           <>
+            <TypeCorrector />
             <div className="grid grid-cols-3 gap-3 mb-4">
               <div className="bg-gray-50 rounded-lg p-3 text-center">
                 <p className="text-[11px] text-gray-400 uppercase font-semibold">Période</p>
@@ -444,6 +470,7 @@ export default function SmartUpload({ onClose, bienId: initialBienId }) {
       {/* ── CONFIRM: Quittance ───────────────────────── */}
       {step === 'confirm_quittance' && result && (
         <>
+          <TypeCorrector />
           <div className="bg-green-50 rounded-xl p-4 mb-4 border border-green-200 text-sm">
             <p className="text-gray-500">Quittance de loyer détectée. Le document sera stocké.</p>
           </div>
