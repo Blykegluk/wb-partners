@@ -16,6 +16,7 @@ export default function SmartUpload({ onClose, bienId: initialBienId }) {
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [trimInfo, setTrimInfo] = useState(null)
 
   // Bail linking state
   const [bienChoice, setBienChoice] = useState(initialBienId || '')
@@ -34,6 +35,7 @@ export default function SmartUpload({ onClose, bienId: initialBienId }) {
     try {
       const base64 = await fileToBase64(f)
       const data = await extractFromPDF(base64, f.type || 'application/pdf')
+      if (data._trimInfo) { setTrimInfo(data._trimInfo); delete data._trimInfo }
       setResult(data)
 
       if (!data?.type) {
@@ -308,6 +310,11 @@ export default function SmartUpload({ onClose, bienId: initialBienId }) {
         const addrLabel = [d.adresse, d.code_postal, d.ville].filter(Boolean).join(', ')
         return (
           <>
+            {trimInfo && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3 text-xs text-amber-700">
+                Document volumineux ({trimInfo.totalPages} pages). Seules les {trimInfo.sentPages} premières pages ont été analysées. Vérifiez que toutes les données sont correctes.
+              </div>
+            )}
             <p className="text-xs text-gray-400 mb-3">Vérifiez et corrigez les données extraites avant validation.</p>
             <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Locataire</h4>
             <Grid2>

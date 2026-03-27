@@ -90,11 +90,8 @@ Deno.serve(async (req) => {
     const { fileBase64, mimeType } = await req.json();
     if (!fileBase64) throw new Error("fileBase64 is required");
 
-    // Use Haiku for large documents (handles up to 100 pages, faster, cheaper)
-    // Use Sonnet for smaller documents (more precise extraction)
-    const sizeBytes = (fileBase64.length * 3) / 4;
-    const isLarge = sizeBytes > 5 * 1024 * 1024; // > 5MB
-    const model = isLarge ? "claude-haiku-4-5-20251001" : "claude-sonnet-4-20250514";
+    // PDFs are trimmed to ≤95 pages client-side before reaching here
+    const model = "claude-sonnet-4-20250514";
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
