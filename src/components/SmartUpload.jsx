@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Upload, FileText, CheckCircle, Plus, ArrowRight, AlertTriangle } from 'lucide-react'
+import { Upload, FileText, CheckCircle, Plus, ArrowRight, AlertTriangle, Scissors } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useSociete } from '../contexts/Societe'
 import { extractFromPDF, fileToBase64 } from '../lib/extraction'
@@ -303,22 +303,44 @@ export default function SmartUpload({ onClose, bienId: initialBienId }) {
       {/* ── CONFIRM: Bail ────────────────────────────── */}
       {step === 'confirm_bail' && result && (() => {
         const d = result
+        const rv = (k, v) => setResult(p => ({ ...p, [k]: v }))
         const locLabel = d.locataire_raison_sociale || `${d.locataire_prenom || ''} ${d.locataire_nom || ''}`.trim() || '—'
         const addrLabel = [d.adresse, d.code_postal, d.ville].filter(Boolean).join(', ')
         return (
           <>
-            <div className="bg-blue-50 rounded-xl p-4 mb-4 border border-blue-200">
-              <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
-                <div><span className="text-gray-400">Locataire :</span> <strong className="text-navy">{locLabel}</strong></div>
-                <div><span className="text-gray-400">Adresse :</span> <strong className="text-navy">{addrLabel}</strong></div>
-                <div><span className="text-gray-400">Loyer HT :</span> <strong className="text-navy">{fmt(d.loyer_mensuel)}/mois</strong></div>
-                <div><span className="text-gray-400">Charges :</span> <strong className="text-navy">{fmt(d.charges)}/mois</strong></div>
-                <div><span className="text-gray-400">Type :</span> <strong className="text-navy capitalize">{d.type_bail || '—'}</strong></div>
-                <div><span className="text-gray-400">Période :</span> <strong className="text-navy">{d.date_debut ? fmtDate(d.date_debut) : '—'} → {d.date_fin ? fmtDate(d.date_fin) : '∞'}</strong></div>
-                <div><span className="text-gray-400">Dépôt :</span> <strong className="text-navy">{fmt(d.depot_garantie)}</strong></div>
-                <div><span className="text-gray-400">Indexation :</span> <strong className="text-navy">{d.indexation || '—'}</strong></div>
-              </div>
-            </div>
+            <p className="text-xs text-gray-400 mb-3">Vérifiez et corrigez les données extraites avant validation.</p>
+            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Locataire</h4>
+            <Grid2>
+              <Field label="Raison sociale" value={d.locataire_raison_sociale || ''} onChange={e => rv('locataire_raison_sociale', e.target.value)} />
+              <Grid2>
+                <Field label="Prénom" value={d.locataire_prenom || ''} onChange={e => rv('locataire_prenom', e.target.value)} />
+                <Field label="Nom" value={d.locataire_nom || ''} onChange={e => rv('locataire_nom', e.target.value)} />
+              </Grid2>
+            </Grid2>
+            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 mt-3">Bien</h4>
+            <Grid3>
+              <Field label="Adresse" value={d.adresse || ''} onChange={e => rv('adresse', e.target.value)} />
+              <Field label="Ville" value={d.ville || ''} onChange={e => rv('ville', e.target.value)} />
+              <Field label="Code postal" value={d.code_postal || ''} onChange={e => rv('code_postal', e.target.value)} />
+            </Grid3>
+            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 mt-3">Bail</h4>
+            <Grid3>
+              <Field label="Loyer HT (€/mois)" type="number" value={d.loyer_mensuel ?? ''} onChange={e => rv('loyer_mensuel', e.target.value === '' ? null : Number(e.target.value))} />
+              <Field label="Charges (€/mois)" type="number" value={d.charges ?? ''} onChange={e => rv('charges', e.target.value === '' ? null : Number(e.target.value))} />
+              <Field label="Dépôt garantie (€)" type="number" value={d.depot_garantie ?? ''} onChange={e => rv('depot_garantie', e.target.value === '' ? null : Number(e.target.value))} />
+            </Grid3>
+            <Grid3>
+              <Sel label="Type bail" value={d.type_bail || 'commercial'} onChange={e => rv('type_bail', e.target.value)}
+                options={[{v:'commercial',l:'Commercial'},{v:'professionnel',l:'Professionnel'},{v:'habitation',l:'Habitation'}]} />
+              <Sel label="Indexation" value={d.indexation || 'ILC'} onChange={e => rv('indexation', e.target.value)}
+                options={[{v:'ILC',l:'ILC'},{v:'ICC',l:'ICC'},{v:'IRL',l:'IRL'}]} />
+              <Field label="Activité" value={d.activite || ''} onChange={e => rv('activite', e.target.value)} />
+            </Grid3>
+            <Grid3>
+              <Field label="Date début" type="date" value={d.date_debut || ''} onChange={e => rv('date_debut', e.target.value)} />
+              <Field label="Date fin" type="date" value={d.date_fin || ''} onChange={e => rv('date_fin', e.target.value)} />
+              <Field label="Date révision" type="date" value={d.date_revision_anniversaire || ''} onChange={e => rv('date_revision_anniversaire', e.target.value)} />
+            </Grid3>
             <BienSelector showCreate addrHint={addrLabel} />
             <LocSelector nameHint={locLabel} />
             {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
@@ -333,16 +355,19 @@ export default function SmartUpload({ onClose, bienId: initialBienId }) {
       })()}
 
       {/* ── CONFIRM: Amortissement ───────────────────── */}
-      {step === 'confirm_amort' && result && (
+      {step === 'confirm_amort' && result && (() => {
+        const rv = (k, v) => setResult(p => ({ ...p, [k]: v }))
+        return (
         <>
-          <div className="bg-orange-50 rounded-xl p-4 mb-4 border border-orange-200">
-            <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
-              <div><span className="text-gray-400">Emprunt :</span> <strong className="text-navy">{fmt(result.montant_emprunt)}</strong></div>
-              <div><span className="text-gray-400">Durée :</span> <strong className="text-navy">{result.duree_credit ? `${result.duree_credit} mois` : '—'}</strong></div>
-              <div><span className="text-gray-400">Taux :</span> <strong className="text-navy">{result.taux ? `${result.taux}%` : '—'}</strong></div>
-              <div><span className="text-gray-400">Mensualité :</span> <strong className="text-navy">{fmt(result.annuites)}/mois</strong></div>
-            </div>
-          </div>
+          <p className="text-xs text-gray-400 mb-3">Vérifiez et corrigez les données extraites avant validation.</p>
+          <Grid2>
+            <Field label="Montant emprunt (€)" type="number" value={result.montant_emprunt ?? ''} onChange={e => rv('montant_emprunt', e.target.value === '' ? null : Number(e.target.value))} />
+            <Field label="Durée (mois)" type="number" value={result.duree_credit ?? ''} onChange={e => rv('duree_credit', e.target.value === '' ? null : Number(e.target.value))} />
+          </Grid2>
+          <Grid2>
+            <Field label="Taux (%)" type="number" step="0.01" value={result.taux ?? ''} onChange={e => rv('taux', e.target.value === '' ? null : Number(e.target.value))} />
+            <Field label="Mensualité (€/mois)" type="number" value={result.annuites ?? ''} onChange={e => rv('annuites', e.target.value === '' ? null : Number(e.target.value))} />
+          </Grid2>
           <BienSelector />
           {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
           <div className="flex justify-end gap-3 mt-2">
@@ -352,7 +377,8 @@ export default function SmartUpload({ onClose, bienId: initialBienId }) {
             </Btn>
           </div>
         </>
-      )}
+        )
+      })()}
 
       {/* ── CONFIRM: Charges ─────────────────────────── */}
       {step === 'confirm_charges' && result && (() => {

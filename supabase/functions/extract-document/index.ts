@@ -90,28 +90,11 @@ Deno.serve(async (req) => {
     const { fileBase64, mimeType } = await req.json();
     if (!fileBase64) throw new Error("fileBase64 is required");
 
-    // Check approximate page count from base64 size (rough: ~50KB per page for a typical PDF)
+    // Use Haiku for large documents (handles up to 100 pages, faster, cheaper)
+    // Use Sonnet for smaller documents (more precise extraction)
     const sizeBytes = (fileBase64.length * 3) / 4;
-    const estimatedPages = Math.ceil(sizeBytes / 50000);
-    const needsTruncation = estimatedPages > 80;
-
-    // Build document content block with optional page range
-    const docBlock: Record<string, unknown> = {
-      type: "document",
-      source: { type: "base64", media_type: mimeType || "application/pdf", data: fileBase64 },
-    };
-
-    // For large PDFs, only analyze first 50 pages (bail info is always in the first pages)
-    if (needsTruncation && (mimeType === "application/pdf" || !mimeType)) {
-      docBlock.pages = [];
-      for (let i = 0; i < Math.min(50, estimatedPages); i++) {
-        (docBlock.pages as number[]).push(i);
-      }
-    }
-
-    const extraPrompt = needsTruncation
-      ? "\n\nNOTE: Ce document est volumineux. Seules les premières pages sont analysées. Les informations clés (parties, adresse, loyer, dates) se trouvent généralement dans les premières pages."
-      : "";
+    const isLarge = sizeBytes > 5 * 1024 * 1024; // > 5MB
+    const model = isLarge ? "claude-haiku-4-5-20251001" : "claude-sonnet-4-20250514";
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -121,13 +104,13 @@ Deno.serve(async (req) => {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model,
         max_tokens: 4096,
         messages: [{
           role: "user",
           content: [
-            docBlock,
-            { type: "text", text: EXTRACT_PROMPT + extraPrompt },
+            { type: "document", source: { type: "base64", media_type: mimeType || "application/pdf", data: fileBase64 } },
+            { type: "text", text: EXTRACT_PROMPT },
           ],
         }],
       }),
