@@ -8,7 +8,7 @@ import { Badge } from './UI'
 
 const NAV = [
   { k: 'dashboard', l: 'Tableau de bord', I: LayoutDashboard },
-  { k: 'patrimoine', l: 'Patrimoine', I: Building2 },
+  { k: 'patrimoine', l: 'Biens', I: Building2 },
   { k: 'finances', l: 'Finances', I: CreditCard },
   { k: 'analyse', l: 'Analyse', I: BarChart3 },
   { k: 'outils', l: 'Outils', I: Calculator },
