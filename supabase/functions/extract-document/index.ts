@@ -90,6 +90,29 @@ Deno.serve(async (req) => {
     const { fileBase64, mimeType } = await req.json();
     if (!fileBase64) throw new Error("fileBase64 is required");
 
+    // Check approximate page count from base64 size (rough: ~50KB per page for a typical PDF)
+    const sizeBytes = (fileBase64.length * 3) / 4;
+    const estimatedPages = Math.ceil(sizeBytes / 50000);
+    const needsTruncation = estimatedPages > 80;
+
+    // Build document content block with optional page range
+    const docBlock: Record<string, unknown> = {
+      type: "document",
+      source: { type: "base64", media_type: mimeType || "application/pdf", data: fileBase64 },
+    };
+
+    // For large PDFs, only analyze first 50 pages (bail info is always in the first pages)
+    if (needsTruncation && (mimeType === "application/pdf" || !mimeType)) {
+      docBlock.pages = [];
+      for (let i = 0; i < Math.min(50, estimatedPages); i++) {
+        (docBlock.pages as number[]).push(i);
+      }
+    }
+
+    const extraPrompt = needsTruncation
+      ? "\n\nNOTE: Ce document est volumineux. Seules les premières pages sont analysées. Les informations clés (parties, adresse, loyer, dates) se trouvent généralement dans les premières pages."
+      : "";
+
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -103,8 +126,8 @@ Deno.serve(async (req) => {
         messages: [{
           role: "user",
           content: [
-            { type: "document", source: { type: "base64", media_type: mimeType || "application/pdf", data: fileBase64 } },
-            { type: "text", text: EXTRACT_PROMPT },
+            docBlock,
+            { type: "text", text: EXTRACT_PROMPT + extraPrompt },
           ],
         }],
       }),
