@@ -332,6 +332,7 @@ function MembresTab() {
 
 // ── Banque tab ──────────────────────────────────────────
 function BanqueTab() {
+  const { user } = useAuth()
   const { selected, isAdmin } = useSociete()
   const [conn, setConn] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -362,6 +363,7 @@ function BanqueTab() {
         body: JSON.stringify({
           societe_id: selected.id,
           callback_url: window.location.origin + window.location.pathname,
+          user_email: user?.email || '',
         }),
       })
       const data = await res.json()
