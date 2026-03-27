@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Building2, Plus, Trash2, ExternalLink, Upload, MapPin, Zap, FileText, Users, FolderOpen, ArrowRight, Link } from 'lucide-react'
+import { Building2, Plus, Trash2, ExternalLink, Upload, MapPin, Zap, FileText, Users, FolderOpen, ArrowRight, Link, Receipt, CheckCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useSociete } from '../contexts/Societe'
 import { fmt, fmtDate, googleMapsUrl, DOC_TYPES } from '../lib/utils'
@@ -21,7 +21,7 @@ const EMPTY_BIEN = {
 const EMPTY_UI = { apport_mode: 'euro', apport_pct: '', duree_mode: 'annees', duree_annees: '' }
 
 export default function Biens({ navigate }) {
-  const { biens, baux, locataires, documents, transactions, selected, canEdit, reload } = useSociete()
+  const { biens, baux, locataires, documents, transactions, appelsCharges, selected, canEdit, reload } = useSociete()
   const [open, setOpen] = useState(false)
   const [edit, setEdit] = useState(null)
   const [f, setF] = useState(EMPTY_BIEN)
@@ -150,6 +150,120 @@ export default function Biens({ navigate }) {
     reload()
   }
 
+  // ── Appel de charges ─────────────────────────────────────
+  const [chargeModal, setChargeModal] = useState(null) // { bienId }
+  const [chargeExtracting, setChargeExtracting] = useState(false)
+  const [chargeResult, setChargeResult] = useState(null) // extracted data
+  const [chargeError, setChargeError] = useState('')
+
+  const handleChargeUpload = async (file, bienId) => {
+    setChargeExtracting(true)
+    setChargeError('')
+    setChargeResult(null)
+    try {
+      const base64 = await fileToBase64(file)
+      const result = await extractFromPDF(base64, file.type || 'application/pdf')
+      if (result.type !== 'appel_charges') {
+        setChargeError("Ce document n'a pas été reconnu comme un appel de charges/fonds.")
+        return
+      }
+      setChargeResult(result)
+    } catch (err) {
+      setChargeError(err.message)
+    }
+    setChargeExtracting(false)
+  }
+
+  const saveCharges = async (bienId) => {
+    if (!chargeResult) return
+    const ref = chargeResult.charges_refacturables ?? (chargeResult.lignes || []).filter(l => l.refacturable).reduce((s, l) => s + (l.montant || 0), 0)
+    const nonRef = chargeResult.charges_non_refacturables ?? (chargeResult.lignes || []).filter(l => !l.refacturable).reduce((s, l) => s + (l.montant || 0), 0)
+    await supabase.from('appels_charges').insert({
+      bien_id: bienId,
+      societe_id: selected.id,
+      periode: chargeResult.periode || '',
+      montant_total: chargeResult.montant_total || (ref + nonRef),
+      charges_refacturables: ref,
+      charges_non_refacturables: nonRef,
+      lignes: chargeResult.lignes || [],
+    })
+    // Update bien charges with refacturable monthly amount
+    await supabase.from('biens').update({
+      charges_refacturables: ref,
+      charges_non_refacturables: nonRef,
+    }).eq('id', bienId)
+    setChargeModal(null)
+    setChargeResult(null)
+    reload()
+  }
+
+  // ── Bail upload wizard ──────────────────────────────────
+  const [bailWizard, setBailWizard] = useState(null) // { step, data, extracting }
+
+  const handleBailUpload = async (file) => {
+    setBailWizard({ step: 'extracting', data: null })
+    try {
+      const base64 = await fileToBase64(file)
+      const result = await extractFromPDF(base64, file.type || 'application/pdf')
+      if (result.type !== 'bail') {
+        setBailWizard({ step: 'error', error: "Ce document n'a pas été reconnu comme un bail." })
+        return
+      }
+      setBailWizard({ step: 'link', data: result, bien_id: '', locataire_id: '', createLoc: false, createBien: false })
+    } catch (err) {
+      setBailWizard({ step: 'error', error: err.message })
+    }
+  }
+
+  const saveBailWizard = async () => {
+    const w = bailWizard
+    const d = w.data
+    let bienId = w.bien_id
+    let locId = w.locataire_id
+
+    // Create bien if needed
+    if (w.createBien) {
+      const { data: newBien } = await supabase.from('biens').insert({
+        societe_id: selected.id,
+        adresse: d.adresse || '', ville: d.ville || '', code_postal: d.code_postal || '',
+        surface_rdc: d.surface_rdc, surface_sous_sol: d.surface_sous_sol,
+        loyer_mensuel: d.loyer_mensuel, charges: d.charges,
+        type_bail: d.type_bail || 'commercial', indexation: d.indexation || 'ILC',
+        attribution_charges: d.attribution_charges || '', activite: d.activite || '',
+        type: 'Commercial', statut_bien: 'Actif',
+      }).select().single()
+      if (newBien) bienId = newBien.id
+    }
+
+    // Create locataire if needed
+    if (w.createLoc) {
+      const { data: newLoc } = await supabase.from('locataires').insert({
+        societe_id: selected.id,
+        raison_sociale: d.locataire_raison_sociale || '',
+        nom: d.locataire_nom || '', prenom: d.locataire_prenom || '',
+        email: d.locataire_email || '', telephone: d.locataire_telephone || '',
+        adresse: d.locataire_adresse || '', code_postal: d.locataire_code_postal || '',
+        ville: d.locataire_ville || '',
+      }).select().single()
+      if (newLoc) locId = newLoc.id
+    }
+
+    if (!bienId || !locId) return
+
+    // Create bail
+    await supabase.from('baux').insert({
+      societe_id: selected.id, bien_id: bienId, locataire_id: locId,
+      loyer_ht: d.loyer_mensuel, charges: d.charges, depot: d.depot_garantie,
+      type_bail: d.type_bail || 'commercial', indice_revision: d.indexation || 'ILC',
+      date_debut: d.date_debut || null, date_fin: d.date_fin || null,
+      date_revision_anniversaire: d.date_revision_anniversaire || null,
+      utilisation: d.utilisation || d.activite || '', actif: true,
+    })
+
+    setBailWizard(null)
+    reload()
+  }
+
   // ── Extraction IA ─────────────────────────────────────────
   const handleExtract = async (file) => {
     setExtracting(true)
@@ -210,7 +324,16 @@ export default function Biens({ navigate }) {
   return (
     <div>
       <PageHeader title="Biens immobiliers" sub="Gérez votre patrimoine">
-        {canEdit && <Btn onClick={openNew}><Plus size={15} /> Ajouter un bien</Btn>}
+        {canEdit && (
+          <div className="flex gap-2">
+            <label className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-xl text-sm font-semibold cursor-pointer hover:bg-emerald-700 transition-colors">
+              <Upload size={15} /> Uploader un bail
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden"
+                onChange={e => { if (e.target.files[0]) handleBailUpload(e.target.files[0]) }} />
+            </label>
+            <Btn onClick={openNew}><Plus size={15} /> Ajouter un bien</Btn>
+          </div>
+        )}
       </PageHeader>
 
       {biens.length === 0 ? (
@@ -378,6 +501,58 @@ export default function Biens({ navigate }) {
                     </div>
                   )}
                 </div>
+
+                {/* ── Charges / Appels de fonds ─────────────────── */}
+                {(() => {
+                  const bienCharges = appelsCharges.filter(ac => ac.bien_id === b.id)
+                  const totalRef = b.charges_refacturables || 0
+                  const totalNonRef = b.charges_non_refacturables || 0
+                  return (
+                    <div className="mt-5 pt-4 border-t border-gray-100">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide flex items-center gap-1.5">
+                          <Receipt size={13} /> Charges ({bienCharges.length} appel{bienCharges.length > 1 ? 's' : ''})
+                        </h4>
+                        {canEdit && (
+                          <label className="text-xs text-blue-500 hover:text-blue-700 font-semibold cursor-pointer flex items-center gap-1">
+                            <Upload size={12} /> Ajouter un appel de fonds
+                            <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden"
+                              onChange={e => { if (e.target.files[0]) { setChargeModal({ bienId: b.id }); handleChargeUpload(e.target.files[0], b.id) } }} />
+                          </label>
+                        )}
+                      </div>
+                      {(totalRef > 0 || totalNonRef > 0) && (
+                        <div className="grid grid-cols-3 gap-3 mb-3">
+                          <div className="bg-emerald-50 rounded-lg p-3">
+                            <p className="text-[11px] text-emerald-600 font-semibold uppercase">Refacturables</p>
+                            <p className="text-lg font-bold text-emerald-700">{fmt(totalRef)}<span className="text-xs font-normal">/an</span></p>
+                          </div>
+                          <div className="bg-red-50 rounded-lg p-3">
+                            <p className="text-[11px] text-red-600 font-semibold uppercase">Non refacturables</p>
+                            <p className="text-lg font-bold text-red-600">{fmt(totalNonRef)}<span className="text-xs font-normal">/an</span></p>
+                          </div>
+                          <div className="bg-gray-50 rounded-lg p-3">
+                            <p className="text-[11px] text-gray-500 font-semibold uppercase">Total charges</p>
+                            <p className="text-lg font-bold text-navy">{fmt(totalRef + totalNonRef)}<span className="text-xs font-normal">/an</span></p>
+                          </div>
+                        </div>
+                      )}
+                      {bienCharges.length > 0 && (
+                        <div className="space-y-1">
+                          {bienCharges.map(ac => (
+                            <div key={ac.id} className="flex items-center justify-between py-1.5 px-2 rounded bg-gray-50 text-xs">
+                              <span className="text-gray-500">{ac.periode || 'Sans période'}</span>
+                              <span className="font-semibold text-navy">{fmt(ac.montant_total)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {bienCharges.length === 0 && totalRef === 0 && totalNonRef === 0 && (
+                        <p className="text-sm text-gray-300 italic">Aucun appel de charges.</p>
+                      )}
+                    </div>
+                  )
+                })()}
 
                 {/* ── Documents liés ────────────────────────────── */}
                 <div className="mt-5 pt-4 border-t border-gray-100">
@@ -814,6 +989,166 @@ export default function Biens({ navigate }) {
           </div>
         </Modal>
       )}
+
+      {/* ── Modal Appel de charges ───────────────────────── */}
+      {chargeModal && (
+        <Modal title="Appel de fonds / charges" onClose={() => { setChargeModal(null); setChargeResult(null); setChargeError('') }} width="max-w-2xl">
+          {chargeExtracting && (
+            <div className="text-center py-8">
+              <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-3" />
+              <p className="text-sm text-gray-500">Analyse du document en cours...</p>
+            </div>
+          )}
+          {chargeError && <p className="text-red-500 text-sm mb-4">{chargeError}</p>}
+          {!chargeExtracting && !chargeResult && !chargeError && (
+            <div className="text-center py-8">
+              <label className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-sm font-semibold cursor-pointer hover:bg-blue-100 border border-blue-200">
+                <Upload size={15} /> Charger un appel de fonds
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden"
+                  onChange={e => { if (e.target.files[0]) handleChargeUpload(e.target.files[0], chargeModal.bienId) }} />
+              </label>
+            </div>
+          )}
+          {chargeResult && (
+            <>
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="bg-gray-50 rounded-lg p-3 text-center">
+                  <p className="text-[11px] text-gray-400 uppercase font-semibold">Période</p>
+                  <p className="font-bold text-navy">{chargeResult.periode || '—'}</p>
+                </div>
+                <div className="bg-emerald-50 rounded-lg p-3 text-center">
+                  <p className="text-[11px] text-emerald-600 uppercase font-semibold">Refacturables</p>
+                  <p className="font-bold text-emerald-700">{fmt((chargeResult.lignes || []).filter(l => l.refacturable).reduce((s, l) => s + (l.montant || 0), 0))}</p>
+                </div>
+                <div className="bg-red-50 rounded-lg p-3 text-center">
+                  <p className="text-[11px] text-red-600 uppercase font-semibold">Non refacturables</p>
+                  <p className="font-bold text-red-600">{fmt((chargeResult.lignes || []).filter(l => !l.refacturable).reduce((s, l) => s + (l.montant || 0), 0))}</p>
+                </div>
+              </div>
+              {(chargeResult.lignes || []).length > 0 && (
+                <div className="border border-gray-200 rounded-lg overflow-hidden mb-4">
+                  <table className="w-full text-sm">
+                    <thead><tr className="bg-gray-50"><th className="px-3 py-2 text-left text-xs font-bold text-gray-400">Poste</th><th className="px-3 py-2 text-right text-xs font-bold text-gray-400">Montant</th><th className="px-3 py-2 text-center text-xs font-bold text-gray-400">Refacturable</th></tr></thead>
+                    <tbody>
+                      {chargeResult.lignes.map((l, i) => (
+                        <tr key={i} className="border-t border-gray-100">
+                          <td className="px-3 py-2 text-navy">{l.poste}</td>
+                          <td className="px-3 py-2 text-right font-semibold">{fmt(l.montant)}</td>
+                          <td className="px-3 py-2 text-center">
+                            <button onClick={() => setChargeResult(prev => ({ ...prev, lignes: prev.lignes.map((x, j) => j === i ? { ...x, refacturable: !x.refacturable } : x) }))}
+                              className={`px-2 py-0.5 rounded-full text-xs font-semibold cursor-pointer ${l.refacturable ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
+                              {l.refacturable ? 'Oui' : 'Non'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div className="flex justify-end gap-3">
+                <Btn variant="ghost" onClick={() => { setChargeModal(null); setChargeResult(null) }}>Annuler</Btn>
+                <Btn onClick={() => saveCharges(chargeModal.bienId)}>
+                  <CheckCircle size={14} className="mr-1" /> Enregistrer les charges
+                </Btn>
+              </div>
+            </>
+          )}
+        </Modal>
+      )}
+
+      {/* ── Wizard upload bail ───────────────────────────── */}
+      {bailWizard && bailWizard.step === 'extracting' && (
+        <Modal title="Analyse du bail" onClose={() => setBailWizard(null)} width="max-w-md">
+          <div className="text-center py-8">
+            <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-3" />
+            <p className="text-sm text-gray-500">Extraction des données en cours...</p>
+          </div>
+        </Modal>
+      )}
+      {bailWizard && bailWizard.step === 'error' && (
+        <Modal title="Erreur" onClose={() => setBailWizard(null)} width="max-w-md">
+          <p className="text-red-500 text-sm mb-4">{bailWizard.error}</p>
+          <div className="flex justify-end">
+            <Btn variant="ghost" onClick={() => setBailWizard(null)}>Fermer</Btn>
+          </div>
+        </Modal>
+      )}
+      {bailWizard && bailWizard.step === 'link' && (() => {
+        const d = bailWizard.data
+        const w = bailWizard
+        const locLabel = d.locataire_raison_sociale || `${d.locataire_prenom || ''} ${d.locataire_nom || ''}`.trim() || '—'
+        const addrLabel = `${d.adresse || ''}, ${d.code_postal || ''} ${d.ville || ''}`.trim()
+        return (
+          <Modal title="Bail extrait — rattacher" onClose={() => setBailWizard(null)} width="max-w-2xl">
+            {/* Résumé extraction */}
+            <div className="bg-blue-50 rounded-xl p-4 mb-5 border border-blue-200">
+              <h4 className="text-xs font-bold text-blue-700 uppercase mb-2">Données extraites</h4>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
+                <div><span className="text-gray-400">Locataire :</span> <span className="font-semibold text-navy">{locLabel}</span></div>
+                <div><span className="text-gray-400">Adresse :</span> <span className="font-semibold text-navy">{addrLabel}</span></div>
+                <div><span className="text-gray-400">Loyer HT :</span> <span className="font-semibold text-navy">{fmt(d.loyer_mensuel)}/mois</span></div>
+                <div><span className="text-gray-400">Charges :</span> <span className="font-semibold text-navy">{fmt(d.charges)}/mois</span></div>
+                <div><span className="text-gray-400">Type :</span> <span className="font-semibold text-navy capitalize">{d.type_bail || '—'}</span></div>
+                <div><span className="text-gray-400">Début :</span> <span className="font-semibold text-navy">{d.date_debut ? fmtDate(d.date_debut) : '—'}</span></div>
+              </div>
+            </div>
+
+            {/* Rattacher à un bien */}
+            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Rattacher à un bien</h4>
+            <div className="space-y-2 mb-2">
+              {biens.map(b => (
+                <label key={b.id} className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${w.bien_id === b.id ? 'bg-blue-50 border border-blue-300' : 'bg-gray-50 hover:bg-gray-100 border border-transparent'}`}>
+                  <input type="radio" name="wiz_bien" checked={w.bien_id === b.id}
+                    onChange={() => setBailWizard(p => ({ ...p, bien_id: b.id, createBien: false }))} className="accent-blue-600" />
+                  <div>
+                    <p className="text-sm font-semibold text-navy">{b.reference || b.adresse}</p>
+                    <p className="text-xs text-gray-400">{b.adresse}, {b.code_postal} {b.ville}</p>
+                  </div>
+                </label>
+              ))}
+              <label className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${w.createBien ? 'bg-emerald-50 border border-emerald-300' : 'bg-gray-50 hover:bg-gray-100 border border-transparent'}`}>
+                <input type="radio" name="wiz_bien" checked={w.createBien}
+                  onChange={() => setBailWizard(p => ({ ...p, bien_id: '', createBien: true }))} className="accent-emerald-600" />
+                <div>
+                  <p className="text-sm font-semibold text-emerald-700"><Plus size={12} className="inline mr-1" />Créer un nouveau bien</p>
+                  <p className="text-xs text-gray-400">Avec les données extraites : {addrLabel}</p>
+                </div>
+              </label>
+            </div>
+
+            {/* Rattacher à un locataire */}
+            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 mt-5">Rattacher à un locataire</h4>
+            <div className="space-y-2 mb-2 max-h-48 overflow-y-auto">
+              {locataires.map(l => (
+                <label key={l.id} className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${w.locataire_id === l.id ? 'bg-blue-50 border border-blue-300' : 'bg-gray-50 hover:bg-gray-100 border border-transparent'}`}>
+                  <input type="radio" name="wiz_loc" checked={w.locataire_id === l.id}
+                    onChange={() => setBailWizard(p => ({ ...p, locataire_id: l.id, createLoc: false }))} className="accent-blue-600" />
+                  <div>
+                    <p className="text-sm font-semibold text-navy">{l.raison_sociale || `${l.prenom || ''} ${l.nom || ''}`.trim() || '—'}</p>
+                    <p className="text-xs text-gray-400">{l.email || '—'}</p>
+                  </div>
+                </label>
+              ))}
+              <label className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${w.createLoc ? 'bg-emerald-50 border border-emerald-300' : 'bg-gray-50 hover:bg-gray-100 border border-transparent'}`}>
+                <input type="radio" name="wiz_loc" checked={w.createLoc}
+                  onChange={() => setBailWizard(p => ({ ...p, locataire_id: '', createLoc: true }))} className="accent-emerald-600" />
+                <div>
+                  <p className="text-sm font-semibold text-emerald-700"><Plus size={12} className="inline mr-1" />Créer un nouveau locataire</p>
+                  <p className="text-xs text-gray-400">Avec les données extraites : {locLabel}</p>
+                </div>
+              </label>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <Btn variant="ghost" onClick={() => setBailWizard(null)}>Annuler</Btn>
+              <Btn onClick={saveBailWizard} disabled={!w.bien_id && !w.createBien || !w.locataire_id && !w.createLoc}>
+                <CheckCircle size={14} className="mr-1" /> Créer le bail
+              </Btn>
+            </div>
+          </Modal>
+        )
+      })()}
     </div>
   )
 }

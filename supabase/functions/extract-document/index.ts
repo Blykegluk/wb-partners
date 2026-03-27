@@ -2,9 +2,11 @@ import { corsHeaders } from "../_shared/cors.ts";
 
 const ANTHROPIC_KEY = Deno.env.get("ANTHROPIC_KEY");
 
-const EXTRACT_PROMPT = `Tu es un expert en immobilier commercial français. Analyse ce document et extrais les informations suivantes au format JSON strict.
+const EXTRACT_PROMPT = `Tu es un expert en immobilier commercial français. Analyse ce document et extrais les informations au format JSON strict.
 
-Si le document est un BAIL ou AVENANT, extrais :
+Identifie d'abord le TYPE de document parmi : bail, amortissement, appel_charges.
+
+Si BAIL ou AVENANT :
 {
   "type": "bail",
   "locataire_raison_sociale": "",
@@ -12,6 +14,9 @@ Si le document est un BAIL ou AVENANT, extrais :
   "locataire_prenom": "",
   "locataire_email": "",
   "locataire_telephone": "",
+  "locataire_adresse": "",
+  "locataire_code_postal": "",
+  "locataire_ville": "",
   "adresse": "",
   "ville": "",
   "code_postal": "",
@@ -24,12 +29,13 @@ Si le document est un BAIL ou AVENANT, extrais :
   "attribution_charges": "",
   "date_debut": "YYYY-MM-DD",
   "date_fin": "YYYY-MM-DD",
+  "date_revision_anniversaire": "YYYY-MM-DD",
   "depot_garantie": null,
   "utilisation": "",
   "activite": ""
 }
 
-Si le document est un TABLEAU D'AMORTISSEMENT, extrais :
+Si TABLEAU D'AMORTISSEMENT :
 {
   "type": "amortissement",
   "montant_emprunt": null,
@@ -40,12 +46,22 @@ Si le document est un TABLEAU D'AMORTISSEMENT, extrais :
   "date_debut_pret": "YYYY-MM-DD"
 }
 
+Si APPEL DE FONDS, APPEL DE CHARGES, BUDGET PRÉVISIONNEL ou DÉCOMPTE DE CHARGES de copropriété/syndic :
+{
+  "type": "appel_charges",
+  "periode": "T1 2025",
+  "montant_total": null,
+  "lignes": [
+    { "poste": "nom du poste", "montant": null, "refacturable": true }
+  ]
+}
+Pour le champ "refacturable", mets true si la charge est récupérable sur le locataire (entretien parties communes, eau, ascenseur, espaces verts, électricité communs, assurance immeuble, TEOM, gardiennage). Mets false si non récupérable (gros travaux art.606, ravalement, honoraires syndic, fonds travaux Alur).
+
 Réponds UNIQUEMENT avec le JSON, sans commentaire ni markdown.
 Les montants doivent être des nombres (pas de symboles €).
 Les durées en mois. Les surfaces en m².`;
 
 Deno.serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -70,7 +86,7 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 2048,
+        max_tokens: 4096,
         messages: [
           {
             role: "user",
