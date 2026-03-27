@@ -106,6 +106,8 @@ function SocieteTab() {
 }
 
 // ── Membres tab ─────────────────────────────────────────
+const FUNCTIONS_URL = import.meta.env.VITE_SUPABASE_URL + '/functions/v1'
+
 function MembresTab() {
   const { user } = useAuth()
   const { selected, membres, isAdmin, reload } = useSociete()
@@ -113,25 +115,80 @@ function MembresTab() {
   const [email, setEmail] = useState('')
   const [role, setRole] = useState('viewer')
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
+  const [invitations, setInvitations] = useState([])
+
+  // Load pending invitations
+  useEffect(() => {
+    if (selected) {
+      supabase.from('invitations').select('*').eq('societe_id', selected.id).then(({ data }) => setInvitations(data || []))
+    }
+  }, [selected, membres])
 
   const invite = async () => {
     setError('')
+    setSuccess('')
     setLoading(true)
-    const { data: profiles } = await supabase.from('profiles').select('id, email, full_name').eq('email', email.trim().toLowerCase())
-    if (!profiles || profiles.length === 0) {
-      setError("Aucun utilisateur trouvé avec cet email. Il doit d'abord se connecter à WB Partners.")
+    const trimmedEmail = email.trim().toLowerCase()
+
+    // Check if already invited
+    if (invitations.find(i => i.email === trimmedEmail)) {
+      setError('Une invitation a déjà été envoyée à cet email.')
       setLoading(false)
       return
     }
-    const target = profiles[0]
-    if (membres.find(m => m.user_id === target.id)) { setError('Déjà membre.'); setLoading(false); return }
-    if (target.id === selected.owner_id) { setError('Propriétaire de la société.'); setLoading(false); return }
 
-    const { error: e } = await supabase.from('societe_membres').insert({ societe_id: selected.id, user_id: target.id, role })
-    if (e) { setError(e.message); setLoading(false); return }
-    setOpen(false); setEmail(''); setRole('viewer'); setLoading(false)
-    reload()
+    // Try to find existing user
+    const { data: profiles } = await supabase.from('profiles').select('id, email, full_name').eq('email', trimmedEmail)
+
+    if (profiles && profiles.length > 0) {
+      // User exists → add directly as member
+      const target = profiles[0]
+      if (membres.find(m => m.user_id === target.id)) { setError('Déjà membre.'); setLoading(false); return }
+      if (target.id === selected.owner_id) { setError('Propriétaire de la société.'); setLoading(false); return }
+
+      const { error: e } = await supabase.from('societe_membres').insert({ societe_id: selected.id, user_id: target.id, role })
+      if (e) { setError(e.message); setLoading(false); return }
+      setOpen(false); setEmail(''); setRole('viewer'); setLoading(false)
+      reload()
+      return
+    }
+
+    // User doesn't exist → store invitation + send email
+    const { error: invErr } = await supabase.from('invitations').insert({
+      societe_id: selected.id, email: trimmedEmail, role, invited_by: user.id,
+    })
+    if (invErr) { setError(invErr.message); setLoading(false); return }
+
+    // Send invitation email
+    const { data: { session } } = await supabase.auth.getSession()
+    try {
+      await fetch(`${FUNCTIONS_URL}/send-invite`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({
+          email: trimmedEmail,
+          societe_name: selected.nom_affiche || selected.nom,
+          invited_by_name: user.user_metadata?.full_name || user.email,
+          role,
+        }),
+      })
+    } catch { /* email sending is best-effort */ }
+
+    setSuccess(`Invitation envoyée à ${trimmedEmail}`)
+    setLoading(false)
+    // Refresh invitations list
+    const { data: inv } = await supabase.from('invitations').select('*').eq('societe_id', selected.id)
+    setInvitations(inv || [])
+  }
+
+  const cancelInvite = async (id) => {
+    await supabase.from('invitations').delete().eq('id', id)
+    setInvitations(prev => prev.filter(i => i.id !== id))
   }
 
   const changeRole = async (id, newRole) => {
@@ -168,10 +225,9 @@ function MembresTab() {
         </div>
       </Card>
 
-      {membres.length === 0 ? (
-        <Empty icon={<UserPlus size={40} />} text="Aucun membre invité." />
-      ) : (
-        <div className="space-y-2">
+      {/* Active members */}
+      {membres.length > 0 && (
+        <div className="space-y-2 mb-4">
           {membres.map(m => (
             <Card key={m.id} className="p-4">
               <div className="flex items-center justify-between">
@@ -211,8 +267,44 @@ function MembresTab() {
         </div>
       )}
 
+      {/* Pending invitations */}
+      {invitations.length > 0 && (
+        <>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 mt-6">Invitations en attente</p>
+          <div className="space-y-2 mb-4">
+            {invitations.map(inv => (
+              <Card key={inv.id} className="p-4 border-dashed border-amber-200 bg-amber-50/30">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 text-xs font-bold">
+                      {inv.email[0].toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-navy text-sm">{inv.email}</p>
+                      <p className="text-xs text-amber-600">Invitation envoyée</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold capitalize">{inv.role}</span>
+                    {isAdmin && (
+                      <button onClick={() => cancelInvite(inv.id)} className="text-gray-300 hover:text-red-500 cursor-pointer">
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
+
+      {membres.length === 0 && invitations.length === 0 && (
+        <Empty icon={<UserPlus size={40} />} text="Aucun membre invité." />
+      )}
+
       {open && (
-        <Modal title="Inviter un membre" onClose={() => { setOpen(false); setError('') }}>
+        <Modal title="Inviter un membre" onClose={() => { setOpen(false); setError(''); setSuccess('') }}>
           <Field label="Email *" type="email" placeholder="nom@exemple.com" value={email} onChange={e => setEmail(e.target.value)} />
           <Sel label="Rôle" value={role} onChange={e => setRole(e.target.value)}
             options={[
@@ -221,9 +313,10 @@ function MembresTab() {
               { v: 'admin', l: 'Admin — peut gérer les membres' },
             ]} />
           {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
+          {success && <p className="text-emerald-600 text-sm mb-3 font-medium">{success}</p>}
           <div className="flex justify-end gap-3 mt-4">
-            <Btn variant="ghost" onClick={() => { setOpen(false); setError('') }}>Annuler</Btn>
-            <Btn onClick={invite} disabled={loading || !email.trim()}>{loading ? '...' : 'Inviter'}</Btn>
+            <Btn variant="ghost" onClick={() => { setOpen(false); setError(''); setSuccess('') }}>Fermer</Btn>
+            <Btn onClick={invite} disabled={loading || !email.trim()}>{loading ? 'Envoi...' : 'Inviter'}</Btn>
           </div>
         </Modal>
       )}
