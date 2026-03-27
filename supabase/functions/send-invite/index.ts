@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
         "Authorization": `Bearer ${RESEND_KEY}`,
       },
       body: JSON.stringify({
-        from: "WB Partners <onboarding@resend.dev>",
+        from: "WB Partners <noreply@wbpartners.fr>",
         to: [email],
         subject: `${invited_by_name || "Un collaborateur"} vous invite sur WB Partners`,
         html: `
