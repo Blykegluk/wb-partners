@@ -331,22 +331,6 @@ function MembresTab() {
 }
 
 // ── Banque tab ──────────────────────────────────────────
-const FR_BANKS = [
-  { id: 'BNP_BNPAFRPP', name: 'BNP Paribas' },
-  { id: 'SOCIETE_GENERALE_SOGEFRPP', name: 'Société Générale' },
-  { id: 'CREDIT_AGRICOLE_AGRIFRPP', name: 'Crédit Agricole' },
-  { id: 'CREDIT_MUTUEL_CMCIFRPP', name: 'Crédit Mutuel' },
-  { id: 'LA_BANQUE_POSTALE_PSSTFRPP', name: 'La Banque Postale' },
-  { id: 'CIC_CMCIFRPP', name: 'CIC' },
-  { id: 'LCLFR', name: 'LCL' },
-  { id: 'CAISSE_D_EPARGNE_CEPAFRPP', name: 'Caisse d\'Épargne' },
-  { id: 'BOURSORAMA_BOUSFRPP', name: 'Boursorama' },
-  { id: 'QONTO_QNTOFRP1', name: 'Qonto' },
-  { id: 'SHINE_SABORFRP1', name: 'Shine' },
-  { id: 'REVOLUT_REVOLT21', name: 'Revolut' },
-  { id: 'N26_NTSBDEB1', name: 'N26' },
-]
-
 function BanqueTab() {
   const { selected, isAdmin } = useSociete()
   const [conn, setConn] = useState(null)
@@ -354,7 +338,6 @@ function BanqueTab() {
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState(null)
   const [error, setError] = useState('')
-  const [selectedBank, setSelectedBank] = useState('')
 
   useEffect(() => {
     if (selected) {
@@ -369,7 +352,6 @@ function BanqueTab() {
   }
 
   const connectBank = async () => {
-    if (!selectedBank) { setError('Sélectionnez une banque.'); return }
     setError('')
     setLoading(true)
     try {
@@ -379,14 +361,13 @@ function BanqueTab() {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({
           societe_id: selected.id,
-          institution_id: selectedBank,
-          redirect_url: window.location.origin + window.location.pathname,
+          callback_url: window.location.origin + window.location.pathname,
         }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      // Redirect user to bank authorization page
-      window.location.href = data.link
+      // Redirect to Bridge Connect widget (user selects bank there)
+      window.location.href = data.url
     } catch (e) {
       setError(e.message)
       setLoading(false)
@@ -394,19 +375,21 @@ function BanqueTab() {
   }
 
   const checkCallback = async () => {
-    if (!conn?.requisition_id) return
     setLoading(true)
+    setError('')
     try {
       const token = await getToken()
       const res = await fetch(`${FUNCTIONS_URL_TOP}/bank-callback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ requisition_id: conn.requisition_id }),
+        body: JSON.stringify({ societe_id: selected.id }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       if (data.status === 'connected') {
         setConn(prev => ({ ...prev, ...data, status: 'connected' }))
+      } else {
+        setError(data.message || 'Connexion en attente.')
       }
     } catch (e) { setError(e.message) }
     setLoading(false)
@@ -524,17 +507,15 @@ function BanqueTab() {
       <div className="text-center mb-6">
         <Landmark size={40} className="text-gray-300 mx-auto mb-4" />
         <p className="font-semibold text-navy mb-1">Connecter un compte bancaire</p>
-        <p className="text-sm text-gray-400">Vérifiez automatiquement si les loyers sont perçus en connectant le compte bancaire de la société.</p>
+        <p className="text-sm text-gray-400 max-w-md mx-auto">Vérifiez automatiquement si les loyers sont perçus en connectant le compte bancaire de la société. Vous choisirez votre banque à l'étape suivante.</p>
       </div>
 
-      <div className="max-w-md mx-auto">
-        <Sel label="Banque" value={selectedBank} onChange={e => setSelectedBank(e.target.value)}
-          options={[{ v: '', l: 'Sélectionner votre banque' }, ...FR_BANKS.map(b => ({ v: b.id, l: b.name }))]} />
+      <div className="max-w-md mx-auto text-center">
         {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
-        <Btn onClick={connectBank} disabled={!selectedBank || loading} className="w-full justify-center mt-2">
+        <Btn onClick={connectBank} disabled={loading} className="justify-center">
           <Landmark size={15} /> {loading ? 'Connexion...' : 'Connecter ma banque'}
         </Btn>
-        <p className="text-xs text-gray-300 text-center mt-4">Connexion sécurisée via GoCardless (Open Banking / DSP2). Aucun mot de passe bancaire n'est stocké.</p>
+        <p className="text-xs text-gray-300 mt-4">Connexion sécurisée via Bridge (Open Banking / DSP2). Vos identifiants bancaires ne sont jamais stockés sur nos serveurs.</p>
       </div>
     </Card>
   )
