@@ -1,6 +1,6 @@
 import { corsHeaders } from "../_shared/cors.ts";
 
-const ANTHROPIC_KEY = Deno.env.get("ANTHROPIC_KEY");
+const GEMINI_KEY = Deno.env.get("GEMINI_KEY");
 
 const EXTRACT_PROMPT = `Tu es un expert en immobilier commercial français. Analyse ce document et extrais les informations au format JSON strict.
 
@@ -73,7 +73,7 @@ Pour "refacturable": true si récupérable sur locataire (entretien parties comm
   "description": "brève description du document"
 }
 
-Réponds UNIQUEMENT avec le JSON, sans commentaire ni markdown.
+Réponds UNIQUEMENT avec le JSON, sans commentaire ni markdown ni backticks.
 Les montants doivent être des nombres (pas de symboles €).
 Les durées en mois. Les surfaces en m².`;
 
@@ -83,48 +83,58 @@ Deno.serve(async (req) => {
   }
 
   try {
-    if (!ANTHROPIC_KEY) {
-      throw new Error("ANTHROPIC_KEY not configured");
+    if (!GEMINI_KEY) {
+      throw new Error("GEMINI_KEY not configured in Edge Function secrets");
     }
 
     const { fileBase64, mimeType } = await req.json();
     if (!fileBase64) throw new Error("fileBase64 is required");
 
-    // Use Haiku: faster, cheaper, respects lower rate limits
-    // PDFs are trimmed to ≤25 pages client-side before reaching here
-    const model = "claude-haiku-4-5-20251001";
-
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 4096,
-        messages: [{
-          role: "user",
-          content: [
-            { type: "document", source: { type: "base64", media_type: mimeType || "application/pdf", data: fileBase64 } },
-            { type: "text", text: EXTRACT_PROMPT },
-          ],
-        }],
-      }),
-    });
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              {
+                inline_data: {
+                  mime_type: mimeType || "application/pdf",
+                  data: fileBase64,
+                },
+              },
+              { text: EXTRACT_PROMPT },
+            ],
+          }],
+          generationConfig: {
+            maxOutputTokens: 4096,
+            temperature: 0.1,
+          },
+        }),
+      }
+    );
 
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error?.message || "Anthropic API error");
 
-    const text = data.content?.[0]?.text || "";
+    if (!response.ok) {
+      const msg = data.error?.message || JSON.stringify(data.error) || "Gemini API error";
+      throw new Error(msg);
+    }
+
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
     let parsed;
     try {
       parsed = JSON.parse(text);
     } catch {
-      const match = text.match(/\{[\s\S]*\}/);
-      if (match) parsed = JSON.parse(match[0]);
-      else throw new Error("Impossible de parser la réponse IA : " + text.slice(0, 200));
+      // Try to extract JSON from markdown code blocks or surrounding text
+      const match = text.match(/```(?:json)?\s*([\s\S]*?)```/) || text.match(/(\{[\s\S]*\})/);
+      if (match) {
+        parsed = JSON.parse(match[1]);
+      } else {
+        throw new Error("Impossible de parser la réponse IA : " + text.slice(0, 300));
+      }
     }
 
     return new Response(JSON.stringify(parsed), {
