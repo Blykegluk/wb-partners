@@ -472,9 +472,10 @@ export default function SmartUpload({ onClose, bienId: initialBienId }) {
             options={[
               { v: 'bail', l: 'Bail & avenant' }, { v: 'amortissement', l: 'Tableau d\'amortissement' },
               { v: 'appel_charges', l: 'Appel de charges' }, { v: 'quittance', l: 'Quittance de loyer' },
-              { v: 'facture', l: 'Facture' }, { v: 'avis_echeance', l: 'Avis d\'échéance' },
-              { v: 'commandement', l: 'Commandement de payer' }, { v: 'diagnostic', l: 'Diagnostic immobilier' },
-              { v: 'acte_vente', l: 'Acte de vente' }, { v: 'autre', l: 'Autre' },
+              { v: 'taxe_fonciere', l: 'Taxe foncière' }, { v: 'facture', l: 'Facture' },
+              { v: 'avis_echeance', l: 'Avis d\'échéance' }, { v: 'commandement', l: 'Commandement de payer' },
+              { v: 'diagnostic', l: 'Diagnostic immobilier' }, { v: 'acte_vente', l: 'Acte de vente' },
+              { v: 'autre', l: 'Autre' },
             ]} />
           {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
           <div className="flex justify-end gap-3 mt-4">
