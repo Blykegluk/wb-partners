@@ -4,5 +4,8 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  base: '/wb-partners/'
+  base: '/app/',
+  build: {
+    outDir: 'dist/app',
+  }
 })

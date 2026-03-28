@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WB Partners — Investissement Immobilier</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; color: #1e293b; background: #fff; }
+    .navy { color: #0f1d3a; }
+    .bg-navy { background: #0f1d3a; }
+
+    /* Nav */
+    nav { display: flex; justify-content: space-between; align-items: center; padding: 1.25rem 5%; max-width: 1280px; margin: 0 auto; }
+    nav .logo { display: flex; align-items: center; gap: 0.75rem; font-weight: 900; font-size: 1.15rem; letter-spacing: 2px; color: #0f1d3a; text-decoration: none; }
+    nav .logo-icon { width: 40px; height: 40px; background: #0f1d3a; border-radius: 12px; display: flex; align-items: center; justify-content: center; }
+    nav .cta { background: #0f1d3a; color: #fff; padding: 0.65rem 1.5rem; border-radius: 10px; font-size: 0.875rem; font-weight: 600; text-decoration: none; transition: opacity 0.2s; }
+    nav .cta:hover { opacity: 0.85; }
+
+    /* Hero */
+    .hero { text-align: center; padding: 6rem 5% 4rem; max-width: 800px; margin: 0 auto; }
+    .hero h1 { font-size: 3.2rem; font-weight: 900; line-height: 1.1; margin-bottom: 1.5rem; color: #0f1d3a; }
+    .hero h1 span { background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero p { font-size: 1.15rem; color: #64748b; line-height: 1.7; margin-bottom: 2.5rem; }
+    .hero .buttons { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+    .hero .btn-primary { background: #0f1d3a; color: #fff; padding: 0.85rem 2rem; border-radius: 12px; font-size: 1rem; font-weight: 700; text-decoration: none; transition: all 0.2s; }
+    .hero .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(15,29,58,0.3); }
+    .hero .btn-secondary { background: #f1f5f9; color: #0f1d3a; padding: 0.85rem 2rem; border-radius: 12px; font-size: 1rem; font-weight: 600; text-decoration: none; transition: all 0.2s; }
+    .hero .btn-secondary:hover { background: #e2e8f0; }
+
+    /* Services */
+    .services { padding: 4rem 5%; max-width: 1280px; margin: 0 auto; }
+    .services h2 { text-align: center; font-size: 2rem; font-weight: 800; margin-bottom: 0.75rem; color: #0f1d3a; }
+    .services .sub { text-align: center; color: #64748b; margin-bottom: 3rem; font-size: 1.05rem; }
+    .services .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; }
+    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 2.5rem; transition: all 0.3s; }
+    .card:hover { border-color: #3b82f6; box-shadow: 0 8px 30px rgba(59,130,246,0.1); transform: translateY(-4px); }
+    .card .icon { width: 56px; height: 56px; border-radius: 14px; display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem; font-size: 1.5rem; }
+    .card h3 { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.75rem; color: #0f1d3a; }
+    .card p { color: #64748b; line-height: 1.6; font-size: 0.95rem; }
+    .card ul { list-style: none; margin-top: 1rem; }
+    .card ul li { padding: 0.35rem 0; color: #475569; font-size: 0.9rem; }
+    .card ul li::before { content: "✓ "; color: #22c55e; font-weight: 700; }
+
+    /* Stats */
+    .stats { padding: 4rem 5%; background: #f8fafc; }
+    .stats .inner { max-width: 1280px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 2rem; text-align: center; }
+    .stats .num { font-size: 2.5rem; font-weight: 900; color: #0f1d3a; }
+    .stats .label { color: #64748b; font-size: 0.9rem; margin-top: 0.25rem; }
+
+    /* CTA section */
+    .cta-section { padding: 5rem 5%; text-align: center; }
+    .cta-section .box { max-width: 700px; margin: 0 auto; background: #0f1d3a; border-radius: 24px; padding: 4rem; }
+    .cta-section h2 { color: #fff; font-size: 2rem; font-weight: 800; margin-bottom: 1rem; }
+    .cta-section p { color: #94a3b8; margin-bottom: 2rem; font-size: 1.05rem; }
+    .cta-section .btn { display: inline-block; background: #fff; color: #0f1d3a; padding: 0.85rem 2.5rem; border-radius: 12px; font-weight: 700; font-size: 1rem; text-decoration: none; transition: all 0.2s; }
+    .cta-section .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(255,255,255,0.2); }
+
+    /* Footer */
+    footer { padding: 2rem 5%; border-top: 1px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 0.85rem; }
+
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 2.2rem; }
+      .services .grid { grid-template-columns: 1fr; }
+      .stats .inner { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav>
+    <a href="/" class="logo">
+      <div class="logo-icon">
+        <svg width="22" height="22" fill="none" stroke="#fff" stroke-width="2" viewBox="0 0 24 24"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M8 10v11M12 10v11M16 10v11M20 10v11"/></svg>
+      </div>
+      WB PARTNERS
+    </a>
+    <a href="/app/" class="cta">Espace membres</a>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <h1>L'immobilier <span>intelligent</span> au service de votre patrimoine</h1>
+    <p>WB Partners accompagne les investisseurs immobiliers avec une approche structurée : de l'identification des opportunités à la gestion quotidienne, en passant par l'intégration d'outils technologiques de pointe.</p>
+    <div class="buttons">
+      <a href="/app/" class="btn-primary">Accéder à la plateforme</a>
+      <a href="#services" class="btn-secondary">Nos services</a>
+    </div>
+  </section>
+
+  <!-- Services -->
+  <section class="services" id="services">
+    <h2>Nos expertises</h2>
+    <p class="sub">Un accompagnement complet pour vos investissements immobiliers</p>
+    <div class="grid">
+      <div class="card">
+        <div class="icon" style="background: #eff6ff; color: #3b82f6;">
+          <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M8 10v11M12 10v11M16 10v11M20 10v11"/></svg>
+        </div>
+        <h3>Investissement Immobilier</h3>
+        <p>Identification et analyse d'opportunités d'investissement en immobilier commercial et résidentiel.</p>
+        <ul>
+          <li>Sourcing d'opportunités off-market</li>
+          <li>Analyse de rendement et cashflow</li>
+          <li>Structuration juridique et fiscale</li>
+          <li>Accompagnement à l'acquisition</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="icon" style="background: #f0fdf4; color: #22c55e;">
+          <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        </div>
+        <h3>Conseil en investissement</h3>
+        <p>Accompagnement stratégique pour optimiser la performance de votre portefeuille immobilier.</p>
+        <ul>
+          <li>Audit de patrimoine existant</li>
+          <li>Stratégie d'optimisation fiscale</li>
+          <li>Pilotage de la performance</li>
+          <li>Reporting financier détaillé</li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="icon" style="background: #faf5ff; color: #8b5cf6;">
+          <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <h3>Outils de gestion</h3>
+        <p>Plateforme technologique intégrée pour la gestion quotidienne de votre patrimoine immobilier.</p>
+        <ul>
+          <li>Suivi des loyers et charges</li>
+          <li>Analyse IA des documents</li>
+          <li>Connexion bancaire automatisée</li>
+          <li>Génération automatique de documents</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats -->
+  <section class="stats">
+    <div class="inner">
+      <div>
+        <div class="num">10+</div>
+        <div class="label">Années d'expérience</div>
+      </div>
+      <div>
+        <div class="num">50M€+</div>
+        <div class="label">D'actifs sous gestion</div>
+      </div>
+      <div>
+        <div class="num">100+</div>
+        <div class="label">Biens gérés</div>
+      </div>
+      <div>
+        <div class="num">8%+</div>
+        <div class="label">Rendement brut moyen</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section">
+    <div class="box">
+      <h2>Prêt à optimiser votre patrimoine ?</h2>
+      <p>Accédez à votre espace de gestion immobilière et bénéficiez de nos outils d'analyse avancés.</p>
+      <a href="/app/" class="btn">Accéder à la plateforme →</a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <p>© 2026 WB Partners — Investissement Immobilier, Conseil, Gestion · <a href="mailto:contact@wbpartners.fr" style="color: #64748b;">contact@wbpartners.fr</a></p>
+  </footer>
+
+</body>
+</html>
