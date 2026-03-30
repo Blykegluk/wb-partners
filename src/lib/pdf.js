@@ -25,8 +25,8 @@ const parties = (soc, loc) => `
     <div class="bloc"><h3>Locataire</h3><p><strong>${loc.raison_sociale || `${loc.prenom} ${loc.nom}`}</strong><br>${loc.email || ''}<br>${loc.telephone || ''}</p></div>
   </div>`
 
-const bienBox = (bien, bail) => `
-  <div class="bien-box"><strong>Bien loué :</strong> ${bien.adresse}, ${bien.ville} ${bien.code_postal} | ${bien.surface_rdc || 0} m² RDC${bien.surface_sous_sol ? ` + ${bien.surface_sous_sol} m² SS` : ''}${bail?.utilisation ? ` | ${bail.utilisation}` : ''}</div>`
+const bienBox = (bien) => `
+  <div class="bien-box"><strong>Bien :</strong> ${bien.adresse}, ${bien.code_postal} ${bien.ville}${bien.surface_rdc ? ` — ${bien.surface_rdc} m²` : ''}</div>`
 
 const ibanBlock = (soc) => soc?.iban ? `
   <div class="iban">
@@ -45,7 +45,7 @@ export const pdfAvisEcheance = (bail, bien, loc, soc, mois, annee) => {
   openPrint(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Avis d'échéance</title><style>${baseStyle}</style></head><body>
     ${header(soc, "Avis d'Échéance", `<p>Période : ${periode}</p><p>Émis le ${new Date().toLocaleDateString('fr-FR')}</p>`)}
     ${parties(soc, loc)}
-    ${bienBox(bien, bail)}
+    ${bienBox(bien)}
     <table><thead><tr><th>Désignation</th><th style="text-align:right">HT</th><th style="text-align:right">TVA 20%</th><th style="text-align:right">TTC</th></tr></thead><tbody>
       <tr><td>Loyer hors charges</td><td style="text-align:right">${loyerHT.toFixed(2)} €</td><td style="text-align:right">${(loyerHT * 0.2).toFixed(2)} €</td><td style="text-align:right">${(loyerHT * 1.2).toFixed(2)} €</td></tr>
       ${bail.charges > 0 ? `<tr><td>Provisions sur charges</td><td style="text-align:right">${bail.charges.toFixed(2)} €</td><td style="text-align:right">${(bail.charges * 0.2).toFixed(2)} €</td><td style="text-align:right">${(bail.charges * 1.2).toFixed(2)} €</td></tr>` : ''}
@@ -68,7 +68,7 @@ export const pdfFacture = (bail, bien, loc, soc, mois, annee) => {
   openPrint(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Facture ${num}</title><style>${baseStyle}</style></head><body>
     ${header(soc, 'FACTURE', `<p class="num" style="font-size:14px;color:#3b82f6;font-weight:600">${num}</p><p>Date : ${new Date().toLocaleDateString('fr-FR')}</p><p>Période : ${periode}</p>`)}
     ${parties(soc, loc)}
-    ${bienBox(bien, bail)}
+    ${bienBox(bien)}
     <table><thead><tr><th>Désignation</th><th style="text-align:right">P.U. HT</th><th style="text-align:right">TVA 20%</th><th style="text-align:right">TTC</th></tr></thead><tbody>
       <tr><td>Loyer — ${periode}</td><td style="text-align:right">${loyerHT.toFixed(2)} €</td><td style="text-align:right">${(loyerHT * 0.2).toFixed(2)} €</td><td style="text-align:right">${(loyerHT * 1.2).toFixed(2)} €</td></tr>
       ${bail.charges > 0 ? `<tr><td>Charges</td><td style="text-align:right">${bail.charges.toFixed(2)} €</td><td style="text-align:right">${(bail.charges * 0.2).toFixed(2)} €</td><td style="text-align:right">${(bail.charges * 1.2).toFixed(2)} €</td></tr>` : ''}
@@ -91,7 +91,7 @@ export const pdfQuittance = (bail, bien, loc, soc, transaction) => {
   openPrint(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Quittance</title><style>${baseStyle}</style></head><body>
     ${header(soc, 'Quittance de Loyer', `<p>Période : ${periode}</p><p>Date de paiement : ${datePaiement}</p>`)}
     ${parties(soc, loc)}
-    ${bienBox(bien, bail)}
+    ${bienBox(bien)}
     <table><thead><tr><th>Désignation</th><th style="text-align:right">HT</th><th style="text-align:right">TVA 20%</th><th style="text-align:right">TTC</th></tr></thead><tbody>
       <tr><td>Loyer</td><td style="text-align:right">${loyerHT.toFixed(2)} €</td><td style="text-align:right">${(loyerHT * 0.2).toFixed(2)} €</td><td style="text-align:right">${(loyerHT * 1.2).toFixed(2)} €</td></tr>
       <tr><td>Charges</td><td style="text-align:right">${chargesHT.toFixed(2)} €</td><td style="text-align:right">${(chargesHT * 0.2).toFixed(2)} €</td><td style="text-align:right">${(chargesHT * 1.2).toFixed(2)} €</td></tr>
@@ -111,7 +111,7 @@ export const pdfRelance = (bail, bien, loc, soc, transactions) => {
   openPrint(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Relance amiable</title><style>${baseStyle}</style></head><body>
     ${header(soc, 'Relance Amiable', `<p>${new Date().toLocaleDateString('fr-FR')}</p>`)}
     ${parties(soc, loc)}
-    ${bienBox(bien, bail)}
+    ${bienBox(bien)}
     <p style="margin-bottom:20px">Madame, Monsieur,</p>
     <p style="margin-bottom:16px">Sauf erreur de notre part, nous constatons que le(s) loyer(s) suivant(s) reste(nt) impayé(s) :</p>
     <p style="margin-bottom:16px;font-weight:700">Périodes concernées : ${periodes}</p>
@@ -133,7 +133,7 @@ export const pdfMiseEnDemeure = (bail, bien, loc, soc, transactions) => {
     ${header(soc, 'MISE EN DEMEURE', `<p>Lettre recommandée avec AR</p><p>${new Date().toLocaleDateString('fr-FR')}</p>`)}
     ${parties(soc, loc)}
     <div class="urgent">MISE EN DEMEURE DE PAYER</div>
-    ${bienBox(bien, bail)}
+    ${bienBox(bien)}
     <p style="margin-bottom:16px">Madame, Monsieur,</p>
     <p style="margin-bottom:16px">Malgré nos précédentes relances restées sans effet, nous constatons que les sommes suivantes restent dues :</p>
     <table><thead><tr><th>Période</th><th style="text-align:right">Loyer</th><th style="text-align:right">Charges</th><th style="text-align:right">Total</th></tr></thead>
@@ -156,7 +156,7 @@ export const pdfCommandement = (bail, bien, loc, soc, transactions) => {
     ${header(soc, 'COMMANDEMENT DE PAYER', `<p>Par acte d'huissier</p><p>${new Date().toLocaleDateString('fr-FR')}</p>`)}
     ${parties(soc, loc)}
     <div class="urgent">COMMANDEMENT DE PAYER — CLAUSE RÉSOLUTOIRE</div>
-    ${bienBox(bien, bail)}
+    ${bienBox(bien)}
     <p style="margin-bottom:16px">En vertu du bail en date du ${bail.date_debut || '—'}, il est fait commandement de payer les sommes suivantes :</p>
     <table><thead><tr><th>Période</th><th style="text-align:right">Montant HT</th></tr></thead>
       <tbody>${rows}<tr class="tot"><td><strong>TOTAL</strong></td><td style="text-align:right"><strong>${(totalDu * 1.2).toFixed(2)} € TTC</strong></td></tr></tbody>

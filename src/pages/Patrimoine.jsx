@@ -44,7 +44,11 @@ export default function Patrimoine({ navigate }) {
   const [viewMode, setViewMode] = useState('list') // 'list' | 'carte'
   const [showUpload, setShowUpload] = useState(false)
   const [uploadBienId, setUploadBienId] = useState(null)
-  const [locDetail, setLocDetail] = useState(null) // locataire detail popup
+  const [locDetail, setLocDetail] = useState(null)
+  const [genModal, setGenModal] = useState(null) // { type, bail, bien, loc }
+  const [genMois, setGenMois] = useState(new Date().getMonth())
+  const [genAnnee, setGenAnnee] = useState(new Date().getFullYear())
+  const [genDate, setGenDate] = useState(new Date().toISOString().slice(0, 10))
 
   // Bien modal
   const [editBien, setEditBien] = useState(null)
@@ -428,21 +432,23 @@ export default function Patrimoine({ navigate }) {
           const DOC_SECTIONS = [
             { key: 'bail', label: 'Baux & Avenants', color: '#8b5cf6', canGenerate: false },
             { key: 'avis_echeance', label: "Avis d'échéances", color: '#3b82f6', canGenerate: true,
-              generate: () => activeBail && pdfAvisEcheance(activeBail, detail, activeLoc, selected, curMonth, curYear),
+              generate: () => activeBail && setGenModal({ type: 'avis_echeance', bail: activeBail, bien: detail, loc: activeLoc }),
               genLabel: 'Générer avis' },
             { key: 'facture', label: 'Factures', color: '#f59e0b', canGenerate: true,
-              generate: () => activeBail && pdfFacture(activeBail, detail, activeLoc, selected, curMonth, curYear),
+              generate: () => activeBail && setGenModal({ type: 'facture', bail: activeBail, bien: detail, loc: activeLoc }),
               genLabel: 'Générer facture' },
             { key: 'quittance', label: 'Quittances de loyer', color: '#22c55e', canGenerate: true,
-              generate: () => {
-                const paidTx = transactions.find(t => t.bail_id === activeBail?.id && t.statut === 'payé' && t.annee === curYear && t.mois === curMonth - 1)
-                if (paidTx && activeBail) pdfQuittance(activeBail, detail, activeLoc, selected, paidTx)
-                else alert('Aucun loyer payé le mois dernier pour générer une quittance.')
-              },
+              generate: () => activeBail && setGenModal({ type: 'quittance', bail: activeBail, bien: detail, loc: activeLoc }),
               genLabel: 'Générer quittance' },
             { key: 'appel_charges', label: 'Appels de charges', color: '#06b6d4', canGenerate: false },
+            { key: 'relance', label: 'Relances', color: '#f97316', canGenerate: true,
+              generate: () => activeBail && setGenModal({ type: 'relance', bail: activeBail, bien: detail, loc: activeLoc }),
+              genLabel: 'Générer relance' },
+            { key: 'mise_en_demeure', label: 'Mises en demeure', color: '#dc2626', canGenerate: true,
+              generate: () => activeBail && setGenModal({ type: 'mise_en_demeure', bail: activeBail, bien: detail, loc: activeLoc }),
+              genLabel: 'Générer MED' },
             { key: 'commandement', label: 'Commandements de payer', color: '#ef4444', canGenerate: true,
-              generate: () => activeBail && pdfCommandement(activeBail, detail, activeLoc, selected, transactions),
+              generate: () => activeBail && setGenModal({ type: 'commandement', bail: activeBail, bien: detail, loc: activeLoc }),
               genLabel: 'Générer commandement' },
             { key: 'taxe_fonciere', label: 'Taxe foncière', color: '#ec4899', canGenerate: false },
             { key: 'amortissement', label: "Tableaux d'amortissement", color: '#f97316', canGenerate: false },
@@ -718,6 +724,51 @@ export default function Patrimoine({ navigate }) {
         {renderBienModal()}
         {renderBailModal()}
         {renderLocModal()}
+
+        {/* Generate document modal */}
+        {genModal && (
+          <Modal title={
+            { avis_echeance: "Générer un avis d'échéance", facture: 'Générer une facture',
+              quittance: 'Générer une quittance', relance: 'Générer une relance',
+              mise_en_demeure: 'Générer une mise en demeure', commandement: 'Générer un commandement de payer',
+            }[genModal.type] || 'Générer un document'
+          } onClose={() => setGenModal(null)} width="max-w-md">
+            {['avis_echeance', 'facture', 'quittance'].includes(genModal.type) && (
+              <Grid2>
+                <div className="mb-3">
+                  <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wide">Mois</label>
+                  <select value={genMois} onChange={e => setGenMois(Number(e.target.value))}
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm">
+                    {['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'].map((m, i) => (
+                      <option key={i} value={i}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+                <Field label="Année" type="number" value={genAnnee} onChange={e => setGenAnnee(Number(e.target.value))} />
+              </Grid2>
+            )}
+            <Field label="Date d'émission" type="date" value={genDate} onChange={e => setGenDate(e.target.value)} />
+            <div className="flex justify-end gap-3 mt-4">
+              <Btn variant="ghost" onClick={() => setGenModal(null)}>Annuler</Btn>
+              <Btn onClick={() => {
+                const { type, bail, bien, loc } = genModal
+                if (type === 'avis_echeance') pdfAvisEcheance(bail, bien, loc, selected, genMois, genAnnee)
+                else if (type === 'facture') pdfFacture(bail, bien, loc, selected, genMois, genAnnee)
+                else if (type === 'quittance') {
+                  const paidTx = transactions.find(t => t.bail_id === bail.id && t.statut === 'payé' && t.annee === genAnnee && t.mois === genMois)
+                  if (paidTx) pdfQuittance(bail, bien, loc, selected, paidTx)
+                  else { alert(`Aucun loyer payé pour ${['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'][genMois]} ${genAnnee}.`); return }
+                }
+                else if (type === 'relance') pdfRelance(bail, bien, loc, selected, transactions)
+                else if (type === 'mise_en_demeure') pdfMiseEnDemeure(bail, bien, loc, selected, transactions)
+                else if (type === 'commandement') pdfCommandement(bail, bien, loc, selected, transactions)
+                setGenModal(null)
+              }}>
+                <Printer size={14} /> Générer
+              </Btn>
+            </div>
+          </Modal>
+        )}
 
         {/* Locataire detail popup */}
         {locDetail && (
