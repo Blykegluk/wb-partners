@@ -94,35 +94,37 @@ Deno.serve(async (req) => {
     const { fileBase64, mimeType } = await req.json();
     if (!fileBase64) throw new Error("fileBase64 is required");
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
-      {
+    const geminiBody = JSON.stringify({
+      contents: [{
+        parts: [
+          { inline_data: { mime_type: mimeType || "application/pdf", data: fileBase64 } },
+          { text: EXTRACT_PROMPT },
+        ],
+      }],
+      generationConfig: { maxOutputTokens: 4096, temperature: 0.1 },
+    });
+
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`;
+
+    // Retry up to 3 times on 429/503 (rate limit / overloaded)
+    let response, data;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      response = await fetch(geminiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              {
-                inline_data: {
-                  mime_type: mimeType || "application/pdf",
-                  data: fileBase64,
-                },
-              },
-              { text: EXTRACT_PROMPT },
-            ],
-          }],
-          generationConfig: {
-            maxOutputTokens: 4096,
-            temperature: 0.1,
-          },
-        }),
+        body: geminiBody,
+      });
+      data = await response.json();
+
+      if (response.status === 429 || response.status === 503) {
+        await new Promise(r => setTimeout(r, (attempt + 1) * 5000)); // 5s, 10s, 15s
+        continue;
       }
-    );
+      break;
+    }
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      const msg = data.error?.message || JSON.stringify(data.error) || "Gemini API error";
+    if (!response!.ok) {
+      const msg = data!.error?.message || JSON.stringify(data!.error) || "Gemini API error";
       throw new Error(msg);
     }
 
