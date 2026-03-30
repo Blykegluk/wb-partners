@@ -65,8 +65,11 @@ Deno.serve(async (req) => {
         subject: `${invited_by_name || "Un collaborateur"} vous invite sur WB Partners`,
         html: `
           <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 500px; margin: 0 auto; padding: 40px 20px;">
-            <h1 style="color: #1e293b; font-size: 20px; margin-bottom: 8px;">WB Partners</h1>
-            <p style="color: #94a3b8; font-size: 13px; margin-bottom: 32px;">Gestion Immobilière</p>
+            <div style="text-align: center; margin-bottom: 32px;">
+              <img src="https://wbpartners.fr/logo.png" alt="WB Partners" width="64" height="64" style="border-radius: 12px; margin-bottom: 12px;" />
+              <h1 style="color: #1e293b; font-size: 20px; margin: 0;">WB Partners</h1>
+              <p style="color: #94a3b8; font-size: 13px; margin: 4px 0 0;">Gestion Immobilière</p>
+            </div>
             <p style="color: #334155; font-size: 15px; line-height: 1.6;">
               <strong>${invited_by_name || "Un collaborateur"}</strong> vous invite à rejoindre la société
               <strong>${societe_name || "—"}</strong> en tant que <strong>${roleLabel[role] || "Lecteur"}</strong>.

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 220" fill="none">
+  <!-- WB Partners Logo - Gold on transparent -->
+  <!-- Outer diamond/mountain shape -->
+  <path d="M100 10 L170 90 L100 170 L30 90 Z" stroke="#C5975B" stroke-width="8" fill="none" stroke-linejoin="miter"/>
+  <!-- Inner W shape (two interlocked chevrons) -->
+  <path d="M60 80 L80 105 L100 80 L120 105 L140 80" stroke="#C5975B" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Inner bottom connectors -->
+  <path d="M70 95 L90 120 L100 105 L110 120 L130 95" stroke="#C5975B" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -6,6 +6,7 @@ import {
 import { useAuth } from '../contexts/Auth'
 import { useSociete } from '../contexts/Societe'
 import { Badge } from './UI'
+import logoUrl from '../assets/logo.png'
 
 const NAV = [
   { k: 'dashboard', l: 'Tableau de bord', I: LayoutDashboard },
@@ -27,10 +28,13 @@ export default function Layout({ page, setPage, children }) {
   const SidebarContent = () => (
     <>
       {/* Logo */}
-      <div className="px-5 py-6 border-b border-white/10 flex justify-between items-center">
-        <div>
-          <h1 className="text-white font-black text-lg tracking-[3px]">WB Partners</h1>
-          <p className="text-white/40 text-xs mt-0.5">Gestion Immobilière</p>
+      <div className="px-5 py-5 border-b border-white/10 flex justify-between items-center">
+        <div className="flex items-center gap-3">
+          <img src={logoUrl} alt="WB Partners" className="w-9 h-9 rounded-lg" />
+          <div>
+            <h1 className="text-white font-black text-base tracking-[2px]">WB Partners</h1>
+            <p className="text-white/40 text-[10px]">Gestion Immobilière</p>
+          </div>
         </div>
         <button onClick={() => setMobileOpen(false)} className="lg:hidden text-white/50 cursor-pointer">
           <X size={20} />

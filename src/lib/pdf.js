@@ -12,7 +12,10 @@ const baseStyle = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:'
 
 const header = (soc, title, sub) => `
   <div class="hdr">
-    <div class="logo">${soc?.nom_affiche || soc?.nom || 'WB Partners'}<small>Gestion Immobilière</small></div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <img src="https://wbpartners.fr/logo.png" alt="" width="40" height="40" style="border-radius:8px" />
+      <div class="logo">${soc?.nom_affiche || soc?.nom || 'WB Partners'}<small>Gestion Immobilière</small></div>
+    </div>
     <div class="doc-title"><h1>${title}</h1>${sub}</div>
   </div>`
 
