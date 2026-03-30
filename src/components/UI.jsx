@@ -148,8 +148,8 @@ export function Grid3({ children }) {
 
 // ── Card ─────────────────────────────────────────────────────
 
-export function Card({ children, className = '' }) {
-  return <div className={`bg-white rounded-xl border border-gray-100 shadow-sm ${className}`}>{children}</div>
+export function Card({ children, className = '', ...props }) {
+  return <div className={`bg-white rounded-xl border border-gray-100 shadow-sm ${className}`} {...props}>{children}</div>
 }
 
 // ── Address autocomplete ─────────────────────────────────────
