@@ -11,7 +11,7 @@ const EMPTY_BIEN = {
   reference: '', adresse: '', ville: '', code_postal: '', latitude: null, longitude: null,
   surface_rdc: '', surface_sous_sol: '', type: 'Commercial', activite: '',
   type_bail: 'commercial', attribution_charges: '', indexation: 'ILC',
-  prix_achat: '', frais_notaire_pct: '', frais_notaire: '', apport: '', montant_emprunt: '', duree_credit: '', decalage_pret: '',
+  prix_achat: '', frais_notaire_pct: '', frais_notaire: '', commission_agent: '', commission_agent_pct: '', apport: '', montant_emprunt: '', duree_credit: '', decalage_pret: '',
   loyer_mensuel: '', charges: '', annuites: '',
   date_acquisition: '', presence_extraction: false, taxe_fonciere: '', statut_bien: 'Actif',
 }
@@ -82,7 +82,9 @@ export default function Patrimoine({ navigate }) {
   const prixAchat = Number(f.prix_achat) || 0
   const fraisNotaire = f.frais_notaire !== '' ? Number(f.frais_notaire) || 0
     : f.frais_notaire_pct !== '' ? Math.round(prixAchat * (Number(f.frais_notaire_pct) / 100)) : 0
-  const coutTotal = prixAchat + fraisNotaire
+  const commissionAgent = f.commission_agent !== '' ? Number(f.commission_agent) || 0
+    : f.commission_agent_pct !== '' ? Math.round(prixAchat * (Number(f.commission_agent_pct) / 100)) : 0
+  const coutTotal = prixAchat + fraisNotaire + commissionAgent
   const apportCalc = ui.apport_mode === 'pct'
     ? Math.round(prixAchat * (Number(ui.apport_pct) / 100))
     : Number(f.apport) || 0
@@ -116,7 +118,8 @@ export default function Patrimoine({ navigate }) {
     data.apport = apportCalc || null
     data.montant_emprunt = empruntCalc || null
     data.frais_notaire = fraisNotaire || null
-    for (const k of ['surface_rdc','surface_sous_sol','prix_achat','apport','montant_emprunt','duree_credit','decalage_pret','loyer_mensuel','charges','annuites','taxe_fonciere','latitude','longitude','frais_notaire','frais_notaire_pct']) {
+    data.commission_agent = commissionAgent || null
+    for (const k of ['surface_rdc','surface_sous_sol','prix_achat','apport','montant_emprunt','duree_credit','decalage_pret','loyer_mensuel','charges','annuites','taxe_fonciere','latitude','longitude','frais_notaire','frais_notaire_pct','commission_agent','commission_agent_pct']) {
       data[k] = data[k] === '' || data[k] === null || data[k] === undefined ? null : Number(data[k])
     }
     data.presence_extraction = !!data.presence_extraction
@@ -300,6 +303,7 @@ export default function Patrimoine({ navigate }) {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                 <div><p className="text-gray-400 text-xs mb-1">Prix d'achat</p><p className="font-semibold text-navy">{fmt(detail.prix_achat)}</p></div>
                 <div><p className="text-gray-400 text-xs mb-1">Frais de notaire</p><p className="font-semibold text-navy">{fmt(detail.frais_notaire)}</p></div>
+                <div><p className="text-gray-400 text-xs mb-1">Commission agent</p><p className="font-semibold text-navy">{fmt(detail.commission_agent)}</p></div>
                 <div><p className="text-gray-400 text-xs mb-1">Apport</p><p className="font-semibold text-navy">{fmt(detail.apport)}</p></div>
                 <div><p className="text-gray-400 text-xs mb-1">Emprunt</p><p className="font-semibold text-navy">{fmt(detail.montant_emprunt)}</p></div>
                 <div><p className="text-gray-400 text-xs mb-1">Durée crédit</p><p className="font-semibold text-navy">{detail.duree_credit ? `${detail.duree_credit} mois` : '—'}</p></div>
@@ -755,12 +759,37 @@ export default function Patrimoine({ navigate }) {
               readOnly={f.frais_notaire_pct !== ''} />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-navy mb-1">Coût total</label>
-            <div className="px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-bold text-navy mt-5">
-              {fmt(coutTotal)}
+            <label className="block text-xs font-semibold text-navy mb-1">Commission agent</label>
+            <div className="flex gap-1.5 mb-2">
+              {[3, 5, 7].map(pct => (
+                <button key={pct} type="button"
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${Number(f.commission_agent_pct) === pct ? 'bg-navy text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                  onClick={() => {
+                    const ca = Math.round(prixAchat * (pct / 100))
+                    setF(p => ({ ...p, commission_agent_pct: pct, commission_agent: ca }))
+                  }}>
+                  {pct}%
+                </button>
+              ))}
+              <button type="button"
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${f.commission_agent_pct === '' && f.commission_agent !== '' ? 'bg-navy text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                onClick={() => setF(p => ({ ...p, commission_agent_pct: '' }))}>
+                Manuel
+              </button>
             </div>
+            <input type="number" placeholder="Montant (EUR)"
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm"
+              value={f.commission_agent_pct !== '' ? commissionAgent : f.commission_agent}
+              onChange={e => setF(p => ({ ...p, commission_agent: e.target.value === '' ? '' : e.target.value, commission_agent_pct: '' }))}
+              readOnly={f.commission_agent_pct !== ''} />
           </div>
         </Grid3>
+        <div className="mb-3">
+          <label className="block text-xs font-semibold text-navy mb-1">Coût total (prix + notaire + commission)</label>
+          <div className="px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-bold text-navy">
+            {fmt(coutTotal)}
+          </div>
+        </div>
 
         {/* Apport + Emprunt */}
         <Grid3>

@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Building2, Plus, LogOut } from 'lucide-react'
+import { Plus, LogOut } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/Auth'
 import { useSociete } from '../contexts/Societe'
 import { Badge, Modal, Field, Btn, Spinner } from '../components/UI'
+import logoUrl from '../assets/logo.png'
 
 export default function SelectSociete() {
   const { signOut, user } = useAuth()
@@ -28,9 +29,7 @@ export default function SelectSociete() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-xl">
         <div className="text-center mb-8">
-          <div className="bg-navy w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3">
-            <Building2 size={26} color="#fff" />
-          </div>
+          <img src={logoUrl} alt="WB Partners" className="w-20 h-20 rounded-2xl mx-auto mb-3" />
           <h1 className="text-xl font-black text-navy tracking-[3px]">WB Partners</h1>
           <p className="text-gray-400 text-sm mt-2">Sélectionnez une société</p>
         </div>
