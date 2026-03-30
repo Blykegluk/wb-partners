@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Building2, Plus, Trash2, Upload, MapPin, FileText, Users, FolderOpen, Receipt, ArrowRight, Link, Euro, ChevronLeft, Download, ExternalLink } from 'lucide-react'
+import { Building2, Plus, Trash2, Upload, MapPin, FileText, Users, FolderOpen, Receipt, ArrowRight, Link, Euro, ChevronLeft, Download, ExternalLink, Map, List } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useSociete } from '../contexts/Societe'
 import { fmt, fmtDate, googleMapsUrl, DOC_TYPES } from '../lib/utils'
 import { rendementBrut, rendementNet, cashflowMensuel } from '../lib/calculs'
 import SmartUpload from '../components/SmartUpload'
+import Carte from './Carte'
 import { PageHeader, Card, Modal, Field, Sel, Check, Grid2, Grid3, Btn, Badge, Empty, AddressField } from '../components/UI'
 
 const EMPTY_BIEN = {
@@ -39,6 +40,7 @@ export default function Patrimoine({ navigate }) {
 
   const [detailId, setDetailId] = useState(null)
   const [tab, setTab] = useState('infos')
+  const [viewMode, setViewMode] = useState('list') // 'list' | 'carte'
   const [showUpload, setShowUpload] = useState(false)
   const [uploadBienId, setUploadBienId] = useState(null)
   const [locDetail, setLocDetail] = useState(null) // locataire detail popup
@@ -409,54 +411,87 @@ export default function Patrimoine({ navigate }) {
         )}
 
         {/* ── TAB: Documents ─────────────────────────────────── */}
-        {tab === 'documents' && (
-          <div>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide">
-                Documents ({bienDocs.length})
-              </h3>
-              {canEdit && (
-                <Btn variant="green" className="!text-xs" onClick={() => openUpload(detail.id)}>
-                  <Upload size={13} /> SmartUpload
-                </Btn>
+        {tab === 'documents' && (() => {
+          const DOC_SECTIONS = [
+            { key: 'bail', label: 'Baux & Avenants', color: '#8b5cf6' },
+            { key: 'avis_echeance', label: "Avis d'échéances", color: '#3b82f6' },
+            { key: 'quittance', label: 'Quittances de loyer', color: '#22c55e' },
+            { key: 'facture', label: 'Factures', color: '#f59e0b' },
+            { key: 'appel_charges', label: 'Appels de charges', color: '#06b6d4' },
+            { key: 'commandement', label: 'Commandements de payer', color: '#ef4444' },
+            { key: 'taxe_fonciere', label: 'Taxe foncière', color: '#ec4899' },
+            { key: 'amortissement', label: 'Tableaux d\'amortissement', color: '#f97316' },
+            { key: 'diagnostic', label: 'Diagnostics immobiliers', color: '#14b8a6' },
+            { key: 'acte_vente', label: 'Actes de vente', color: '#6366f1' },
+            { key: 'autre', label: 'Autres documents', color: '#64748b' },
+          ]
+          const grouped = {}
+          DOC_SECTIONS.forEach(s => { grouped[s.key] = bienDocs.filter(d => d.type === s.key) })
+          // Also catch any docs with types not in sections
+          const knownTypes = DOC_SECTIONS.map(s => s.key)
+          const uncategorized = bienDocs.filter(d => !knownTypes.includes(d.type))
+          if (uncategorized.length > 0) grouped['autre'] = [...(grouped['autre'] || []), ...uncategorized]
+
+          const sectionsWithDocs = DOC_SECTIONS.filter(s => (grouped[s.key] || []).length > 0)
+
+          return (
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide">
+                  Documents ({bienDocs.length})
+                </h3>
+                {canEdit && (
+                  <Btn variant="green" className="!text-xs" onClick={() => openUpload(detail.id)}>
+                    <Upload size={13} /> SmartUpload
+                  </Btn>
+                )}
+              </div>
+
+              {bienDocs.length === 0 ? (
+                <Empty icon={<FolderOpen size={40} />} text="Aucun document pour ce bien." />
+              ) : (
+                <div className="space-y-6">
+                  {sectionsWithDocs.map(section => (
+                    <div key={section.key}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ background: section.color }} />
+                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide">
+                          {section.label} ({grouped[section.key].length})
+                        </h4>
+                      </div>
+                      <div className="space-y-1.5">
+                        {grouped[section.key].map(d => (
+                          <Card key={d.id} className="p-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: section.color }} />
+                                <div>
+                                  <p className="text-sm font-semibold text-navy">{d.nom}</p>
+                                  <p className="text-xs text-gray-400">{fmtDate(d.created_at)}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <a href={d.fichier_url} target="_blank" rel="noreferrer"
+                                  className="text-gray-300 hover:text-blue-500 cursor-pointer">
+                                  <Download size={16} />
+                                </a>
+                                {canEdit && (
+                                  <button onClick={() => delDoc(d.id)} className="text-gray-300 hover:text-red-500 cursor-pointer">
+                                    <Trash2 size={16} />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
-
-            {bienDocs.length === 0 ? (
-              <Empty icon={<FolderOpen size={40} />} text="Aucun document pour ce bien." />
-            ) : (
-              <div className="space-y-2">
-                {bienDocs.map(d => {
-                  const ti = DOC_TYPES.find(t => t.v === d.type) || { l: d.type, color: '#64748b' }
-                  return (
-                    <Card key={d.id} className="p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: ti.color }} />
-                          <div>
-                            <p className="text-sm font-semibold text-navy">{d.nom}</p>
-                            <p className="text-xs text-gray-400">{ti.l} — {fmtDate(d.created_at)}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <a href={d.fichier_url} target="_blank" rel="noreferrer"
-                            className="text-gray-300 hover:text-blue-500 cursor-pointer">
-                            <Download size={16} />
-                          </a>
-                          {canEdit && (
-                            <button onClick={() => delDoc(d.id)} className="text-gray-300 hover:text-red-500 cursor-pointer">
-                              <Trash2 size={16} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </Card>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
+          )
+        })()}
 
         {/* ── TAB: Charges ───────────────────────────────────── */}
         {tab === 'charges' && (
@@ -549,7 +584,17 @@ export default function Patrimoine({ navigate }) {
   function renderListView() {
     return (
       <div>
-        <PageHeader title="Patrimoine" sub="Vue consolidée de vos biens immobiliers">
+        <PageHeader title="Biens" sub="Vue consolidée de vos biens immobiliers">
+          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5 mr-2">
+            <button onClick={() => setViewMode('list')}
+              className={`p-2 rounded-md cursor-pointer transition-colors ${viewMode === 'list' ? 'bg-white shadow-sm text-navy' : 'text-gray-400 hover:text-gray-600'}`}>
+              <List size={16} />
+            </button>
+            <button onClick={() => setViewMode('carte')}
+              className={`p-2 rounded-md cursor-pointer transition-colors ${viewMode === 'carte' ? 'bg-white shadow-sm text-navy' : 'text-gray-400 hover:text-gray-600'}`}>
+              <Map size={16} />
+            </button>
+          </div>
           {canEdit && (
             <>
               <Btn variant="green" onClick={() => openUpload()}>
@@ -562,7 +607,9 @@ export default function Patrimoine({ navigate }) {
           )}
         </PageHeader>
 
-        {biens.length === 0 ? (
+        {viewMode === 'carte' ? (
+          <Carte />
+        ) : biens.length === 0 ? (
           <Empty icon={<Building2 size={40} />} text="Aucun bien. Ajoutez votre premier bien immobilier." />
         ) : (
           <div className="space-y-3">

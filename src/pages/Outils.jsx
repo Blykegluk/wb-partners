@@ -1,11 +1,9 @@
 import { useState } from 'react'
 import Simulateur from './Simulateur'
-import Carte from './Carte'
 import Revisions from './Revisions'
 
 const TABS = [
   { key: 'simulateur', label: 'Simulateur' },
-  { key: 'carte', label: 'Carte' },
   { key: 'revisions', label: 'Révisions loyer' },
 ]
 
@@ -25,9 +23,6 @@ export default function Outils({ navigate }) {
       <div style={{ display: tab === 'simulateur' ? 'block' : 'none' }}>
         <Simulateur navigate={navigate} />
       </div>
-      {tab === 'carte' && (
-        <Carte navigate={navigate} />
-      )}
       <div style={{ display: tab === 'revisions' ? 'block' : 'none' }}>
         <Revisions navigate={navigate} />
       </div>
