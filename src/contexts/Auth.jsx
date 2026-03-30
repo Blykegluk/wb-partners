@@ -7,20 +7,22 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  // When user logs in, check for pending invitations and accept them
+  const FUNCTIONS_URL = import.meta.env.VITE_SUPABASE_URL + '/functions/v1'
+
+  // When user logs in, accept pending invitations via Edge Function (bypasses RLS)
   const acceptPendingInvitations = async (u) => {
     if (!u?.email) return
-    const { data: invites } = await supabase.from('invitations').select('*').eq('email', u.email.toLowerCase())
-    if (!invites || invites.length === 0) return
-    for (const inv of invites) {
-      // Add as member (ignore if already exists)
-      await supabase.from('societe_membres').upsert(
-        { societe_id: inv.societe_id, user_id: u.id, role: inv.role },
-        { onConflict: 'societe_id,user_id' }
-      )
-      // Delete the invitation
-      await supabase.from('invitations').delete().eq('id', inv.id)
-    }
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      await fetch(`${FUNCTIONS_URL}/accept-invitations`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ user_id: u.id, email: u.email }),
+      })
+    } catch { /* best effort */ }
   }
 
   useEffect(() => {
