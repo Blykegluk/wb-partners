@@ -25,9 +25,9 @@ export default function Outils({ navigate }) {
       <div style={{ display: tab === 'simulateur' ? 'block' : 'none' }}>
         <Simulateur navigate={navigate} />
       </div>
-      <div style={{ display: tab === 'carte' ? 'block' : 'none' }}>
+      {tab === 'carte' && (
         <Carte navigate={navigate} />
-      </div>
+      )}
       <div style={{ display: tab === 'revisions' ? 'block' : 'none' }}>
         <Revisions navigate={navigate} />
       </div>
