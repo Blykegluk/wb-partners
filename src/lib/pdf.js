@@ -19,22 +19,47 @@ const header = (soc, title, sub) => `
     <div class="doc-title"><h1>${title}</h1>${sub}</div>
   </div>`
 
+// Generate unique payment reference: BIEN-MOIS-ANNEE-CODE
+const genRef = (bail, mois, annee) => {
+  const bienCode = (bail?.id || '').slice(0, 6).toUpperCase()
+  return `LOY-${bienCode}-${String(mois + 1).padStart(2, '0')}${annee}`
+}
+
 const parties = (soc, loc) => `
   <div class="grid2">
-    <div class="bloc"><h3>Bailleur</h3><p><strong>${soc?.nom || '—'}</strong>${soc?.siret ? `<br>SIRET : ${soc.siret}` : ''}</p></div>
-    <div class="bloc"><h3>Locataire</h3><p><strong>${loc.raison_sociale || `${loc.prenom} ${loc.nom}`}</strong><br>${loc.email || ''}<br>${loc.telephone || ''}</p></div>
+    <div class="bloc">
+      <h3>Bailleur</h3>
+      <p><strong>${soc?.nom || '—'}</strong>
+      ${soc?.siret ? `<br>SIRET : ${soc.siret}` : ''}
+      ${soc?.rcs ? `<br>RCS : ${soc.rcs}` : ''}
+      ${soc?.tva_intracommunautaire ? `<br>TVA : ${soc.tva_intracommunautaire}` : ''}
+      ${soc?.adresse ? `<br>${soc.adresse}` : ''}
+      ${soc?.code_postal || soc?.ville ? `<br>${soc.code_postal || ''} ${soc.ville || ''}` : ''}
+      ${soc?.telephone ? `<br>Tél : ${soc.telephone}` : ''}
+      ${soc?.email ? `<br>${soc.email}` : ''}</p>
+    </div>
+    <div class="bloc">
+      <h3>Locataire</h3>
+      <p><strong>${loc.raison_sociale || `${loc.prenom || ''} ${loc.nom || ''}`}</strong>
+      ${loc.adresse ? `<br>${loc.adresse}` : ''}
+      ${loc.code_postal || loc.ville ? `<br>${loc.code_postal || ''} ${loc.ville || ''}` : ''}
+      ${loc.email ? `<br>${loc.email}` : ''}
+      ${loc.telephone ? `<br>${loc.telephone}` : ''}</p>
+    </div>
   </div>`
 
 const bienBox = (bien) => `
   <div class="bien-box"><strong>Bien :</strong> ${bien.adresse}, ${bien.code_postal} ${bien.ville}${bien.surface_rdc ? ` — ${bien.surface_rdc} m²` : ''}</div>`
 
-const ibanBlock = (soc) => soc?.iban ? `
+const ibanBlock = (soc, ref = '') => soc?.iban ? `
   <div class="iban">
     <div><div class="lbl">Virement — IBAN</div><div class="val">${soc.iban}</div></div>
     ${soc.bic ? `<div><div class="lbl">BIC</div><div class="val">${soc.bic}</div></div>` : ''}
+    ${soc.nom_banque ? `<div><div class="lbl">Banque</div><div class="val">${soc.nom_banque}</div></div>` : ''}
+    ${ref ? `<div><div class="lbl">Référence virement</div><div class="val" style="color:#f59e0b">${ref}</div></div>` : ''}
   </div>` : ''
 
-const footer = (soc) => `<div class="footer">${soc?.nom || 'WB Partners'} — ${soc?.siret ? `SIRET ${soc.siret}` : ''}</div>`
+const footer = (soc) => `<div class="footer">${soc?.nom || 'WB Partners'}${soc?.siret ? ` — SIRET ${soc.siret}` : ''}${soc?.adresse ? ` — ${soc.adresse}, ${soc.code_postal || ''} ${soc.ville || ''}` : ''}</div>`
 
 // ── Avis d'échéance ─────────────────────────────────────────
 
@@ -42,8 +67,9 @@ export const pdfAvisEcheance = (bail, bien, loc, soc, mois, annee) => {
   const loyerHT = getLoyerPourMois(bail, mois, annee)
   const total = loyerHT + bail.charges
   const periode = `${MONTHS[mois]} ${annee}`
+  const ref = genRef(bail, mois, annee)
   openPrint(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Avis d'échéance</title><style>${baseStyle}</style></head><body>
-    ${header(soc, "Avis d'Échéance", `<p>Période : ${periode}</p><p>Émis le ${new Date().toLocaleDateString('fr-FR')}</p>`)}
+    ${header(soc, "Avis d'Échéance", `<p>Période : ${periode}</p><p>Émis le ${new Date().toLocaleDateString('fr-FR')}</p><p class="num" style="font-size:11px;color:#3b82f6;font-weight:600">Réf : ${ref}</p>`)}
     ${parties(soc, loc)}
     ${bienBox(bien)}
     <table><thead><tr><th>Désignation</th><th style="text-align:right">HT</th><th style="text-align:right">TVA 20%</th><th style="text-align:right">TTC</th></tr></thead><tbody>
@@ -51,7 +77,7 @@ export const pdfAvisEcheance = (bail, bien, loc, soc, mois, annee) => {
       ${bail.charges > 0 ? `<tr><td>Provisions sur charges</td><td style="text-align:right">${bail.charges.toFixed(2)} €</td><td style="text-align:right">${(bail.charges * 0.2).toFixed(2)} €</td><td style="text-align:right">${(bail.charges * 1.2).toFixed(2)} €</td></tr>` : ''}
       <tr class="tot"><td colspan="2"><strong>Total à régler avant le 1er ${periode}</strong></td><td></td><td style="text-align:right"><strong>${(total * 1.2).toFixed(2)} €</strong></td></tr>
     </tbody></table>
-    ${ibanBlock(soc)}
+    ${ibanBlock(soc, ref)}
     <p class="note">Indice de révision : ${bail.indice_revision || 'ILC'} — Bail ${bail.type_bail || 'commercial'} du ${bail.date_debut || '—'}</p>
     ${footer(soc)}
   </body></html>`)
@@ -64,7 +90,8 @@ export const pdfFacture = (bail, bien, loc, soc, mois, annee) => {
   const totalHT = loyerHT + bail.charges
   const totalTTC = totalHT * 1.2
   const periode = `${MONTHS[mois]} ${annee}`
-  const num = `FAC-${annee}${String(mois + 1).padStart(2, '0')}-${bail.id?.slice(0, 4).toUpperCase()}`
+  const ref = genRef(bail, mois, annee)
+  const num = `FAC-${annee}${String(mois + 1).padStart(2, '0')}-${bail.id?.slice(0, 6).toUpperCase()}`
   openPrint(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Facture ${num}</title><style>${baseStyle}</style></head><body>
     ${header(soc, 'FACTURE', `<p class="num" style="font-size:14px;color:#3b82f6;font-weight:600">${num}</p><p>Date : ${new Date().toLocaleDateString('fr-FR')}</p><p>Période : ${periode}</p>`)}
     ${parties(soc, loc)}
@@ -74,7 +101,7 @@ export const pdfFacture = (bail, bien, loc, soc, mois, annee) => {
       ${bail.charges > 0 ? `<tr><td>Charges</td><td style="text-align:right">${bail.charges.toFixed(2)} €</td><td style="text-align:right">${(bail.charges * 0.2).toFixed(2)} €</td><td style="text-align:right">${(bail.charges * 1.2).toFixed(2)} €</td></tr>` : ''}
       <tr class="tot"><td colspan="2"><strong>TOTAL</strong></td><td style="text-align:right"><strong>${(totalHT * 0.2).toFixed(2)} €</strong></td><td style="text-align:right"><strong>${totalTTC.toFixed(2)} €</strong></td></tr>
     </tbody></table>
-    ${ibanBlock(soc)}
+    ${ibanBlock(soc, ref)}
     ${footer(soc)}
   </body></html>`)
 }
@@ -108,6 +135,7 @@ export const pdfRelance = (bail, bien, loc, soc, transactions) => {
   const impayees = transactions.filter(t => t.bail_id === bail.id && t.statut === 'impayé')
   const totalDu = impayees.reduce((s, t) => s + t.montant_loyer + t.montant_charges, 0)
   const periodes = impayees.map(t => `${MONTHS[t.mois]} ${t.annee}`).join(', ')
+  const refStr = impayees.map(t => genRef(bail, t.mois, t.annee)).join(' / ')
   openPrint(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Relance amiable</title><style>${baseStyle}</style></head><body>
     ${header(soc, 'Relance Amiable', `<p>${new Date().toLocaleDateString('fr-FR')}</p>`)}
     ${parties(soc, loc)}
@@ -117,7 +145,7 @@ export const pdfRelance = (bail, bien, loc, soc, transactions) => {
     <p style="margin-bottom:16px;font-weight:700">Périodes concernées : ${periodes}</p>
     <p style="margin-bottom:16px;font-weight:700;font-size:16px;color:#dc2626">Montant total dû : ${(totalDu * 1.2).toFixed(2)} € TTC</p>
     <p style="margin-bottom:16px">Nous vous prions de bien vouloir régulariser cette situation dans les meilleurs délais.</p>
-    ${ibanBlock(soc)}
+    ${ibanBlock(soc, refStr)}
     <p class="note">Ce courrier constitue une relance amiable. À défaut de règlement sous 8 jours, nous nous réservons le droit d'engager toute procédure utile.</p>
     ${footer(soc)}
   </body></html>`)
@@ -129,6 +157,7 @@ export const pdfMiseEnDemeure = (bail, bien, loc, soc, transactions) => {
   const impayees = transactions.filter(t => t.bail_id === bail.id && t.statut === 'impayé')
   const totalDu = impayees.reduce((s, t) => s + t.montant_loyer + t.montant_charges, 0)
   const rows = impayees.map(t => `<tr><td>${MONTHS[t.mois]} ${t.annee}</td><td style="text-align:right">${t.montant_loyer.toFixed(2)} €</td><td style="text-align:right">${t.montant_charges.toFixed(2)} €</td><td style="text-align:right">${(t.montant_loyer + t.montant_charges).toFixed(2)} €</td></tr>`).join('')
+  const refStr = impayees.map(t => genRef(bail, t.mois, t.annee)).join(' / ')
   openPrint(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Mise en demeure</title><style>${baseStyle} .urgent{background:#fee2e2;border:2px solid #dc2626;border-radius:8px;padding:16px;margin-bottom:20px;text-align:center;color:#dc2626;font-weight:700;font-size:14px}</style></head><body>
     ${header(soc, 'MISE EN DEMEURE', `<p>Lettre recommandée avec AR</p><p>${new Date().toLocaleDateString('fr-FR')}</p>`)}
     ${parties(soc, loc)}
@@ -141,7 +170,7 @@ export const pdfMiseEnDemeure = (bail, bien, loc, soc, transactions) => {
     </table>
     <p style="margin-bottom:16px"><strong>Nous vous mettons en demeure de régler l'intégralité de cette somme sous 8 jours</strong> à compter de la réception de la présente.</p>
     <p style="margin-bottom:16px">À défaut, nous nous réservons le droit de faire application de la clause résolutoire du bail et d'engager toute procédure judiciaire utile.</p>
-    ${ibanBlock(soc)}
+    ${ibanBlock(soc, refStr)}
     ${footer(soc)}
   </body></html>`)
 }
