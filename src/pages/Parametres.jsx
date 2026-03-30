@@ -162,9 +162,9 @@ function MembresTab() {
     }
 
     // User doesn't exist → store invitation + send email
-    const { error: invErr } = await supabase.from('invitations').insert({
+    const { error: invErr } = await supabase.from('invitations').upsert({
       societe_id: selected.id, email: trimmedEmail, role, invited_by: user.id,
-    })
+    }, { onConflict: 'societe_id,email' })
     if (invErr) { setError(invErr.message); setLoading(false); return }
 
     // Send invitation email
