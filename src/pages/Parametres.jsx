@@ -138,58 +138,37 @@ function MembresTab() {
     setLoading(true)
     const trimmedEmail = email.trim().toLowerCase()
 
-    // Check if already invited
-    if (invitations.find(i => i.email === trimmedEmail)) {
-      setError('Une invitation a déjà été envoyée à cet email.')
-      setLoading(false)
-      return
-    }
-
-    // Try to find existing user
-    const { data: profiles } = await supabase.from('profiles').select('id, email, full_name').eq('email', trimmedEmail)
-
-    if (profiles && profiles.length > 0) {
-      // User exists → add directly as member
-      const target = profiles[0]
-      if (membres.find(m => m.user_id === target.id)) { setError('Déjà membre.'); setLoading(false); return }
-      if (target.id === selected.owner_id) { setError('Propriétaire de la société.'); setLoading(false); return }
-
-      const { error: e } = await supabase.from('societe_membres').insert({ societe_id: selected.id, user_id: target.id, role })
-      if (e) { setError(e.message); setLoading(false); return }
-      setOpen(false); setEmail(''); setRole('viewer'); setLoading(false)
-      reload()
-      return
-    }
-
-    // User doesn't exist → store invitation + send email
-    const { error: invErr } = await supabase.from('invitations').upsert({
-      societe_id: selected.id, email: trimmedEmail, role, invited_by: user.id,
-    }, { onConflict: 'societe_id,email' })
-    if (invErr) { setError(invErr.message); setLoading(false); return }
-
-    // Send invitation email
+    // Everything handled server-side (no profiles query = no permission error)
     const { data: { session } } = await supabase.auth.getSession()
-    try {
-      await fetch(`${FUNCTIONS_URL}/send-invite`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
-        },
-        body: JSON.stringify({
-          email: trimmedEmail,
-          societe_name: selected.nom_affiche || selected.nom,
-          invited_by_name: user.user_metadata?.full_name || user.email,
-          role,
-        }),
-      })
-    } catch { /* email sending is best-effort */ }
+    const res = await fetch(`${FUNCTIONS_URL_TOP}/send-invite`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token}`,
+      },
+      body: JSON.stringify({
+        email: trimmedEmail,
+        societe_id: selected.id,
+        societe_name: selected.nom_affiche || selected.nom,
+        invited_by_name: user.user_metadata?.full_name || user.email,
+        invited_by_id: user.id,
+        role,
+      }),
+    })
+    const result = await res.json()
+    if (!res.ok) { setError(result.error || 'Erreur'); setLoading(false); return }
 
-    setSuccess(`Invitation envoyée à ${trimmedEmail}`)
+    if (result.action === 'added_directly') {
+      setSuccess(`${trimmedEmail} ajouté comme membre.`)
+      reload()
+    } else if (result.action === 'already_member') {
+      setError('Déjà membre de cette société.')
+    } else {
+      setSuccess(`Invitation envoyée à ${trimmedEmail}`)
+      const { data: inv } = await supabase.from('invitations').select('*').eq('societe_id', selected.id)
+      setInvitations(inv || [])
+    }
     setLoading(false)
-    // Refresh invitations list
-    const { data: inv } = await supabase.from('invitations').select('*').eq('societe_id', selected.id)
-    setInvitations(inv || [])
   }
 
   const cancelInvite = async (id) => {

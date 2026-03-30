@@ -41,6 +41,7 @@ export default function Patrimoine({ navigate }) {
   const [tab, setTab] = useState('infos')
   const [showUpload, setShowUpload] = useState(false)
   const [uploadBienId, setUploadBienId] = useState(null)
+  const [locDetail, setLocDetail] = useState(null) // locataire detail popup
 
   // Bien modal
   const [editBien, setEditBien] = useState(null)
@@ -362,9 +363,9 @@ export default function Patrimoine({ navigate }) {
                             <Users size={18} className="text-gray-400" />
                           </div>
                           <div>
-                            <p className="font-semibold text-navy text-sm">
+                            <button onClick={() => loc && setLocDetail(loc)} className="font-semibold text-navy text-sm hover:text-blue-600 cursor-pointer text-left">
                               {loc?.raison_sociale || `${loc?.prenom || ''} ${loc?.nom || ''}`.trim() || '—'}
-                            </p>
+                            </button>
                             <p className="text-xs text-gray-400">
                               {fmtDate(ba.date_debut)} → {ba.date_fin ? fmtDate(ba.date_fin) : '∞'}
                               <span className="ml-2 capitalize">{ba.type_bail}</span>
@@ -633,6 +634,47 @@ export default function Patrimoine({ navigate }) {
         {renderBienModal()}
         {renderBailModal()}
         {renderLocModal()}
+
+        {/* Locataire detail popup */}
+        {locDetail && (
+          <Modal title="Fiche locataire" onClose={() => setLocDetail(null)} width="max-w-md">
+            <div className="space-y-3">
+              {locDetail.raison_sociale && (
+                <div>
+                  <p className="text-xs text-gray-400 uppercase font-semibold">Raison sociale</p>
+                  <p className="font-bold text-navy">{locDetail.raison_sociale}</p>
+                </div>
+              )}
+              {(locDetail.prenom || locDetail.nom) && (
+                <div>
+                  <p className="text-xs text-gray-400 uppercase font-semibold">Contact</p>
+                  <p className="font-semibold text-navy">{locDetail.prenom} {locDetail.nom}</p>
+                </div>
+              )}
+              {locDetail.email && (
+                <div>
+                  <p className="text-xs text-gray-400 uppercase font-semibold">Email</p>
+                  <a href={`mailto:${locDetail.email}`} className="text-blue-600 hover:underline text-sm">{locDetail.email}</a>
+                </div>
+              )}
+              {locDetail.telephone && (
+                <div>
+                  <p className="text-xs text-gray-400 uppercase font-semibold">Téléphone</p>
+                  <a href={`tel:${locDetail.telephone}`} className="text-blue-600 hover:underline text-sm">{locDetail.telephone}</a>
+                </div>
+              )}
+              {(locDetail.adresse || locDetail.ville) && (
+                <div>
+                  <p className="text-xs text-gray-400 uppercase font-semibold">Adresse</p>
+                  <p className="text-sm text-navy">{locDetail.adresse}{locDetail.code_postal ? `, ${locDetail.code_postal}` : ''} {locDetail.ville}</p>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end mt-6">
+              <Btn variant="ghost" onClick={() => setLocDetail(null)}>Fermer</Btn>
+            </div>
+          </Modal>
+        )}
       </div>
     )
   }
