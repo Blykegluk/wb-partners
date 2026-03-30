@@ -13,8 +13,8 @@ const EMPTY_BIEN = {
   reference: '', adresse: '', ville: '', code_postal: '', latitude: null, longitude: null,
   surface_rdc: '', surface_sous_sol: '', type: 'Commercial', activite: '',
   type_bail: 'commercial', attribution_charges: '', indexation: 'ILC',
-  prix_achat: '', frais_notaire_pct: '', frais_notaire: '', commission_agent: '', commission_agent_pct: '', apport: '', montant_emprunt: '', duree_credit: '', decalage_pret: '',
-  loyer_mensuel: '', charges: '', annuites: '',
+  prix_achat: '', frais_notaire_pct: '', frais_notaire: '', commission_agent: '', commission_agent_pct: '5', apport: '', montant_emprunt: '', duree_credit: '', decalage_pret: '',
+  taux_interet: '', loyer_mensuel: '', charges: '', annuites: '',
   date_acquisition: '', presence_extraction: false, taxe_fonciere: '', statut_bien: 'Actif',
 }
 
@@ -92,6 +92,14 @@ export default function Patrimoine({ navigate }) {
   const commissionAgent = f.commission_agent !== '' ? Number(f.commission_agent) || 0
     : f.commission_agent_pct !== '' ? Math.round(prixAchat * (Number(f.commission_agent_pct) / 100)) : 0
   const coutTotal = prixAchat + fraisNotaire + commissionAgent
+  // Auto-calculate annuités from loan params
+  const empruntCalcRaw = Math.max(0, coutTotal - (ui.apport_mode === 'pct' ? Math.round(prixAchat * (Number(ui.apport_pct) / 100)) : Number(f.apport) || 0))
+  const tauxMensuel = (Number(f.taux_interet) || 0) / 100 / 12
+  const dureeMois = Number(f.duree_credit) || (Number(ui.duree_annees) * 12) || 0
+  const annuitesAuto = empruntCalcRaw > 0 && tauxMensuel > 0 && dureeMois > 0
+    ? Math.round(empruntCalcRaw * tauxMensuel / (1 - Math.pow(1 + tauxMensuel, -dureeMois)) * 100) / 100
+    : 0
+
   const apportCalc = ui.apport_mode === 'pct'
     ? Math.round(prixAchat * (Number(ui.apport_pct) / 100))
     : Number(f.apport) || 0
@@ -126,7 +134,8 @@ export default function Patrimoine({ navigate }) {
     data.montant_emprunt = empruntCalc || null
     data.frais_notaire = fraisNotaire || null
     data.commission_agent = commissionAgent || null
-    for (const k of ['surface_rdc','surface_sous_sol','prix_achat','apport','montant_emprunt','duree_credit','decalage_pret','loyer_mensuel','charges','annuites','taxe_fonciere','latitude','longitude','frais_notaire','frais_notaire_pct','commission_agent','commission_agent_pct']) {
+    data.annuites = f.annuites !== '' ? Number(f.annuites) : annuitesAuto || null
+    for (const k of ['surface_rdc','surface_sous_sol','prix_achat','apport','montant_emprunt','duree_credit','decalage_pret','loyer_mensuel','charges','annuites','taxe_fonciere','latitude','longitude','frais_notaire','frais_notaire_pct','commission_agent','commission_agent_pct','taux_interet']) {
       data[k] = data[k] === '' || data[k] === null || data[k] === undefined ? null : Number(data[k])
     }
     data.presence_extraction = !!data.presence_extraction
@@ -860,9 +869,14 @@ export default function Patrimoine({ navigate }) {
 
         {/* Prix + Frais de notaire */}
         <Grid3>
-          <Field label="Prix d'achat (EUR)" type="number" value={f.prix_achat} onChange={e => {
+          <Field label="Prix d'achat HT (EUR)" type="number" value={f.prix_achat} onChange={e => {
             const v = e.target.value
-            setF(p => ({ ...p, prix_achat: v === '' ? '' : v, frais_notaire: p.frais_notaire_pct !== '' ? Math.round((Number(v) || 0) * (Number(p.frais_notaire_pct) / 100)) : p.frais_notaire }))
+            const px = Number(v) || 0
+            setF(p => ({
+              ...p, prix_achat: v === '' ? '' : v,
+              frais_notaire: p.frais_notaire_pct !== '' ? Math.round(px * (Number(p.frais_notaire_pct) / 100)) : p.frais_notaire,
+              commission_agent: p.commission_agent_pct !== '' ? Math.round(px * (Number(p.commission_agent_pct) / 100)) : p.commission_agent,
+            }))
           }} />
           <div>
             <label className="block text-xs font-semibold text-navy mb-1">Frais de notaire</label>
@@ -960,10 +974,10 @@ export default function Patrimoine({ navigate }) {
               {fmt(empruntCalc)}
             </div>
           </div>
-          <Field label="Annuités (EUR/mois)" type="number" value={f.annuites} onChange={e => num('annuites', e.target.value)} />
+          <Field label="Taux d'intérêt (%)" type="number" step="0.01" placeholder="ex: 3.5" value={f.taux_interet} onChange={e => num('taux_interet', e.target.value)} />
         </Grid3>
 
-        {/* Durée + Revenus */}
+        {/* Durée + Annuités */}
         <Grid3>
           <div>
             <label className="block text-xs font-semibold text-navy mb-1">Durée crédit</label>
@@ -1001,12 +1015,20 @@ export default function Patrimoine({ navigate }) {
             )}
           </div>
           <Field label="Différé prêt (mois)" type="number" value={f.decalage_pret} onChange={e => num('decalage_pret', e.target.value)} />
-          <Field label="Taxe foncière (EUR/an)" type="number" value={f.taxe_fonciere} onChange={e => num('taxe_fonciere', e.target.value)} />
+          <div>
+            <label className="block text-xs font-semibold text-navy mb-1">Mensualité crédit</label>
+            <div className="px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm font-bold text-navy mt-5">
+              {annuitesAuto > 0 ? fmt(annuitesAuto) + '/mois' : '—'}
+            </div>
+            {f.annuites !== '' && annuitesAuto > 0 && Number(f.annuites) !== annuitesAuto && (
+              <p className="text-xs text-amber-500 mt-1">Manuel: {fmt(Number(f.annuites))}/mois</p>
+            )}
+          </div>
         </Grid3>
         <Grid3>
-          <Field label="Loyer mensuel (EUR)" type="number" value={f.loyer_mensuel} onChange={e => num('loyer_mensuel', e.target.value)} />
-          <Field label="Charges (EUR/mois)" type="number" value={f.charges} onChange={e => num('charges', e.target.value)} />
-          <div />
+          <Field label="Loyer mensuel HT (EUR)" type="number" value={f.loyer_mensuel} onChange={e => num('loyer_mensuel', e.target.value)} />
+          <Field label="Charges HT (EUR/mois)" type="number" value={f.charges} onChange={e => num('charges', e.target.value)} />
+          <Field label="Taxe foncière (EUR/an)" type="number" value={f.taxe_fonciere} onChange={e => num('taxe_fonciere', e.target.value)} />
         </Grid3>
 
         {/* Autres */}

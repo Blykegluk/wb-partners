@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react'
 import Finances from './Finances'
 import Transactions from './Transactions'
 import Relances from './Relances'
+import TVA from './TVA'
 
 const TABS = [
   { key: 'echeancier', label: 'Échéancier' },
   { key: 'transactions', label: 'Transactions' },
   { key: 'relances', label: 'Relances' },
+  { key: 'tva', label: 'Balance TVA' },
 ]
 
 export default function FinancesHub({ navigate, navState, setNavState }) {
@@ -31,7 +33,6 @@ export default function FinancesHub({ navigate, navState, setNavState }) {
         ))}
       </div>
 
-      {/* Tab content - use display:none to preserve state */}
       <div style={{ display: tab === 'echeancier' ? 'block' : 'none' }}>
         <Finances navigate={navigate} />
       </div>
@@ -40,6 +41,9 @@ export default function FinancesHub({ navigate, navState, setNavState }) {
       </div>
       <div style={{ display: tab === 'relances' ? 'block' : 'none' }}>
         <Relances navigate={navigate} />
+      </div>
+      <div style={{ display: tab === 'tva' ? 'block' : 'none' }}>
+        <TVA />
       </div>
     </div>
   )
