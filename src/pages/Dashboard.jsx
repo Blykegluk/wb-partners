@@ -32,12 +32,12 @@ export default function Dashboard({ navigate }) {
   })
 
   const kpis = [
-    { l: 'Biens', v: biens.length, icon: <Building2 size={18} />, c: 'text-blue-500 bg-blue-50', page: 'biens' },
-    { l: 'Locataires', v: locataires.length, icon: <Users size={18} />, c: 'text-purple-500 bg-purple-50', page: 'locataires' },
-    { l: 'Baux actifs', v: bauxActifs.length, icon: <FileText size={18} />, c: 'text-emerald-500 bg-emerald-50', page: 'baux' },
-    { l: 'Total encaissé', v: fmt(totalEnc), icon: <Euro size={18} />, c: 'text-emerald-500 bg-emerald-50', page: 'finances' },
-    { l: "Taux d'occupation", v: tauxOcc + '%', icon: <TrendingUp size={18} />, c: 'text-amber-500 bg-amber-50', page: 'biens' },
-    { l: 'Impayés', v: fmt(totalImp), icon: <AlertTriangle size={18} />, c: 'text-red-500 bg-red-50', page: 'relances' },
+    { l: 'Biens', v: biens.length, icon: <Building2 size={18} />, c: 'text-blue-500 bg-blue-50', nav: () => navigate('patrimoine') },
+    { l: 'Locataires', v: locataires.length, icon: <Users size={18} />, c: 'text-purple-500 bg-purple-50', nav: () => navigate('patrimoine') },
+    { l: 'Baux actifs', v: bauxActifs.length, icon: <FileText size={18} />, c: 'text-emerald-500 bg-emerald-50', nav: () => navigate('patrimoine') },
+    { l: 'Total encaissé', v: fmt(totalEnc), icon: <Euro size={18} />, c: 'text-emerald-500 bg-emerald-50', nav: () => navigate('finances') },
+    { l: "Taux d'occupation", v: tauxOcc + '%', icon: <TrendingUp size={18} />, c: 'text-amber-500 bg-amber-50', nav: () => navigate('patrimoine') },
+    { l: 'Impayés', v: fmt(totalImp), icon: <AlertTriangle size={18} />, c: 'text-red-500 bg-red-50', nav: () => navigate('finances', { tab: 'relances' }) },
   ]
 
   return (
@@ -48,7 +48,7 @@ export default function Dashboard({ navigate }) {
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-8">
         {kpis.map((k, i) => (
-          <Card key={i} className="p-6 cursor-pointer hover:border-blue-200 hover:shadow-md transition-all" onClick={() => navigate(k.page)}>
+          <Card key={i} className="p-6 cursor-pointer hover:border-blue-200 hover:shadow-md transition-all" onClick={k.nav}>
             <div className="flex justify-between items-start">
               <div>
                 <p className="text-sm text-gray-400 mb-2 font-medium">{k.l}</p>
@@ -77,12 +77,12 @@ export default function Dashboard({ navigate }) {
               <span className="text-base">📅</span>
               <h3 className="text-sm font-bold text-navy">Révisions de loyer à venir ({alertesRevision.length})</h3>
             </div>
-            <button onClick={() => navigate('revisions')} className="text-xs text-blue-500 hover:underline cursor-pointer font-medium">
+            <button onClick={() => navigate('outils', { tab: 'revisions' })} className="text-xs text-blue-500 hover:underline cursor-pointer font-medium">
               Gérer les révisions →
             </button>
           </div>
           {alertesRevision.map(a => (
-            <div key={a.id} onClick={() => navigate('revisions')} className="flex justify-between items-center py-3 border-b border-gray-50 last:border-0 cursor-pointer hover:bg-gray-50 -mx-2 px-2 rounded">
+            <div key={a.id} onClick={() => navigate('outils', { tab: 'revisions' })} className="flex justify-between items-center py-3 border-b border-gray-50 last:border-0 cursor-pointer hover:bg-gray-50 -mx-2 px-2 rounded">
               <div>
                 <p className="font-semibold text-navy text-sm">{a.loc?.raison_sociale || `${a.loc?.prenom} ${a.loc?.nom}` || '—'}</p>
                 <p className="text-xs text-gray-400">{a.bien?.adresse} — Indice {a.indice_revision || 'ILC'}</p>
@@ -106,7 +106,7 @@ export default function Dashboard({ navigate }) {
               <AlertTriangle size={16} className="text-red-500" />
               <h3 className="text-sm font-bold text-navy">Alertes impayés ({alertes.length})</h3>
             </div>
-            <button onClick={() => navigate('relances')} className="text-xs text-blue-500 hover:underline cursor-pointer font-medium">
+            <button onClick={() => navigate('finances', { tab: 'relances' })} className="text-xs text-blue-500 hover:underline cursor-pointer font-medium">
               Gérer les relances →
             </button>
           </div>
@@ -115,7 +115,7 @@ export default function Dashboard({ navigate }) {
             const loc = bail ? locataires.find(l => l.id === bail.locataire_id) : null
             const bien = bail ? biens.find(b => b.id === bail.bien_id) : null
             return (
-              <div key={a.id} onClick={() => navigate('relances')} className="flex justify-between items-center py-3 border-b border-gray-50 last:border-0 cursor-pointer hover:bg-gray-50 -mx-2 px-2 rounded">
+              <div key={a.id} onClick={() => navigate('finances', { tab: 'relances' })} className="flex justify-between items-center py-3 border-b border-gray-50 last:border-0 cursor-pointer hover:bg-gray-50 -mx-2 px-2 rounded">
                 <div>
                   <p className="font-semibold text-navy text-sm">{loc?.raison_sociale || `${loc?.prenom} ${loc?.nom}` || '—'}</p>
                   <p className="text-xs text-gray-400">{bien?.adresse} — {MONTHS[a.mois]} {a.annee}</p>

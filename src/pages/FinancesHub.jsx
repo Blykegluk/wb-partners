@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Finances from './Finances'
 import Transactions from './Transactions'
 import Relances from './Relances'
@@ -9,8 +9,15 @@ const TABS = [
   { key: 'relances', label: 'Relances' },
 ]
 
-export default function FinancesHub({ navigate }) {
+export default function FinancesHub({ navigate, navState, setNavState }) {
   const [tab, setTab] = useState('echeancier')
+
+  useEffect(() => {
+    if (navState?.tab && TABS.find(t => t.key === navState.tab)) {
+      setTab(navState.tab)
+      setNavState(null)
+    }
+  }, [navState, setNavState])
 
   return (
     <div>

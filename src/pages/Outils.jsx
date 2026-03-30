@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Simulateur from './Simulateur'
 import Revisions from './Revisions'
 
@@ -7,8 +7,15 @@ const TABS = [
   { key: 'revisions', label: 'Révisions loyer' },
 ]
 
-export default function Outils({ navigate }) {
+export default function Outils({ navigate, navState, setNavState }) {
   const [tab, setTab] = useState('simulateur')
+
+  useEffect(() => {
+    if (navState?.tab && TABS.find(t => t.key === navState.tab)) {
+      setTab(navState.tab)
+      setNavState(null)
+    }
+  }, [navState, setNavState])
 
   return (
     <div>
