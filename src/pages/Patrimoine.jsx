@@ -296,7 +296,7 @@ export default function Patrimoine({ navigate }) {
                   <Btn className="!text-xs !px-3 !py-1.5" onClick={() => openEditBien(detail)}>Modifier</Btn>
                 )}
               </div>
-              <div className="grid grid-cols-4 gap-4 text-sm">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                 <div><p className="text-gray-400 text-xs mb-1">Prix d'achat</p><p className="font-semibold text-navy">{fmt(detail.prix_achat)}</p></div>
                 <div><p className="text-gray-400 text-xs mb-1">Frais de notaire</p><p className="font-semibold text-navy">{fmt(detail.frais_notaire)}</p></div>
                 <div><p className="text-gray-400 text-xs mb-1">Apport</p><p className="font-semibold text-navy">{fmt(detail.apport)}</p></div>
@@ -315,7 +315,7 @@ export default function Patrimoine({ navigate }) {
                 <div><p className="text-gray-400 text-xs mb-1">Extraction VMC</p><p className="font-semibold text-navy">{detail.presence_extraction ? 'Oui' : 'Non'}</p></div>
               </div>
               {/* Rendements */}
-              <div className="mt-5 pt-4 border-t border-gray-100 grid grid-cols-3 gap-4">
+              <div className="mt-5 pt-4 border-t border-gray-100 grid grid-cols-2 sm:grid-cols-3 gap-4">
                 <div className="bg-emerald-50 rounded-lg p-4 text-center">
                   <p className="text-xs text-emerald-600 font-semibold uppercase mb-1">Rendement brut</p>
                   <p className="text-2xl font-bold text-emerald-700">{rb(detail)}</p>
@@ -467,7 +467,7 @@ export default function Patrimoine({ navigate }) {
 
             {/* Summary cards */}
             {(totalRef > 0 || totalNonRef > 0) && (
-              <div className="grid grid-cols-3 gap-3 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
                 <div className="bg-emerald-50 rounded-lg p-4">
                   <p className="text-[11px] text-emerald-600 font-semibold uppercase">Refacturables</p>
                   <p className="text-xl font-bold text-emerald-700">{fmt(totalRef)}<span className="text-xs font-normal">/an</span></p>

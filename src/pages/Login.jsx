@@ -6,7 +6,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="bg-white rounded-2xl p-12 w-[420px] shadow-xl">
+      <div className="bg-white rounded-2xl p-8 sm:p-12 w-[95vw] max-w-[420px] shadow-xl">
         <div className="text-center mb-10">
           <div className="bg-navy w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Building2 size={30} color="#fff" />

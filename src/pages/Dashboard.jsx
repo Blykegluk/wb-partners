@@ -46,7 +46,7 @@ export default function Dashboard({ navigate }) {
       <p className="text-gray-400 mb-8">Vue d'ensemble de votre patrimoine immobilier</p>
 
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-8">
         {kpis.map((k, i) => (
           <Card key={i} className="p-6 cursor-pointer hover:border-blue-200 hover:shadow-md transition-all" onClick={() => navigate(k.page)}>
             <div className="flex justify-between items-start">
