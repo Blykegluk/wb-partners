@@ -20,7 +20,7 @@ const EMPTY_UI = { apport_mode: 'euro', apport_pct: '', duree_mode: 'annees', du
 
 const EMPTY_BAIL = {
   bien_id: '', locataire_id: '', date_debut: '', date_fin: '',
-  loyer_ht: '', loyer_an1: '', loyer_an2: '', charges: '', depot: '',
+  loyer_ht: '', loyer_an1: '', loyer_an2: '', loyer_an3: '', franchise_mois: '', charges: '', depot: '',
   type_bail: 'commercial', utilisation: '', indice_revision: 'ILC',
   date_revision_anniversaire: '', actif: true,
 }
@@ -166,7 +166,7 @@ export default function Patrimoine({ navigate }) {
       return
     }
     const data = { ...bf }
-    for (const k of ['loyer_ht','loyer_an1','loyer_an2','charges','depot']) {
+    for (const k of ['loyer_ht','loyer_an1','loyer_an2','loyer_an3','franchise_mois','charges','depot']) {
       data[k] = data[k] === '' || data[k] === null ? null : Number(data[k])
     }
     data.actif = Boolean(data.actif)
@@ -376,6 +376,8 @@ export default function Patrimoine({ navigate }) {
                           <div className="text-right">
                             <p className="font-bold text-navy text-sm">{fmt(ba.loyer_ht)}/mois</p>
                             {ba.charges > 0 && <p className="text-xs text-gray-400">+ {fmt(ba.charges)} charges</p>}
+                            {ba.franchise_mois > 0 && <p className="text-xs text-blue-500 font-medium">Franchise {ba.franchise_mois} mois</p>}
+                            {(ba.loyer_an1 || ba.loyer_an2 || ba.loyer_an3) && <p className="text-xs text-purple-500 font-medium">Progressif</p>}
                           </div>
                           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${ba.actif ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
                             {ba.actif ? 'Actif' : 'Inactif'}
@@ -852,17 +854,23 @@ export default function Patrimoine({ navigate }) {
           </div>
         </Grid2>
 
-        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3 mt-4">Loyers (progressif)</h4>
+        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3 mt-4">Loyers</h4>
         <Grid3>
-          <Field label="Loyer HT (palier final) *" type="number" value={bf.loyer_ht} onChange={e => setBf(p => ({ ...p, loyer_ht: e.target.value }))} />
-          <Field label="Loyer An 1" type="number" placeholder="Si progressif" value={bf.loyer_an1 || ''} onChange={e => setBf(p => ({ ...p, loyer_an1: e.target.value }))} />
-          <Field label="Loyer An 2" type="number" placeholder="Si progressif" value={bf.loyer_an2 || ''} onChange={e => setBf(p => ({ ...p, loyer_an2: e.target.value }))} />
+          <Field label="Loyer HT final (€/mois) *" type="number" value={bf.loyer_ht} onChange={e => setBf(p => ({ ...p, loyer_ht: e.target.value }))} />
+          <Field label="Franchise (mois)" type="number" placeholder="0 = pas de franchise" value={bf.franchise_mois || ''} onChange={e => setBf(p => ({ ...p, franchise_mois: e.target.value }))} />
+          <Field label="Charges (€/mois)" type="number" value={bf.charges} onChange={e => setBf(p => ({ ...p, charges: e.target.value }))} />
+        </Grid3>
+        <p className="text-xs text-gray-400 mb-2 -mt-1">Loyer progressif (laisser vide si non applicable)</p>
+        <Grid3>
+          <Field label="Loyer An 1" type="number" placeholder="€/mois" value={bf.loyer_an1 || ''} onChange={e => setBf(p => ({ ...p, loyer_an1: e.target.value }))} />
+          <Field label="Loyer An 2" type="number" placeholder="€/mois" value={bf.loyer_an2 || ''} onChange={e => setBf(p => ({ ...p, loyer_an2: e.target.value }))} />
+          <Field label="Loyer An 3" type="number" placeholder="€/mois" value={bf.loyer_an3 || ''} onChange={e => setBf(p => ({ ...p, loyer_an3: e.target.value }))} />
         </Grid3>
         <Grid3>
-          <Field label="Charges (EUR/mois)" type="number" value={bf.charges} onChange={e => setBf(p => ({ ...p, charges: e.target.value }))} />
-          <Field label="Dépôt de garantie (EUR)" type="number" value={bf.depot} onChange={e => setBf(p => ({ ...p, depot: e.target.value }))} />
+          <Field label="Dépôt de garantie (€)" type="number" value={bf.depot} onChange={e => setBf(p => ({ ...p, depot: e.target.value }))} />
           <Sel label="Type de bail" value={bf.type_bail} onChange={e => setBf(p => ({ ...p, type_bail: e.target.value }))}
             options={[{v:'commercial',l:'Commercial'},{v:'professionnel',l:'Professionnel'},{v:'habitation',l:'Habitation'}]} />
+          <div />
         </Grid3>
 
         <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3 mt-4">Dates & révision</h4>
