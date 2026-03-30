@@ -24,7 +24,7 @@ const EMPTY_BAIL = {
   bien_id: '', locataire_id: '', date_debut: '', date_fin: '',
   loyer_ht: '', loyer_an1: '', loyer_an2: '', loyer_an3: '', franchise_mois: '', charges: '', depot: '',
   type_bail: 'commercial', utilisation: '', indice_revision: 'ILC',
-  date_revision_anniversaire: '', actif: true,
+  date_revision_anniversaire: '', actif: true, auto_avis: false, auto_relance: false,
 }
 
 const EMPTY_LOC = { raison_sociale: '', prenom: '', nom: '', email: '', telephone: '' }
@@ -386,6 +386,12 @@ export default function Patrimoine({ navigate }) {
                             {ba.charges > 0 && <p className="text-xs text-gray-400">+ {fmt(ba.charges)} charges</p>}
                             {ba.franchise_mois > 0 && <p className="text-xs text-blue-500 font-medium">Franchise {ba.franchise_mois} mois</p>}
                             {(ba.loyer_an1 || ba.loyer_an2 || ba.loyer_an3) && <p className="text-xs text-purple-500 font-medium">Progressif</p>}
+                            {(ba.auto_avis || ba.auto_relance) && (
+                              <div className="flex gap-1 mt-0.5">
+                                {ba.auto_avis && <span className="text-[10px] bg-blue-50 text-blue-500 px-1.5 py-0.5 rounded font-medium">Auto avis</span>}
+                                {ba.auto_relance && <span className="text-[10px] bg-red-50 text-red-500 px-1.5 py-0.5 rounded font-medium">Auto relance</span>}
+                              </div>
+                            )}
                           </div>
                           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${ba.actif ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
                             {ba.actif ? 'Actif' : 'Inactif'}
@@ -1031,6 +1037,13 @@ export default function Patrimoine({ navigate }) {
         </Grid2>
 
         <Check label="Bail actif" checked={bf.actif || false} onChange={e => setBf(p => ({ ...p, actif: e.target.checked }))} />
+
+        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3 mt-4">Automatisation</h4>
+        <div className="flex gap-6">
+          <Check label="Envoyer avis d'échéance automatiquement" checked={bf.auto_avis || false} onChange={e => setBf(p => ({ ...p, auto_avis: e.target.checked }))} />
+          <Check label="Envoyer relances automatiquement" checked={bf.auto_relance || false} onChange={e => setBf(p => ({ ...p, auto_relance: e.target.checked }))} />
+        </div>
+        <p className="text-xs text-gray-300 mt-1">Les emails seront envoyés au locataire s'il a une adresse email renseignée.</p>
 
         {bailError && <p className="text-red-500 text-sm mt-2">{bailError}</p>}
         <div className="flex justify-end gap-3 mt-6">
