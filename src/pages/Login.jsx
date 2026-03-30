@@ -8,7 +8,7 @@ export default function Login() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="bg-white rounded-2xl p-8 sm:p-12 w-[95vw] max-w-[420px] shadow-xl">
         <div className="text-center mb-10">
-          <img src={logoUrl} alt="WB Partners" className="w-24 h-24 rounded-3xl mx-auto mb-4" />
+          <img src={logoUrl} alt="WB Partners" className="w-32 h-32 rounded-3xl mx-auto mb-4" />
           <h1 className="text-2xl font-black text-navy tracking-[3px]">WB Partners</h1>
           <p className="text-gray-400 text-sm mt-1">Gestion Immobilière</p>
         </div>

@@ -29,7 +29,7 @@ export default function SelectSociete() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
       <div className="w-full max-w-xl">
         <div className="text-center mb-8">
-          <img src={logoUrl} alt="WB Partners" className="w-20 h-20 rounded-2xl mx-auto mb-3" />
+          <img src={logoUrl} alt="WB Partners" className="w-28 h-28 rounded-3xl mx-auto mb-3" />
           <h1 className="text-xl font-black text-navy tracking-[3px]">WB Partners</h1>
           <p className="text-gray-400 text-sm mt-2">Sélectionnez une société</p>
         </div>

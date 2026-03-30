@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Building2, Plus, Trash2, Upload, MapPin, FileText, Users, FolderOpen, Receipt, ArrowRight, Link, Euro, ChevronLeft, Download, ExternalLink, Map, List } from 'lucide-react'
+import { Building2, Plus, Trash2, Upload, MapPin, FileText, Users, FolderOpen, Receipt, ArrowRight, Link, Euro, ChevronLeft, Download, ExternalLink, Map, List, Printer, Zap } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useSociete } from '../contexts/Societe'
 import { fmt, fmtDate, googleMapsUrl, DOC_TYPES } from '../lib/utils'
 import { rendementBrut, rendementNet, cashflowMensuel } from '../lib/calculs'
+import { pdfAvisEcheance, pdfFacture, pdfQuittance, pdfRelance, pdfMiseEnDemeure, pdfCommandement } from '../lib/pdf'
 import SmartUpload from '../components/SmartUpload'
 import Carte from './Carte'
 import { PageHeader, Card, Modal, Field, Sel, Check, Grid2, Grid3, Btn, Badge, Empty, AddressField } from '../components/UI'
@@ -412,27 +413,43 @@ export default function Patrimoine({ navigate }) {
 
         {/* ── TAB: Documents ─────────────────────────────────── */}
         {tab === 'documents' && (() => {
+          const activeBail = bienBaux.find(ba => ba.actif)
+          const activeLoc = activeBail ? locataires.find(l => l.id === activeBail.locataire_id) : null
+          const now = new Date()
+          const curMonth = now.getMonth()
+          const curYear = now.getFullYear()
+
           const DOC_SECTIONS = [
-            { key: 'bail', label: 'Baux & Avenants', color: '#8b5cf6' },
-            { key: 'avis_echeance', label: "Avis d'échéances", color: '#3b82f6' },
-            { key: 'quittance', label: 'Quittances de loyer', color: '#22c55e' },
-            { key: 'facture', label: 'Factures', color: '#f59e0b' },
-            { key: 'appel_charges', label: 'Appels de charges', color: '#06b6d4' },
-            { key: 'commandement', label: 'Commandements de payer', color: '#ef4444' },
-            { key: 'taxe_fonciere', label: 'Taxe foncière', color: '#ec4899' },
-            { key: 'amortissement', label: 'Tableaux d\'amortissement', color: '#f97316' },
-            { key: 'diagnostic', label: 'Diagnostics immobiliers', color: '#14b8a6' },
-            { key: 'acte_vente', label: 'Actes de vente', color: '#6366f1' },
-            { key: 'autre', label: 'Autres documents', color: '#64748b' },
+            { key: 'bail', label: 'Baux & Avenants', color: '#8b5cf6', canGenerate: false },
+            { key: 'avis_echeance', label: "Avis d'échéances", color: '#3b82f6', canGenerate: true,
+              generate: () => activeBail && pdfAvisEcheance(activeBail, detail, activeLoc, selected, curMonth, curYear),
+              genLabel: 'Générer avis' },
+            { key: 'facture', label: 'Factures', color: '#f59e0b', canGenerate: true,
+              generate: () => activeBail && pdfFacture(activeBail, detail, activeLoc, selected, curMonth, curYear),
+              genLabel: 'Générer facture' },
+            { key: 'quittance', label: 'Quittances de loyer', color: '#22c55e', canGenerate: true,
+              generate: () => {
+                const paidTx = transactions.find(t => t.bail_id === activeBail?.id && t.statut === 'payé' && t.annee === curYear && t.mois === curMonth - 1)
+                if (paidTx && activeBail) pdfQuittance(activeBail, detail, activeLoc, selected, paidTx)
+                else alert('Aucun loyer payé le mois dernier pour générer une quittance.')
+              },
+              genLabel: 'Générer quittance' },
+            { key: 'appel_charges', label: 'Appels de charges', color: '#06b6d4', canGenerate: false },
+            { key: 'commandement', label: 'Commandements de payer', color: '#ef4444', canGenerate: true,
+              generate: () => activeBail && pdfCommandement(activeBail, detail, activeLoc, selected, transactions),
+              genLabel: 'Générer commandement' },
+            { key: 'taxe_fonciere', label: 'Taxe foncière', color: '#ec4899', canGenerate: false },
+            { key: 'amortissement', label: "Tableaux d'amortissement", color: '#f97316', canGenerate: false },
+            { key: 'diagnostic', label: 'Diagnostics immobiliers', color: '#14b8a6', canGenerate: false },
+            { key: 'acte_vente', label: 'Actes de vente', color: '#6366f1', canGenerate: false },
+            { key: 'autre', label: 'Autres documents', color: '#64748b', canGenerate: false },
           ]
+
           const grouped = {}
           DOC_SECTIONS.forEach(s => { grouped[s.key] = bienDocs.filter(d => d.type === s.key) })
-          // Also catch any docs with types not in sections
           const knownTypes = DOC_SECTIONS.map(s => s.key)
           const uncategorized = bienDocs.filter(d => !knownTypes.includes(d.type))
           if (uncategorized.length > 0) grouped['autre'] = [...(grouped['autre'] || []), ...uncategorized]
-
-          const sectionsWithDocs = DOC_SECTIONS.filter(s => (grouped[s.key] || []).length > 0)
 
           return (
             <div>
@@ -447,48 +464,58 @@ export default function Patrimoine({ navigate }) {
                 )}
               </div>
 
-              {bienDocs.length === 0 ? (
-                <Empty icon={<FolderOpen size={40} />} text="Aucun document pour ce bien." />
-              ) : (
-                <div className="space-y-6">
-                  {sectionsWithDocs.map(section => (
-                    <div key={section.key}>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="w-2.5 h-2.5 rounded-full" style={{ background: section.color }} />
-                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide">
-                          {section.label} ({grouped[section.key].length})
-                        </h4>
+              <div className="space-y-4">
+                {DOC_SECTIONS.map(section => {
+                  const docs = grouped[section.key] || []
+                  return (
+                    <Card key={section.key} className="p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ background: section.color }} />
+                          <h4 className="text-sm font-bold text-navy">{section.label}</h4>
+                          <span className="text-xs text-gray-300 font-medium">{docs.length}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {section.canGenerate && activeBail && canEdit && (
+                            <button onClick={section.generate}
+                              className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg cursor-pointer transition-colors hover:bg-gray-100 text-blue-500">
+                              <Printer size={12} /> {section.genLabel}
+                            </button>
+                          )}
+                          {canEdit && (
+                            <button onClick={() => openUpload(detail.id)}
+                              className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg cursor-pointer transition-colors hover:bg-gray-100 text-gray-400">
+                              <Upload size={12} /> Uploader
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div className="space-y-1.5">
-                        {grouped[section.key].map(d => (
-                          <Card key={d.id} className="p-3">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: section.color }} />
-                                <div>
-                                  <p className="text-sm font-semibold text-navy">{d.nom}</p>
-                                  <p className="text-xs text-gray-400">{fmtDate(d.created_at)}</p>
-                                </div>
+                      {docs.length > 0 ? (
+                        <div className="space-y-1">
+                          {docs.map(d => (
+                            <div key={d.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+                              <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full" style={{ background: section.color }} />
+                                <p className="text-sm font-medium text-navy">{d.nom}</p>
+                                <p className="text-xs text-gray-300">{fmtDate(d.created_at)}</p>
                               </div>
                               <div className="flex items-center gap-2">
                                 <a href={d.fichier_url} target="_blank" rel="noreferrer"
-                                  className="text-gray-300 hover:text-blue-500 cursor-pointer">
-                                  <Download size={16} />
-                                </a>
+                                  className="text-gray-300 hover:text-blue-500 cursor-pointer"><Download size={14} /></a>
                                 {canEdit && (
-                                  <button onClick={() => delDoc(d.id)} className="text-gray-300 hover:text-red-500 cursor-pointer">
-                                    <Trash2 size={16} />
-                                  </button>
+                                  <button onClick={() => delDoc(d.id)} className="text-gray-300 hover:text-red-500 cursor-pointer"><Trash2 size={14} /></button>
                                 )}
                               </div>
                             </div>
-                          </Card>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-300 italic pl-4">Aucun document</p>
+                      )}
+                    </Card>
+                  )
+                })}
+              </div>
             </div>
           )
         })()}

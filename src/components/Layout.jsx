@@ -30,7 +30,7 @@ export default function Layout({ page, setPage, children }) {
       {/* Logo */}
       <div className="px-5 py-5 border-b border-white/10 flex justify-between items-center">
         <div className="flex items-center gap-3">
-          <img src={logoUrl} alt="WB Partners" className="w-10 h-10 rounded-xl" />
+          <img src={logoUrl} alt="WB Partners" className="w-12 h-12 rounded-xl" />
           <div>
             <h1 className="text-white font-black text-base tracking-[2px]">WB Partners</h1>
             <p className="text-white/40 text-[10px]">Gestion Immobilière</p>
