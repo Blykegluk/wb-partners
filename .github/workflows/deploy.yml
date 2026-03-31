@@ -10,12 +10,15 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: "pages"
   cancel-in-progress: false
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -27,21 +30,20 @@ jobs:
       - run: npm ci
 
       - run: npm run build
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_ANTHROPIC_KEY: ${{ secrets.VITE_ANTHROPIC_KEY }}
+
+      - name: Assemble site
+        run: |
+          mkdir -p _site/app
+          cp public-site/index.html _site/index.html
+          cp public-site/index.html _site/404.html
+          cp public-site/logo.png _site/logo.png 2>/dev/null || true
+          echo "wbpartners.fr" > _site/CNAME
+          cp -r dist/app/* _site/app/
+          cp _site/app/index.html _site/app/404.html
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: _site
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
       - id: deployment
         uses: actions/deploy-pages@v4
