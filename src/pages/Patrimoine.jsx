@@ -462,6 +462,7 @@ export default function Patrimoine({ navigate }) {
             { key: 'taxe_fonciere', label: 'Taxe foncière', color: '#ec4899', canGenerate: false },
             { key: 'amortissement', label: "Tableaux d'amortissement", color: '#f97316', canGenerate: false },
             { key: 'diagnostic', label: 'Diagnostics immobiliers', color: '#14b8a6', canGenerate: false },
+            { key: 'promesse_vente', label: 'Promesses / Compromis de vente', color: '#a855f7', canGenerate: false },
             { key: 'acte_vente', label: 'Actes de vente', color: '#6366f1', canGenerate: false },
             { key: 'autre', label: 'Autres documents', color: '#64748b', canGenerate: false },
           ]
