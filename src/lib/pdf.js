@@ -1,44 +1,53 @@
 import { MONTHS, MONTHS_SHORT, getLoyerPourMois, fmt, fmtPct } from './utils'
 import { rendementBrut, rendementNet, cashflowMensuel } from './calculs'
 
-// Render the HTML inside a hidden iframe in the current page, then trigger
-// print on the iframe's window. This bypasses popup blockers entirely
-// (no new window is ever opened) and works consistently across browsers.
+// Print the generated HTML by injecting it into an off-screen iframe and
+// calling print() on its contentWindow. Crucial implementation details:
+//   1. The iframe MUST have real dimensions (a 0x0 iframe doesn't render
+//      content, so print() prints a blank page or fails silently).
+//   2. We position it off-screen (-99999px) instead of using display:none
+//      or visibility:hidden — those can also prevent content rendering.
+//   3. We use srcdoc instead of document.write — modern, fires 'load'
+//      reliably across all browsers.
+//   4. The 'load' listener is attached BEFORE setting srcdoc, otherwise
+//      we may miss the event.
+//   5. Logs to console so the user can diagnose if something still fails.
 const openPrint = (html) => {
-  // Clean up any leftover print iframes from a previous run.
+  console.log('[WB Print] openPrint called, HTML length:', html.length)
+
+  // Clean up leftover iframes from previous runs.
   document.querySelectorAll('iframe[data-wb-print]').forEach(el => el.remove())
 
   const iframe = document.createElement('iframe')
   iframe.setAttribute('data-wb-print', '1')
-  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;'
-  document.body.appendChild(iframe)
+  // A4 dimensions, positioned off-screen so the user never sees it.
+  iframe.style.cssText = 'position:fixed;top:0;left:-99999px;width:21cm;height:29.7cm;border:0;'
 
   let printed = false
-  const triggerPrint = () => {
+  const triggerPrint = (reason) => {
     if (printed) return
     printed = true
+    console.log('[WB Print] Triggering print (' + reason + ')')
     try {
       iframe.contentWindow.focus()
       iframe.contentWindow.print()
+      console.log('[WB Print] print() returned normally')
     } catch (e) {
-      console.error('Print failed:', e)
+      console.error('[WB Print] print() failed:', e)
+      alert("Impossible d'imprimer : " + (e?.message || 'erreur inconnue'))
     }
-    // Remove the iframe after the print dialog has had time to open.
-    setTimeout(() => iframe.remove(), 2000)
+    // Leave the iframe alive long enough for the print dialog to grab it.
+    setTimeout(() => iframe.remove(), 5000)
   }
 
-  iframe.addEventListener('load', triggerPrint)
+  // Attach BEFORE appending and setting srcdoc.
+  iframe.addEventListener('load', () => triggerPrint('load event'))
 
-  // Write the HTML into the iframe. This typically fires the 'load' event
-  // synchronously for same-origin srcdoc-style content, but we keep the
-  // listener above for browsers that schedule it asynchronously.
-  const doc = iframe.contentWindow.document
-  doc.open()
-  doc.write(html)
-  doc.close()
+  document.body.appendChild(iframe)
+  iframe.srcdoc = html
 
-  // Hard safety fallback if 'load' never fires.
-  setTimeout(triggerPrint, 1500)
+  // Hard safety fallback if 'load' somehow never fires.
+  setTimeout(() => triggerPrint('timeout fallback'), 2500)
 }
 
 const baseStyle = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Helvetica Neue',Arial,sans-serif;color:#1a2d4e;padding:48px;font-size:13px;line-height:1.6}.hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1a2d4e;padding-bottom:20px;margin-bottom:36px}.logo{font-size:22px;font-weight:900;letter-spacing:4px}.logo small{display:block;font-size:10px;color:#94a3b8;font-weight:400;margin-top:2px}.doc-title h1{font-size:18px;font-weight:700;text-align:right}.doc-title p{font-size:12px;color:#64748b;text-align:right}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-bottom:28px}.bloc h3{font-size:10px;text-transform:uppercase;color:#94a3b8;margin-bottom:6px;letter-spacing:1px}.bien-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px 18px;margin-bottom:24px}table{width:100%;border-collapse:collapse;margin-bottom:20px}th{background:#1a2d4e;color:#fff;padding:10px 14px;text-align:left;font-size:11px}td{padding:10px 14px;border-bottom:1px solid #f1f5f9}.tot td{background:#eff6ff;font-weight:700;border-top:2px solid #1a2d4e}.iban{background:#1a2d4e;color:#fff;border-radius:8px;padding:14px 20px;display:flex;justify-content:space-between;margin-bottom:20px}.iban .lbl{font-size:10px;opacity:.6;margin-bottom:3px}.iban .val{font-size:14px;font-weight:600}.note{font-size:11px;color:#94a3b8;font-style:italic}.footer{text-align:center;color:#94a3b8;font-size:11px;margin-top:48px;padding-top:16px;border-top:1px solid #f1f5f9}@media print{@page{margin:1.5cm}}`
