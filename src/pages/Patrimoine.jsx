@@ -439,6 +439,7 @@ export default function Patrimoine({ navigate }) {
           const curYear = now.getFullYear()
 
           const DOC_SECTIONS = [
+            { key: 'offre_location', label: 'Offres de location', color: '#d946ef', canGenerate: false },
             { key: 'bail', label: 'Baux & Avenants', color: '#8b5cf6', canGenerate: false },
             { key: 'avis_echeance', label: "Avis d'échéances", color: '#3b82f6', canGenerate: true,
               generate: () => activeBail && setGenModal({ type: 'avis_echeance', bail: activeBail, bien: detail, loc: activeLoc }),

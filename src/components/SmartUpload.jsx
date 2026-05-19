@@ -497,7 +497,7 @@ export default function SmartUpload({ onClose, bienId: initialBienId }) {
           )}
           <Sel label="Type" value={genericType} onChange={e => setGenericType(e.target.value)}
             options={[
-              { v: 'bail', l: 'Bail & avenant' }, { v: 'amortissement', l: 'Tableau d\'amortissement' },
+              { v: 'offre_location', l: 'Offre de location' }, { v: 'bail', l: 'Bail & avenant' }, { v: 'amortissement', l: 'Tableau d\'amortissement' },
               { v: 'appel_charges', l: 'Appel de charges' }, { v: 'quittance', l: 'Quittance de loyer' },
               { v: 'taxe_fonciere', l: 'Taxe foncière' }, { v: 'facture', l: 'Facture' },
               { v: 'avis_echeance', l: 'Avis d\'échéance' }, { v: 'commandement', l: 'Commandement de payer' },
