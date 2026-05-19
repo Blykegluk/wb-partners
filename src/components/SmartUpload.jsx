@@ -501,7 +501,7 @@ export default function SmartUpload({ onClose, bienId: initialBienId }) {
               { v: 'appel_charges', l: 'Appel de charges' }, { v: 'quittance', l: 'Quittance de loyer' },
               { v: 'taxe_fonciere', l: 'Taxe foncière' }, { v: 'facture', l: 'Facture' },
               { v: 'avis_echeance', l: 'Avis d\'échéance' }, { v: 'commandement', l: 'Commandement de payer' },
-              { v: 'diagnostic', l: 'Diagnostic immobilier' }, { v: 'promesse_vente', l: 'Promesse / Compromis de vente' }, { v: 'acte_vente', l: 'Acte de vente' },
+              { v: 'diagnostic', l: 'Diagnostic immobilier' }, { v: 'offre_acquisition', l: 'Offre d\'acquisition' }, { v: 'promesse_vente', l: 'Promesse / Compromis de vente' }, { v: 'acte_vente', l: 'Acte de vente' },
               { v: 'autre', l: 'Autre' },
             ]} />
           {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
