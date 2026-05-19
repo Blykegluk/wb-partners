@@ -3,32 +3,34 @@ import { rendementBrut, rendementNet, cashflowMensuel } from './calculs'
 
 // Open a new window with the generated HTML and trigger print exactly when
 // the content (incl. the logo image) is ready, instead of waiting an
-// arbitrary 400ms. Falls back to a small buffer if onload doesn't fire.
+// arbitrary 400ms. Falls back to a fixed delay if load events never fire.
 const openPrint = (html) => {
-  const blob = new Blob([html], { type: 'text/html' })
-  const url = URL.createObjectURL(blob)
-  const w = window.open(url, '_blank')
+  const w = window.open('', '_blank')
   if (!w) {
-    // Popup blocked — clean up immediately.
-    URL.revokeObjectURL(url)
     alert('Le navigateur a bloqué l\'ouverture du document. Autorisez les pop-ups pour ce site.')
     return
   }
+  w.document.open()
+  w.document.write(html)
+  w.document.close()
+
   let printed = false
   const triggerPrint = () => {
-    if (printed) return
+    if (printed || w.closed) return
     printed = true
-    // Small delay to ensure image is painted, not just loaded.
-    setTimeout(() => {
-      w.focus()
-      w.print()
-      // Revoke after print dialog opens. The window stays usable.
-      setTimeout(() => URL.revokeObjectURL(url), 1000)
-    }, 50)
+    w.focus()
+    w.print()
   }
-  w.addEventListener('load', triggerPrint)
-  // Fallback in case 'load' never fires (some browsers with cached blob URLs).
-  setTimeout(triggerPrint, 1500)
+
+  // If the document already finished loading (small docs, no remote images),
+  // we missed the load event — trigger after a tiny paint buffer.
+  if (w.document.readyState === 'complete') {
+    setTimeout(triggerPrint, 80)
+  } else {
+    w.addEventListener('load', triggerPrint)
+    // Hard safety fallback if 'load' never fires (e.g., image refused).
+    setTimeout(triggerPrint, 1500)
+  }
 }
 
 const baseStyle = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Helvetica Neue',Arial,sans-serif;color:#1a2d4e;padding:48px;font-size:13px;line-height:1.6}.hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1a2d4e;padding-bottom:20px;margin-bottom:36px}.logo{font-size:22px;font-weight:900;letter-spacing:4px}.logo small{display:block;font-size:10px;color:#94a3b8;font-weight:400;margin-top:2px}.doc-title h1{font-size:18px;font-weight:700;text-align:right}.doc-title p{font-size:12px;color:#64748b;text-align:right}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-bottom:28px}.bloc h3{font-size:10px;text-transform:uppercase;color:#94a3b8;margin-bottom:6px;letter-spacing:1px}.bien-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px 18px;margin-bottom:24px}table{width:100%;border-collapse:collapse;margin-bottom:20px}th{background:#1a2d4e;color:#fff;padding:10px 14px;text-align:left;font-size:11px}td{padding:10px 14px;border-bottom:1px solid #f1f5f9}.tot td{background:#eff6ff;font-weight:700;border-top:2px solid #1a2d4e}.iban{background:#1a2d4e;color:#fff;border-radius:8px;padding:14px 20px;display:flex;justify-content:space-between;margin-bottom:20px}.iban .lbl{font-size:10px;opacity:.6;margin-bottom:3px}.iban .val{font-size:14px;font-weight:600}.note{font-size:11px;color:#94a3b8;font-style:italic}.footer{text-align:center;color:#94a3b8;font-size:11px;margin-top:48px;padding-top:16px;border-top:1px solid #f1f5f9}@media print{@page{margin:1.5cm}}`
