@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import Simulateur from './Simulateur'
 import Revisions from './Revisions'
+import FichePatrimoniale from './FichePatrimoniale'
 
 const TABS = [
   { key: 'simulateur', label: 'Simulateur' },
   { key: 'revisions', label: 'Révisions loyer' },
+  { key: 'fiche', label: 'Fiche patrimoniale' },
 ]
 
 export default function Outils({ navigate, navState, setNavState }) {
@@ -32,6 +34,9 @@ export default function Outils({ navigate, navState, setNavState }) {
       </div>
       <div style={{ display: tab === 'revisions' ? 'block' : 'none' }}>
         <Revisions navigate={navigate} />
+      </div>
+      <div style={{ display: tab === 'fiche' ? 'block' : 'none' }}>
+        <FichePatrimoniale />
       </div>
     </div>
   )

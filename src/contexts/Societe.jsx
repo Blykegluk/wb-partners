@@ -22,6 +22,7 @@ export function SocieteProvider({ children }) {
   const [revisions, setRevisions] = useState([])
   const [evenements, setEvenements] = useState([])
   const [appelsCharges, setAppelsCharges] = useState([])
+  const [actionnaires, setActionnaires] = useState([])
   const [loadingData, setLoadingData] = useState(false)
   const hasLoadedData = useRef(false)
 
@@ -72,7 +73,7 @@ export function SocieteProvider({ children }) {
     if (!hasLoadedData.current) setLoadingData(true)
     const sid = selected.id
 
-    const [b, l, ba, d, m, rev, evt, ac] = await Promise.all([
+    const [b, l, ba, d, m, rev, evt, ac, act] = await Promise.all([
       supabase.from('biens').select('*').eq('societe_id', sid).order('created_at'),
       supabase.from('locataires').select('*').eq('societe_id', sid).order('created_at'),
       supabase.from('baux').select('*').eq('societe_id', sid).order('created_at'),
@@ -81,6 +82,7 @@ export function SocieteProvider({ children }) {
       supabase.from('revisions_loyer').select('*').eq('societe_id', sid).order('date_revision', { ascending: false }),
       supabase.from('evenements_bien').select('*').eq('societe_id', sid).order('date_evenement', { ascending: false }),
       supabase.from('appels_charges').select('*').eq('societe_id', sid).order('created_at', { ascending: false }),
+      supabase.from('actionnaires').select('*').eq('societe_id', sid).order('pourcentage', { ascending: false }),
     ])
 
     setBiens(b.data || [])
@@ -91,6 +93,7 @@ export function SocieteProvider({ children }) {
     setRevisions(rev.data || [])
     setEvenements(evt.data || [])
     setAppelsCharges(ac.data || [])
+    setActionnaires(act.data || [])
 
     // Transactions via baux ids
     const bauxIds = (ba.data || []).map(x => x.id)
@@ -119,7 +122,7 @@ export function SocieteProvider({ children }) {
     <SocieteContext.Provider value={{
       societes, loadingSocietes, loadSocietes,
       selected, selectSociete, role, canEdit, isAdmin,
-      biens, locataires, baux, transactions, documents, membres, revisions, evenements, appelsCharges,
+      biens, locataires, baux, transactions, documents, membres, revisions, evenements, appelsCharges, actionnaires,
       loadingData, reload,
     }}>
       {children}

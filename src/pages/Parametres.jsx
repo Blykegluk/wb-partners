@@ -3,12 +3,13 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/Auth'
 import { useSociete } from '../contexts/Societe'
 import { PageHeader, Card, Modal, Field, Sel, Grid2, Btn, Badge, Empty } from '../components/UI'
-import { CheckCircle, UserPlus, Trash2, Shield, Landmark, RefreshCw, Unlink } from 'lucide-react'
+import { CheckCircle, UserPlus, Trash2, Shield, Landmark, RefreshCw, Unlink, Plus, AlertTriangle, Users } from 'lucide-react'
 
 const FUNCTIONS_URL_TOP = import.meta.env.VITE_SUPABASE_URL + '/functions/v1'
 
 const TABS = [
   { key: 'societe', label: 'Société' },
+  { key: 'actionnariat', label: 'Actionnariat' },
   { key: 'membres', label: 'Membres' },
   { key: 'banque', label: 'Banque' },
 ]
@@ -33,6 +34,9 @@ export default function Parametres() {
 
       <div style={{ display: tab === 'societe' ? 'block' : 'none' }}>
         <SocieteTab />
+      </div>
+      <div style={{ display: tab === 'actionnariat' ? 'block' : 'none' }}>
+        <ActionnariatTab />
       </div>
       <div style={{ display: tab === 'membres' ? 'block' : 'none' }}>
         <MembresTab />
@@ -108,6 +112,192 @@ function SocieteTab() {
       </Grid2>
       <Field label="Adresse de la banque" value={f.adresse_banque || ''} onChange={e => u('adresse_banque', e.target.value)} disabled={!isAdmin} />
     </Card>
+  )
+}
+
+// ── Actionnariat tab ────────────────────────────────────
+function ActionnariatTab() {
+  const { selected, actionnaires, isAdmin, reload } = useSociete()
+  const [open, setOpen] = useState(false)
+  const [editing, setEditing] = useState(null)
+  const [f, setF] = useState({ nom: '', type: 'physique', siret: '', pourcentage: '', notes: '' })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const total = actionnaires.reduce((s, a) => s + Number(a.pourcentage || 0), 0)
+  const totalRounded = Math.round(total * 100) / 100
+  const isComplete = Math.abs(total - 100) < 0.01
+  const isOver = total > 100.01
+
+  const openAdd = () => {
+    setEditing(null)
+    setF({ nom: '', type: 'physique', siret: '', pourcentage: '', notes: '' })
+    setError('')
+    setOpen(true)
+  }
+
+  const openEdit = (a) => {
+    setEditing(a)
+    setF({
+      nom: a.nom || '',
+      type: a.type || 'physique',
+      siret: a.siret || '',
+      pourcentage: a.pourcentage ?? '',
+      notes: a.notes || '',
+    })
+    setError('')
+    setOpen(true)
+  }
+
+  const save = async () => {
+    setError('')
+    if (!f.nom.trim()) { setError('Le nom est requis.'); return }
+    const pct = Number(f.pourcentage)
+    if (isNaN(pct) || pct < 0 || pct > 100) { setError('Le pourcentage doit être entre 0 et 100.'); return }
+
+    setSaving(true)
+    const payload = {
+      societe_id: selected.id,
+      nom: f.nom.trim(),
+      type: f.type,
+      siret: f.siret.trim() || null,
+      pourcentage: pct,
+      notes: f.notes.trim() || null,
+    }
+
+    const { error: e } = editing
+      ? await supabase.from('actionnaires').update(payload).eq('id', editing.id)
+      : await supabase.from('actionnaires').insert(payload)
+
+    setSaving(false)
+    if (e) { setError(e.message); return }
+    setOpen(false)
+    reload()
+  }
+
+  const del = async (a) => {
+    if (!confirm(`Supprimer l'actionnaire « ${a.nom} » ?`)) return
+    await supabase.from('actionnaires').delete().eq('id', a.id)
+    reload()
+  }
+
+  return (
+    <div>
+      <Card className="p-6 mb-4">
+        <div className="flex items-center justify-between mb-1">
+          <div>
+            <h3 className="text-sm font-bold text-navy">Répartition du capital</h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Total des participations enregistrées
+            </p>
+          </div>
+          <div className="text-right">
+            <p className={`text-2xl font-bold ${isComplete ? 'text-emerald-600' : isOver ? 'text-red-500' : 'text-amber-500'}`}>
+              {totalRounded.toFixed(2).replace('.', ',')}%
+            </p>
+            <p className={`text-xs font-semibold ${isComplete ? 'text-emerald-600' : isOver ? 'text-red-500' : 'text-amber-500'}`}>
+              {isComplete ? 'Capital complet' : isOver ? 'Dépasse 100%' : `Reste ${(100 - totalRounded).toFixed(2).replace('.', ',')}%`}
+            </p>
+          </div>
+        </div>
+        {/* Progress bar */}
+        <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden mt-3">
+          <div
+            className={`h-full transition-all ${isComplete ? 'bg-emerald-500' : isOver ? 'bg-red-500' : 'bg-amber-400'}`}
+            style={{ width: `${Math.min(total, 100)}%` }}
+          />
+        </div>
+        {!isComplete && !isOver && actionnaires.length > 0 && (
+          <div className="flex items-center gap-2 mt-3 text-xs text-amber-600">
+            <AlertTriangle size={14} />
+            La somme des participations doit atteindre 100%.
+          </div>
+        )}
+        {isOver && (
+          <div className="flex items-center gap-2 mt-3 text-xs text-red-500">
+            <AlertTriangle size={14} />
+            La somme dépasse 100% : corrigez une ou plusieurs participations.
+          </div>
+        )}
+      </Card>
+
+      {isAdmin && (
+        <div className="flex justify-end mb-4">
+          <Btn onClick={openAdd}><Plus size={15} /> Ajouter un actionnaire</Btn>
+        </div>
+      )}
+
+      {actionnaires.length === 0 ? (
+        <Empty icon={<Users size={40} />} text="Aucun actionnaire enregistré." />
+      ) : (
+        <div className="space-y-2">
+          {actionnaires.map(a => (
+            <Card key={a.id} className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 rounded-full bg-navy/5 flex items-center justify-center flex-shrink-0">
+                    <Users size={16} className="text-navy" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-navy text-sm truncate">{a.nom}</p>
+                      <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                        {a.type === 'morale' ? 'Personne morale' : 'Personne physique'}
+                      </span>
+                    </div>
+                    {a.siret && <p className="text-xs text-gray-400">SIRET : {a.siret}</p>}
+                    {a.notes && <p className="text-xs text-gray-400 italic mt-0.5">{a.notes}</p>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <p className="text-lg font-bold text-navy">{Number(a.pourcentage).toFixed(2).replace('.', ',')}%</p>
+                  {isAdmin && (
+                    <>
+                      <button onClick={() => openEdit(a)}
+                        className="text-xs font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 text-blue-500 cursor-pointer">
+                        Modifier
+                      </button>
+                      <button onClick={() => del(a)} className="text-gray-300 hover:text-red-500 cursor-pointer">
+                        <Trash2 size={15} />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {open && (
+        <Modal title={editing ? 'Modifier l\'actionnaire' : 'Ajouter un actionnaire'} onClose={() => setOpen(false)}>
+          <Field label="Nom / Raison sociale *" value={f.nom}
+            onChange={e => setF(p => ({ ...p, nom: e.target.value }))}
+            placeholder="ex: Anthony Bouskila ou SCI Hoche" />
+          <Sel label="Type *" value={f.type}
+            onChange={e => setF(p => ({ ...p, type: e.target.value }))}
+            options={[
+              { v: 'physique', l: 'Personne physique' },
+              { v: 'morale', l: 'Personne morale' },
+            ]} />
+          {f.type === 'morale' && (
+            <Field label="SIRET" value={f.siret}
+              onChange={e => setF(p => ({ ...p, siret: e.target.value }))} />
+          )}
+          <Field label="Participation (%) *" type="number" step="0.01" min="0" max="100"
+            value={f.pourcentage}
+            onChange={e => setF(p => ({ ...p, pourcentage: e.target.value }))} />
+          <Field label="Notes" value={f.notes}
+            onChange={e => setF(p => ({ ...p, notes: e.target.value }))}
+            placeholder="ex: usufruit, nu-propriété, gérant..." />
+          {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
+          <div className="flex justify-end gap-3 mt-4">
+            <Btn variant="ghost" onClick={() => setOpen(false)}>Annuler</Btn>
+            <Btn onClick={save} disabled={saving}>{saving ? 'Enregistrement...' : 'Enregistrer'}</Btn>
+          </div>
+        </Modal>
+      )}
+    </div>
   )
 }
 

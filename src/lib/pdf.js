@@ -1,11 +1,34 @@
 import { MONTHS, MONTHS_SHORT, getLoyerPourMois, fmt, fmtPct } from './utils'
 import { rendementBrut, rendementNet, cashflowMensuel } from './calculs'
 
+// Open a new window with the generated HTML and trigger print exactly when
+// the content (incl. the logo image) is ready, instead of waiting an
+// arbitrary 400ms. Falls back to a small buffer if onload doesn't fire.
 const openPrint = (html) => {
-  const w = window.open('', '_blank')
-  w.document.write(html)
-  w.document.close()
-  setTimeout(() => w.print(), 400)
+  const blob = new Blob([html], { type: 'text/html' })
+  const url = URL.createObjectURL(blob)
+  const w = window.open(url, '_blank')
+  if (!w) {
+    // Popup blocked — clean up immediately.
+    URL.revokeObjectURL(url)
+    alert('Le navigateur a bloqué l\'ouverture du document. Autorisez les pop-ups pour ce site.')
+    return
+  }
+  let printed = false
+  const triggerPrint = () => {
+    if (printed) return
+    printed = true
+    // Small delay to ensure image is painted, not just loaded.
+    setTimeout(() => {
+      w.focus()
+      w.print()
+      // Revoke after print dialog opens. The window stays usable.
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    }, 50)
+  }
+  w.addEventListener('load', triggerPrint)
+  // Fallback in case 'load' never fires (some browsers with cached blob URLs).
+  setTimeout(triggerPrint, 1500)
 }
 
 const baseStyle = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Helvetica Neue',Arial,sans-serif;color:#1a2d4e;padding:48px;font-size:13px;line-height:1.6}.hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1a2d4e;padding-bottom:20px;margin-bottom:36px}.logo{font-size:22px;font-weight:900;letter-spacing:4px}.logo small{display:block;font-size:10px;color:#94a3b8;font-weight:400;margin-top:2px}.doc-title h1{font-size:18px;font-weight:700;text-align:right}.doc-title p{font-size:12px;color:#64748b;text-align:right}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-bottom:28px}.bloc h3{font-size:10px;text-transform:uppercase;color:#94a3b8;margin-bottom:6px;letter-spacing:1px}.bien-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px 18px;margin-bottom:24px}table{width:100%;border-collapse:collapse;margin-bottom:20px}th{background:#1a2d4e;color:#fff;padding:10px 14px;text-align:left;font-size:11px}td{padding:10px 14px;border-bottom:1px solid #f1f5f9}.tot td{background:#eff6ff;font-weight:700;border-top:2px solid #1a2d4e}.iban{background:#1a2d4e;color:#fff;border-radius:8px;padding:14px 20px;display:flex;justify-content:space-between;margin-bottom:20px}.iban .lbl{font-size:10px;opacity:.6;margin-bottom:3px}.iban .val{font-size:14px;font-weight:600}.note{font-size:11px;color:#94a3b8;font-style:italic}.footer{text-align:center;color:#94a3b8;font-size:11px;margin-top:48px;padding-top:16px;border-top:1px solid #f1f5f9}@media print{@page{margin:1.5cm}}`
@@ -278,5 +301,164 @@ export const pdfPortfolio = (soc, biens, baux, transactions, locataires) => {
     </table>
 
     ${footer(soc)}
+  </body></html>`)
+}
+
+// ── Fiche patrimoniale consolidée multi-sociétés ────────────
+
+export const pdfFichePatrimoniale = ({ userName, societes }) => {
+  const now = new Date()
+  const generatedAt = now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+
+  // Global totals across all sociétés
+  let totalBiens = 0
+  let totalPatrimoine = 0
+  let totalLoyer = 0
+  let totalCashflow = 0
+  let totalDette = 0
+  societes.forEach(({ biens }) => {
+    biens.forEach(b => {
+      totalBiens++
+      totalPatrimoine += b.prix_achat || 0
+      totalLoyer += (b.loyer_mensuel || 0) * 12
+      totalCashflow += cashflowMensuel(b)
+      totalDette += b.montant_emprunt || 0
+    })
+  })
+  const patrimoineNet = totalPatrimoine - totalDette
+
+  // Per-société sections
+  const societesHtml = societes.map(({ societe: soc, biens, actionnaires, baux }) => {
+    const socPatrimoine = biens.reduce((s, b) => s + (b.prix_achat || 0), 0)
+    const socLoyer = biens.reduce((s, b) => s + (b.loyer_mensuel || 0), 0) * 12
+    const socDette = biens.reduce((s, b) => s + (b.montant_emprunt || 0), 0)
+    const socCashflow = biens.reduce((s, b) => s + cashflowMensuel(b), 0)
+    const bauxActifs = (baux || []).filter(b => b.actif)
+    const tauxOcc = biens.length ? Math.round(bauxActifs.length / biens.length * 100) : 0
+
+    const totalPct = (actionnaires || []).reduce((s, a) => s + Number(a.pourcentage || 0), 0)
+    const actionnariatHtml = (actionnaires && actionnaires.length > 0) ? `
+      <h4 style="font-size:11px;font-weight:700;color:#1a2d4e;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Actionnariat</h4>
+      <table style="margin-bottom:24px">
+        <thead><tr>
+          <th>Actionnaire</th>
+          <th>Type</th>
+          <th style="text-align:right">Participation</th>
+          <th style="text-align:right">Quote-part nette</th>
+        </tr></thead>
+        <tbody>
+          ${actionnaires.map(a => {
+            const quotePart = (socPatrimoine - socDette) * Number(a.pourcentage || 0) / 100
+            return `<tr>
+              <td><strong>${a.nom}</strong>${a.siret ? `<br><span style="font-size:10px;color:#94a3b8">SIRET ${a.siret}</span>` : ''}${a.notes ? `<br><span style="font-size:10px;color:#94a3b8;font-style:italic">${a.notes}</span>` : ''}</td>
+              <td><span style="font-size:10px;text-transform:uppercase;color:#64748b">${a.type === 'morale' ? 'P. morale' : 'P. physique'}</span></td>
+              <td style="text-align:right;font-weight:700">${Number(a.pourcentage).toFixed(2)}%</td>
+              <td style="text-align:right;font-weight:600;color:#1a2d4e">${fmt(quotePart)}</td>
+            </tr>`
+          }).join('')}
+          <tr class="tot"><td colspan="2"><strong>Total</strong></td>
+            <td style="text-align:right"><strong style="color:${Math.abs(totalPct - 100) < 0.01 ? '#22c55e' : '#ef4444'}">${totalPct.toFixed(2)}%</strong></td>
+            <td style="text-align:right"><strong>${fmt((socPatrimoine - socDette) * totalPct / 100)}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    ` : '<p style="font-style:italic;color:#94a3b8;font-size:11px;margin-bottom:24px">Aucun actionnaire enregistré pour cette société.</p>'
+
+    const biensHtml = biens.length > 0 ? `
+      <h4 style="font-size:11px;font-weight:700;color:#1a2d4e;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Biens détenus (${biens.length})</h4>
+      <table style="margin-bottom:24px">
+        <thead><tr>
+          <th>Référence / Adresse</th>
+          <th>Ville</th>
+          <th style="text-align:right">Acquisition</th>
+          <th style="text-align:right">Emprunt</th>
+          <th style="text-align:right">Loyer/mois</th>
+          <th style="text-align:right">Cashflow</th>
+        </tr></thead>
+        <tbody>
+          ${biens.map(b => `<tr>
+            <td><strong>${b.reference || b.adresse?.slice(0, 30) || '—'}</strong>${b.reference ? `<br><span style="font-size:10px;color:#94a3b8">${b.adresse?.slice(0, 40) || ''}</span>` : ''}</td>
+            <td>${b.ville || '—'}</td>
+            <td style="text-align:right">${b.prix_achat ? fmt(b.prix_achat) : '—'}</td>
+            <td style="text-align:right">${b.montant_emprunt ? fmt(b.montant_emprunt) : '—'}</td>
+            <td style="text-align:right">${b.loyer_mensuel ? fmt(b.loyer_mensuel) : '—'}</td>
+            <td style="text-align:right;${cashflowMensuel(b) >= 0 ? 'color:#22c55e' : 'color:#ef4444'}">${fmt(cashflowMensuel(b))}</td>
+          </tr>`).join('')}
+          <tr class="tot">
+            <td colspan="2"><strong>Sous-total société</strong></td>
+            <td style="text-align:right"><strong>${fmt(socPatrimoine)}</strong></td>
+            <td style="text-align:right"><strong>${fmt(socDette)}</strong></td>
+            <td style="text-align:right"><strong>${fmt(socLoyer / 12)}</strong></td>
+            <td style="text-align:right;${socCashflow >= 0 ? 'color:#22c55e' : 'color:#ef4444'}"><strong>${fmt(socCashflow)}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    ` : '<p style="font-style:italic;color:#94a3b8;font-size:11px;margin-bottom:24px">Aucun bien enregistré pour cette société.</p>'
+
+    return `
+      <div class="soc-section">
+        <h3 class="soc-title">${soc.nom_affiche || soc.nom}</h3>
+        <div class="soc-identity">
+          ${soc.siret ? `<span><strong>SIRET</strong> ${soc.siret}</span>` : ''}
+          ${soc.rcs ? `<span><strong>RCS</strong> ${soc.rcs}</span>` : ''}
+          ${soc.capital ? `<span><strong>Capital</strong> ${soc.capital}</span>` : ''}
+          ${soc.adresse ? `<span>${soc.adresse}${soc.code_postal || soc.ville ? `, ${soc.code_postal || ''} ${soc.ville || ''}` : ''}</span>` : ''}
+        </div>
+        <div class="soc-summary">
+          <div><div class="lbl">Biens</div><div class="val">${biens.length}</div></div>
+          <div><div class="lbl">Valeur d'acquisition</div><div class="val">${fmt(socPatrimoine)}</div></div>
+          <div><div class="lbl">Encours emprunt</div><div class="val">${fmt(socDette)}</div></div>
+          <div><div class="lbl">Patrimoine net</div><div class="val" style="color:#1a2d4e">${fmt(socPatrimoine - socDette)}</div></div>
+          <div><div class="lbl">Loyer annuel</div><div class="val">${fmt(socLoyer)}</div></div>
+          <div><div class="lbl">Taux d'occupation</div><div class="val">${tauxOcc}%</div></div>
+        </div>
+        ${actionnariatHtml}
+        ${biensHtml}
+      </div>
+    `
+  }).join('')
+
+  openPrint(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Fiche patrimoniale</title><style>${baseStyle}
+    .cover{text-align:center;padding:100px 0 60px}
+    .cover h1{font-size:30px;font-weight:900;letter-spacing:4px}
+    .cover h2{font-size:16px;font-weight:600;color:#64748b;margin-top:12px}
+    .cover .meta{color:#94a3b8;font-size:12px;margin-top:32px}
+    .global-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:36px}
+    .global-summary .item{background:#1a2d4e;color:#fff;border-radius:10px;padding:18px;text-align:center}
+    .global-summary .item .val{font-size:22px;font-weight:800}
+    .global-summary .item .lbl{font-size:10px;opacity:.7;text-transform:uppercase;margin-top:4px;letter-spacing:.5px}
+    .global-summary .item.accent{background:#eff6ff;color:#1a2d4e}
+    .soc-section{margin-bottom:48px;page-break-inside:avoid}
+    .soc-title{font-size:18px;font-weight:800;color:#1a2d4e;border-bottom:3px solid #1a2d4e;padding-bottom:8px;margin-bottom:8px}
+    .soc-identity{display:flex;gap:18px;flex-wrap:wrap;color:#64748b;font-size:11px;margin-bottom:18px}
+    .soc-identity strong{color:#94a3b8;font-size:10px;text-transform:uppercase;margin-right:4px}
+    .soc-summary{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:24px}
+    .soc-summary > div{background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px;text-align:center}
+    .soc-summary .lbl{font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px}
+    .soc-summary .val{font-size:14px;font-weight:700;color:#1a2d4e;margin-top:2px}
+    @media print{.soc-section{page-break-inside:avoid}}
+  </style></head><body>
+
+    <div class="cover">
+      <h1>FICHE PATRIMONIALE</h1>
+      <h2>${userName || 'Patrimoine consolidé'}</h2>
+      <p class="meta">Éditée le ${generatedAt}</p>
+      <p class="meta">${societes.length} société${societes.length > 1 ? 's' : ''} — ${totalBiens} bien${totalBiens > 1 ? 's' : ''} enregistré${totalBiens > 1 ? 's' : ''}</p>
+    </div>
+
+    <h3 style="font-size:14px;font-weight:700;color:#1a2d4e;border-bottom:2px solid #1a2d4e;padding-bottom:6px;margin:32px 0 16px">Synthèse globale</h3>
+    <div class="global-summary">
+      <div class="item"><div class="val">${fmt(totalPatrimoine)}</div><div class="lbl">Valeur d'acquisition</div></div>
+      <div class="item"><div class="val">${fmt(totalDette)}</div><div class="lbl">Encours emprunt</div></div>
+      <div class="item accent"><div class="val">${fmt(patrimoineNet)}</div><div class="lbl">Patrimoine net</div></div>
+      <div class="item"><div class="val">${fmt(totalLoyer)}</div><div class="lbl">Loyers annuels</div></div>
+      <div class="item"><div class="val" style="${totalCashflow >= 0 ? 'color:#22c55e' : 'color:#ef4444'}">${fmt(totalCashflow)}</div><div class="lbl">Cashflow mensuel</div></div>
+      <div class="item"><div class="val">${totalBiens}</div><div class="lbl">Biens totaux</div></div>
+    </div>
+
+    ${societesHtml}
+
+    <div class="footer">Document généré par WB Partners — ${generatedAt}<br>
+    <span style="font-size:9px">Les montants reflètent les valeurs d'acquisition enregistrées. Les valeurs de marché actuelles peuvent différer.</span></div>
   </body></html>`)
 }

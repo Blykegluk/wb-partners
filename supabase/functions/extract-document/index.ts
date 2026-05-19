@@ -101,7 +101,15 @@ Deno.serve(async (req) => {
           { text: EXTRACT_PROMPT },
         ],
       }],
-      generationConfig: { maxOutputTokens: 4096, temperature: 0.1 },
+      generationConfig: {
+        // JSON mode: forces the model to emit valid JSON only, no markdown
+        // preamble or trailing prose that could break JSON.parse.
+        responseMimeType: "application/json",
+        // Doubled from 4096 → leaves headroom for long lease documents
+        // and prevents mid-output truncation.
+        maxOutputTokens: 8192,
+        temperature: 0.1,
+      },
     });
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`;
