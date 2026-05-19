@@ -6,6 +6,7 @@ import { fmt, fmtDate, googleMapsUrl, DOC_TYPES } from '../lib/utils'
 import { rendementBrut, rendementNet, cashflowMensuel } from '../lib/calculs'
 import { pdfAvisEcheance, pdfFacture, pdfQuittance, pdfRelance, pdfMiseEnDemeure, pdfCommandement } from '../lib/pdf'
 import SmartUpload from '../components/SmartUpload'
+import { openDocument, removeFile } from '../lib/storage'
 import Carte from './Carte'
 import { PageHeader, Card, Modal, Field, Sel, Check, Grid2, Grid3, Btn, Badge, Empty, AddressField } from '../components/UI'
 
@@ -232,9 +233,10 @@ export default function Patrimoine({ navigate }) {
   }
 
   // ── Document delete ───────────────────────────────────────
-  const delDoc = async (id) => {
+  const delDoc = async (doc) => {
     if (!confirm('Supprimer ce document ?')) return
-    const { error } = await supabase.from('documents').delete().eq('id', id)
+    await removeFile(doc.fichier_url)
+    const { error } = await supabase.from('documents').delete().eq('id', doc.id)
     if (error) { alert(error.message); return }
     reload()
   }
@@ -538,10 +540,10 @@ export default function Patrimoine({ navigate }) {
                                 <p className="text-xs text-gray-300">{fmtDate(d.created_at)}</p>
                               </div>
                               <div className="flex items-center gap-2">
-                                <a href={d.fichier_url} target="_blank" rel="noreferrer"
-                                  className="text-gray-300 hover:text-blue-500 cursor-pointer"><Download size={14} /></a>
+                                <button onClick={() => openDocument(d.fichier_url)}
+                                  className="text-gray-300 hover:text-blue-500 cursor-pointer"><Download size={14} /></button>
                                 {canEdit && (
-                                  <button onClick={() => delDoc(d.id)} className="text-gray-300 hover:text-red-500 cursor-pointer"><Trash2 size={14} /></button>
+                                  <button onClick={() => delDoc(d)} className="text-gray-300 hover:text-red-500 cursor-pointer"><Trash2 size={14} /></button>
                                 )}
                               </div>
                             </div>

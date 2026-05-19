@@ -6,6 +6,7 @@ import { fmt, fmtDate, googleMapsUrl, DOC_TYPES } from '../lib/utils'
 import { rendementBrut, rendementNet, cashflowMensuel } from '../lib/calculs'
 import Timeline from '../components/Timeline'
 import { extractFromPDF, fileToBase64 } from '../lib/extraction'
+import { openDocument } from '../lib/storage'
 import { PageHeader, Card, Modal, Field, Sel, Check, Grid2, Grid3, Btn, Badge, Empty, AddressField } from '../components/UI'
 
 const EMPTY_BIEN = {
@@ -582,12 +583,12 @@ export default function Biens({ navigate }) {
                       {bienDocs.slice(0, 6).map(d => {
                         const ti = DOC_TYPES.find(t => t.v === d.type) || { l: d.type, color: '#64748b' }
                         return (
-                          <a key={d.id} href={d.fichier_url} target="_blank" rel="noreferrer"
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 text-xs no-underline transition-colors">
+                          <button key={d.id} onClick={() => openDocument(d.fichier_url)}
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-50 hover:bg-gray-100 text-xs cursor-pointer transition-colors">
                             <span className="w-2 h-2 rounded-full" style={{ background: ti.color }} />
                             <span className="text-navy font-medium">{d.nom}</span>
                             <span className="text-gray-300">{ti.l}</span>
-                          </a>
+                          </button>
                         )
                       })}
                       {bienDocs.length > 6 && (

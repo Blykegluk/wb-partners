@@ -224,10 +224,10 @@ export default function SmartUpload({ onClose, bienId: initialBienId }) {
     const path = `${selected.id}/${bienId}/${type}/${Date.now()}_${file.name}`
     const { error: upErr } = await supabase.storage.from('documents').upload(path, file)
     if (upErr) return
-    const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(path)
+    // Bucket is private — store only the path; signed URLs are generated on demand at view time.
     await supabase.from('documents').insert({
       societe_id: selected.id, bien_id: bienId,
-      type, nom: file.name, fichier_url: publicUrl, taille: file.size,
+      type, nom: file.name, fichier_url: path, taille: file.size,
     })
   }
 

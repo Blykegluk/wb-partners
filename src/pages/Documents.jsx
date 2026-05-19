@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useSociete } from '../contexts/Societe'
 import { fmtSize, DOC_TYPES } from '../lib/utils'
 import { PageHeader, Card, Modal, Field, Sel, Btn, Empty } from '../components/UI'
+import { openDocument, removeFile } from '../lib/storage'
 
 export default function Documents({ navigate, navState, setNavState }) {
   const { biens, documents, selected, canEdit, reload } = useSociete()
@@ -38,10 +39,10 @@ export default function Documents({ navigate, navState, setNavState }) {
     const path = `${user.id}/${f.bien_id}/${f.type}/${Date.now()}.${ext}`
     const { error: upErr } = await supabase.storage.from('documents').upload(path, file)
     if (!upErr) {
-      const { data: { publicUrl } } = supabase.storage.from('documents').getPublicUrl(path)
+      // Bucket is private — store only the path; signed URLs are generated on demand at view time.
       await supabase.from('documents').insert({
         societe_id: selected.id, bien_id: f.bien_id, type: f.type,
-        nom: f.nom, fichier_url: publicUrl, taille: file.size,
+        nom: f.nom, fichier_url: path, taille: file.size,
       })
       reload()
       setOpen(false)
@@ -62,8 +63,7 @@ export default function Documents({ navigate, navState, setNavState }) {
 
   const del = async (doc) => {
     if (!confirm('Supprimer ce document ?')) return
-    const urlParts = doc.fichier_url?.split('/object/public/documents/')
-    if (urlParts?.[1]) await supabase.storage.from('documents').remove([urlParts[1]])
+    await removeFile(doc.fichier_url)
     await supabase.from('documents').delete().eq('id', doc.id)
     reload()
   }
@@ -135,10 +135,10 @@ export default function Documents({ navigate, navState, setNavState }) {
                     <td className="px-4 py-3 text-xs text-gray-400">{new Date(d.created_at).toLocaleDateString('fr-FR')}</td>
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
-                        <a href={d.fichier_url} target="_blank" rel="noreferrer"
-                          className="bg-blue-50 text-blue-600 rounded-lg px-2.5 py-1 text-xs font-semibold inline-flex items-center gap-1 no-underline hover:bg-blue-100">
+                        <button onClick={() => openDocument(d.fichier_url)}
+                          className="bg-blue-50 text-blue-600 rounded-lg px-2.5 py-1 text-xs font-semibold inline-flex items-center gap-1 hover:bg-blue-100 cursor-pointer">
                           <Download size={12} /> Ouvrir
-                        </a>
+                        </button>
                         {canEdit && (
                           <button onClick={() => del(d)} className="text-gray-300 hover:text-red-500 cursor-pointer">
                             <Trash2 size={14} />
