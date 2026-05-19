@@ -17,6 +17,7 @@ export default function SmartUpload({ onClose, bienId: initialBienId }) {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [trimInfo, setTrimInfo] = useState(null)
+  const [drag, setDrag] = useState(false)
 
   // Change detected type
   const TYPE_MAP = { bail: 'confirm_bail', amortissement: 'confirm_amort', appel_charges: 'confirm_charges', quittance: 'confirm_quittance', autre: 'confirm_generic' }
@@ -289,19 +290,27 @@ export default function SmartUpload({ onClose, bienId: initialBienId }) {
   return (
     <Modal title={title} onClose={onClose} width="max-w-2xl">
 
-      {/* ── IDLE: file picker ────────────────────────── */}
+      {/* ── IDLE: file picker (drag-and-drop + click) ─ */}
       {step === 'idle' && (
-        <div className="text-center py-10">
-          <label className="inline-flex flex-col items-center gap-3 cursor-pointer group">
-            <div className="w-20 h-20 rounded-2xl bg-blue-50 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
-              <Upload size={32} className="text-blue-500" />
-            </div>
-            <span className="text-sm font-semibold text-navy">Choisir un fichier</span>
-            <span className="text-xs text-gray-400">PDF, image — bail, tableau d'amortissement, appel de charges, quittance...</span>
-            <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden"
-              onChange={e => { if (e.target.files[0]) handleFile(e.target.files[0]) }} />
-          </label>
-        </div>
+        <label
+          onDragOver={e => { e.preventDefault(); setDrag(true) }}
+          onDragLeave={() => setDrag(false)}
+          onDrop={e => {
+            e.preventDefault(); setDrag(false)
+            const f = e.dataTransfer.files?.[0]
+            if (f) handleFile(f)
+          }}
+          className={`flex flex-col items-center justify-center gap-3 py-12 px-6 rounded-2xl border-2 border-dashed cursor-pointer transition-colors ${drag ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'}`}>
+          <div className={`w-20 h-20 rounded-2xl flex items-center justify-center transition-colors ${drag ? 'bg-blue-100' : 'bg-blue-50'}`}>
+            <Upload size={32} className="text-blue-500" />
+          </div>
+          <span className="text-sm font-semibold text-navy">
+            {drag ? 'Déposez le fichier ici' : 'Glissez un fichier ou cliquez pour choisir'}
+          </span>
+          <span className="text-xs text-gray-400 text-center">PDF, image — bail, tableau d'amortissement, appel de charges, quittance...</span>
+          <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden"
+            onChange={e => { if (e.target.files[0]) handleFile(e.target.files[0]) }} />
+        </label>
       )}
 
       {/* ── EXTRACTING: spinner ──────────────────────── */}

@@ -30,8 +30,10 @@ const parties = (soc, loc) => `
     <div class="bloc">
       <h3>Bailleur</h3>
       <p><strong>${soc?.nom || '—'}</strong>
+      ${soc?.capital ? `<br>Capital : ${soc.capital}` : ''}
       ${soc?.siret ? `<br>SIRET : ${soc.siret}` : ''}
       ${soc?.rcs ? `<br>RCS : ${soc.rcs}` : ''}
+      ${soc?.ape ? `<br>APE : ${soc.ape}` : ''}
       ${soc?.tva_intracommunautaire ? `<br>TVA : ${soc.tva_intracommunautaire}` : ''}
       ${soc?.adresse ? `<br>${soc.adresse}` : ''}
       ${soc?.code_postal || soc?.ville ? `<br>${soc.code_postal || ''} ${soc.ville || ''}` : ''}
@@ -51,11 +53,11 @@ const parties = (soc, loc) => `
 const bienBox = (bien) => `
   <div class="bien-box"><strong>Bien :</strong> ${bien.adresse}, ${bien.code_postal} ${bien.ville}${bien.surface_rdc ? ` — ${bien.surface_rdc} m²` : ''}</div>`
 
-const ibanBlock = (soc, ref = '') => soc?.iban ? `
+const ibanBlock = (soc, ref = '', label = 'Virement — IBAN') => soc?.iban ? `
   <div class="iban">
-    <div><div class="lbl">Virement — IBAN</div><div class="val">${soc.iban}</div></div>
+    <div><div class="lbl">${label}</div><div class="val">${soc.iban}</div></div>
     ${soc.bic ? `<div><div class="lbl">BIC</div><div class="val">${soc.bic}</div></div>` : ''}
-    ${soc.nom_banque ? `<div><div class="lbl">Banque</div><div class="val">${soc.nom_banque}</div></div>` : ''}
+    ${soc.nom_banque ? `<div><div class="lbl">Banque</div><div class="val">${soc.nom_banque}${soc.adresse_banque ? `<br><span style="font-size:10px;font-weight:400;opacity:.7">${soc.adresse_banque}</span>` : ''}</div></div>` : ''}
     ${ref ? `<div><div class="lbl">Référence virement</div><div class="val" style="color:#f59e0b">${ref}</div></div>` : ''}
   </div>` : ''
 
@@ -125,6 +127,7 @@ export const pdfQuittance = (bail, bien, loc, soc, transaction) => {
       <tr class="tot"><td colspan="2"><strong>TOTAL ACQUITTÉ</strong></td><td></td><td style="text-align:right"><strong>${totalTTC.toFixed(2)} €</strong></td></tr>
     </tbody></table>
     <p class="note">Le bailleur soussigné reconnaît avoir reçu la somme de ${totalTTC.toFixed(2)} € TTC au titre du loyer et des charges pour la période de ${periode}. Cette quittance ne libère le locataire que pour la période indiquée.</p>
+    ${ibanBlock(soc, '', 'Compte du bailleur')}
     ${footer(soc)}
   </body></html>`)
 }
