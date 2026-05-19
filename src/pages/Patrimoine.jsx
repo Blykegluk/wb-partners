@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Building2, Plus, Trash2, Upload, MapPin, FileText, Users, FolderOpen, Receipt, ArrowRight, Link, Euro, ChevronLeft, Download, ExternalLink, Map, List, Printer, Zap } from 'lucide-react'
+import { Building2, Plus, Trash2, Upload, MapPin, FileText, Users, FolderOpen, Receipt, ArrowRight, Link, Euro, ChevronLeft, ChevronDown, Download, ExternalLink, Map, List, Printer, Zap } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useSociete } from '../contexts/Societe'
 import { fmt, fmtDate, googleMapsUrl, DOC_TYPES } from '../lib/utils'
@@ -475,6 +475,10 @@ export default function Patrimoine({ navigate }) {
           const uncategorized = bienDocs.filter(d => !knownTypes.includes(d.type))
           if (uncategorized.length > 0) grouped['autre'] = [...(grouped['autre'] || []), ...uncategorized]
 
+          const nonEmptySections = DOC_SECTIONS.filter(s => (grouped[s.key] || []).length > 0)
+          const emptySections = DOC_SECTIONS.filter(s => (grouped[s.key] || []).length === 0)
+          const generators = DOC_SECTIONS.filter(s => s.canGenerate)
+
           return (
             <div>
               <div className="flex justify-between items-center mb-4">
@@ -488,24 +492,36 @@ export default function Patrimoine({ navigate }) {
                 )}
               </div>
 
-              <div className="space-y-4">
-                {DOC_SECTIONS.map(section => {
-                  const docs = grouped[section.key] || []
-                  return (
-                    <Card key={section.key} className="p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full" style={{ background: section.color }} />
-                          <h4 className="text-sm font-bold text-navy">{section.label}</h4>
-                          <span className="text-xs text-gray-300 font-medium">{docs.length}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          {section.canGenerate && activeBail && canEdit && (
-                            <button onClick={section.generate}
-                              className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg cursor-pointer transition-colors hover:bg-gray-100 text-blue-500">
-                              <Printer size={12} /> {section.genLabel}
-                            </button>
-                          )}
+              {/* Quick generate actions */}
+              {activeBail && canEdit && generators.length > 0 && (
+                <Card className="p-3 mb-4">
+                  <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-2">Générer un document</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {generators.map(s => (
+                      <button key={s.key} onClick={s.generate}
+                        className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 cursor-pointer transition-colors text-navy">
+                        <span className="w-2 h-2 rounded-full" style={{ background: s.color }} />
+                        <Printer size={11} className="text-gray-400" />
+                        {s.genLabel}
+                      </button>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* Non-empty sections */}
+              {nonEmptySections.length > 0 ? (
+                <div className="space-y-3 mb-4">
+                  {nonEmptySections.map(section => {
+                    const docs = grouped[section.key] || []
+                    return (
+                      <Card key={section.key} className="p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full" style={{ background: section.color }} />
+                            <h4 className="text-sm font-bold text-navy">{section.label}</h4>
+                            <span className="text-xs text-gray-300 font-medium">{docs.length}</span>
+                          </div>
                           {canEdit && (
                             <button onClick={() => openUpload(detail.id)}
                               className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-lg cursor-pointer transition-colors hover:bg-gray-100 text-gray-400">
@@ -513,8 +529,6 @@ export default function Patrimoine({ navigate }) {
                             </button>
                           )}
                         </div>
-                      </div>
-                      {docs.length > 0 ? (
                         <div className="space-y-1">
                           {docs.map(d => (
                             <div key={d.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
@@ -533,13 +547,38 @@ export default function Patrimoine({ navigate }) {
                             </div>
                           ))}
                         </div>
-                      ) : (
-                        <p className="text-xs text-gray-300 italic pl-4">Aucun document</p>
-                      )}
-                    </Card>
-                  )
-                })}
-              </div>
+                      </Card>
+                    )
+                  })}
+                </div>
+              ) : (
+                <Card className="p-8 mb-4 text-center">
+                  <FileText size={28} className="text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm text-gray-400 mb-1">Aucun document pour ce bien</p>
+                  {canEdit && (
+                    <p className="text-xs text-gray-300">Cliquez sur SmartUpload pour en ajouter</p>
+                  )}
+                </Card>
+              )}
+
+              {/* Empty categories accordion */}
+              {emptySections.length > 0 && canEdit && (
+                <details className="group rounded-xl border border-gray-200 bg-white">
+                  <summary className="cursor-pointer px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide hover:bg-gray-50 rounded-xl flex items-center gap-2 select-none">
+                    <ChevronDown size={14} className="text-gray-400 transition-transform group-open:rotate-180" />
+                    Autres catégories ({emptySections.length})
+                  </summary>
+                  <div className="px-4 pb-4 pt-1 grid grid-cols-2 sm:grid-cols-3 gap-2 border-t border-gray-100">
+                    {emptySections.map(s => (
+                      <button key={s.key} onClick={() => openUpload(detail.id)}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 cursor-pointer text-left transition-colors">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                        <span className="text-xs font-medium text-navy truncate">{s.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </details>
+              )}
             </div>
           )
         })()}
