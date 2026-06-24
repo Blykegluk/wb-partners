@@ -2,27 +2,50 @@ name: Keep Supabase Alive
 
 on:
   schedule:
-    - cron: '0 9 * * *'
+    # Every 6 hours — 4x the safety margin vs. the 7-day inactivity window.
+    - cron: '0 */6 * * *'
   workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase REST API
+      - name: Query a real table to count as Postgres activity
         env:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
-          status=$(curl -s -o /dev/null -w "%{http_code}" \
+          set +e
+          # Hit a real table — this forces the request all the way to Postgres,
+          # which is what Supabase actually measures for "project activity".
+          # A ping to /rest/v1/ alone goes to the gateway and doesn't always count.
+          response=$(curl -s -w "\nHTTP_STATUS:%{http_code}\nCURL_EXIT:0" \
             -H "apikey: $SUPABASE_ANON_KEY" \
             -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
-            "$SUPABASE_URL/rest/v1/")
+            -H "Accept: application/json" \
+            "$SUPABASE_URL/rest/v1/societe?select=id&limit=1")
+          curl_exit=$?
+
+          if [ $curl_exit -eq 6 ]; then
+            echo "::error::DNS resolution failed — the Supabase project is already paused."
+            echo "::error::A workflow run cannot wake a paused project. Restore it from the Supabase dashboard:"
+            echo "::error::https://supabase.com/dashboard"
+            exit 1
+          elif [ $curl_exit -ne 0 ]; then
+            echo "::error::curl failed with exit code $curl_exit (network/transport error)"
+            exit 1
+          fi
+
+          status=$(echo "$response" | grep -oE 'HTTP_STATUS:[0-9]+' | cut -d: -f2)
+          body=$(echo "$response" | sed -E '/^HTTP_STATUS:|^CURL_EXIT:/d')
           echo "HTTP status: $status"
+          echo "Body (truncated): $(echo "$body" | head -c 200)"
+
+          # 200 = success, 401/403 = auth/RLS rejection but Postgres was reached — both count as activity.
           if [ "$status" -ge 200 ] && [ "$status" -lt 500 ]; then
             echo "Supabase is alive (status $status)"
             exit 0
           else
-            echo "Unexpected status code: $status"
+            echo "::error::Unexpected status $status — Supabase may be in a degraded state"
             exit 1
           fi
