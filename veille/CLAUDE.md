@@ -12,8 +12,12 @@ quotidien complet en le suivant à la lettre. **Supabase est l'unique source de 
   aucun déploiement nécessaire pour les données.
 - **Ce repo est en LECTURE SEULE pour toi** : ne commite rien, ne pushe jamais (un push
   sur `main` déclenche un déploiement du site).
-- Compte-rendu de fin de run : dans ta réponse finale (résumé en français) + la ligne
-  `runs`. Pas de fichier de rapport.
+- Compte-rendu de fin de run : rédige un **rapport complet en markdown** (titre daté,
+  synthèse chiffrée, top du jour, tableau par recherche avec scores et lecture, pistes
+  hors critères, constats de marché, erreurs/limites, note de prudence finale) et
+  stocke-le dans la colonne `runs.rapport` — il est consultable sur le dashboard
+  (bouton « Rapports » de la page Pipeline). Termine aussi ta réponse par un résumé
+  concis en français.
 
 ## RECHERCHE 1 — Murs commerciaux patrimoniaux (rendement)
 

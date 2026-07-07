@@ -21,3 +21,19 @@ body {
   0%, 80%, 100% { transform: translateY(0); }
   40% { transform: translateY(-6px); }
 }
+
+/* Rendu markdown des rapports quotidiens (page Pipeline) */
+.rapport-md { font-size: 0.875rem; color: #374151; line-height: 1.6; }
+.rapport-md h1 { font-size: 1.15rem; font-weight: 800; color: var(--color-navy); margin: 0 0 1rem; }
+.rapport-md h2 { font-size: 1rem; font-weight: 700; color: var(--color-navy); margin: 1.5rem 0 0.5rem; }
+.rapport-md h3 { font-size: 0.9rem; font-weight: 700; color: var(--color-navy); margin: 1rem 0 0.4rem; }
+.rapport-md p { margin: 0.5rem 0; }
+.rapport-md ul, .rapport-md ol { margin: 0.5rem 0; padding-left: 1.25rem; }
+.rapport-md li { margin: 0.2rem 0; list-style: disc; }
+.rapport-md a { color: #2563eb; text-decoration: underline; }
+.rapport-md code { background: #f3f4f6; padding: 0.1rem 0.3rem; border-radius: 0.25rem; font-size: 0.8rem; }
+.rapport-md hr { border: none; border-top: 1px solid #e5e7eb; margin: 1.25rem 0; }
+.rapport-md table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; font-size: 0.8rem; display: block; overflow-x: auto; }
+.rapport-md th { text-align: left; font-weight: 700; color: #6b7280; text-transform: uppercase; font-size: 0.68rem; letter-spacing: 0.03em; padding: 0.4rem 0.6rem; border-bottom: 2px solid #e5e7eb; white-space: nowrap; }
+.rapport-md td { padding: 0.45rem 0.6rem; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+.rapport-md blockquote { border-left: 3px solid #e5e7eb; padding-left: 0.75rem; color: #6b7280; margin: 0.5rem 0; }

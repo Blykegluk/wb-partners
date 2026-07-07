@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import {
   Radar, ExternalLink, MessageSquare, Send, MapPin, Sparkles,
-  SlidersHorizontal, Store, Hotel, KeyRound,
+  SlidersHorizontal, Store, Hotel, KeyRound, FileText, ChevronLeft,
 } from 'lucide-react'
+import { marked } from 'marked'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/Auth'
 import { Card, Modal, Btn, Sel, Field, Empty, Spinner, PageHeader } from '../components/UI'
@@ -357,14 +358,54 @@ function DetailModal({ opp, onClose, onStatutChange }) {
   )
 }
 
+// ── Rapports quotidiens ──────────────────────────────────────
+
+function RapportsModal({ runs, onClose }) {
+  const [selected, setSelected] = useState(runs.find(r => r.rapport) || null)
+
+  return (
+    <Modal title="Rapports quotidiens" onClose={onClose} width="max-w-3xl">
+      {selected ? (
+        <>
+          {runs.filter(r => r.rapport).length > 1 && (
+            <button onClick={() => setSelected(null)}
+              className="text-blue-600 hover:text-blue-800 text-xs font-semibold cursor-pointer inline-flex items-center gap-1 mb-4">
+              <ChevronLeft size={13} />Tous les rapports
+            </button>
+          )}
+          <div className="rapport-md" dangerouslySetInnerHTML={{ __html: marked.parse(selected.rapport || '') }} />
+        </>
+      ) : (
+        <div className="space-y-2">
+          {runs.filter(r => r.rapport).map(r => (
+            <button key={r.id} onClick={() => setSelected(r)}
+              className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg bg-gray-50 hover:bg-gray-100 cursor-pointer text-left transition-colors">
+              <span className="font-bold text-navy text-sm">
+                {new Date(r.date_run).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              </span>
+              <span className="text-gray-400 text-xs shrink-0">
+                {r.nouvelles ?? 0} nouvelle{(r.nouvelles ?? 0) > 1 ? 's' : ''} · {r.annonces_analysees ?? 0} analysées
+              </span>
+            </button>
+          ))}
+          {runs.filter(r => r.rapport).length === 0 && (
+            <p className="text-gray-300 text-sm text-center py-8">Aucun rapport disponible.</p>
+          )}
+        </div>
+      )}
+    </Modal>
+  )
+}
+
 // ── Page ─────────────────────────────────────────────────────
 
 export default function Pipeline() {
   const [opps, setOpps] = useState(null)
-  const [lastRun, setLastRun] = useState(null)
+  const [runs, setRuns] = useState([])
   const [tab, setTab] = useState('R1')
   const [detail, setDetail] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
+  const [showRapports, setShowRapports] = useState(false)
 
   const [fStatut, setFStatut] = useState('travail')
   const [fVille, setFVille] = useState('')
@@ -375,10 +416,10 @@ export default function Pipeline() {
   const load = async () => {
     const [o, r] = await Promise.all([
       supabase.from('opportunites').select('*'),
-      supabase.from('runs').select('*').order('date_run', { ascending: false }).limit(1),
+      supabase.from('runs').select('*').order('date_run', { ascending: false }).limit(60),
     ])
     setOpps(o.data || [])
-    setLastRun(r.data?.[0] || null)
+    setRuns(r.data || [])
   }
 
   useEffect(() => { load() }, [])
@@ -413,6 +454,7 @@ export default function Pipeline() {
 
   if (opps === null) return <Spinner />
 
+  const lastRun = runs[0] || null
   const actives = (r) => opps.filter(o => o.recherche === r && !o.hors_critere && STATUTS_TRAVAIL.includes(o.statut)).length
   const nouveaux = opps.filter(o => isNouveau(o) && !o.hors_critere && o.statut === 'active').length
 
@@ -452,8 +494,12 @@ export default function Pipeline() {
             <I size={14} />{k} · {label}
           </button>
         ))}
+        <button onClick={() => setShowRapports(true)}
+          className="ml-auto px-3 py-2 rounded-lg text-sm cursor-pointer inline-flex items-center gap-1.5 bg-white text-gray-400 border border-gray-200 hover:bg-gray-50">
+          <FileText size={14} /><span className="hidden sm:inline">Rapports</span>
+        </button>
         <button onClick={() => setShowFilters(v => !v)}
-          className={`ml-auto px-3 py-2 rounded-lg text-sm cursor-pointer inline-flex items-center gap-1.5 ${
+          className={`px-3 py-2 rounded-lg text-sm cursor-pointer inline-flex items-center gap-1.5 ${
             showFilters ? 'bg-blue-50 text-blue-600 border border-blue-200' : 'bg-white text-gray-400 border border-gray-200'
           }`}>
           <SlidersHorizontal size={14} /><span className="hidden sm:inline">Filtres</span>
@@ -509,6 +555,7 @@ export default function Pipeline() {
       </p>
 
       {detail && <DetailModal opp={detail} onClose={() => setDetail(null)} onStatutChange={onStatutChange} />}
+      {showRapports && <RapportsModal runs={runs} onClose={() => setShowRapports(false)} />}
     </div>
   )
 }
