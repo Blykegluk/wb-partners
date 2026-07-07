@@ -40,6 +40,11 @@ create table public.opportunites (
   verifie_le timestamptz
 );
 
+-- Migration opportunites_hors_critere (2026-07-07) : pistes exceptionnelles
+-- violant une règle bloquante (ex. prix non affiché), affichées en sous-section
+alter table public.opportunites add column hors_critere boolean not null default false;
+alter table public.opportunites add column motif_hors_critere text;
+
 create index opportunites_recherche_idx on public.opportunites (recherche);
 create index opportunites_statut_idx on public.opportunites (statut);
 create index opportunites_score_idx on public.opportunites (score desc);

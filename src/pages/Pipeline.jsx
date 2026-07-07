@@ -81,6 +81,9 @@ function OppCard({ o, onOpen }) {
                 <Sparkles size={9} />NOUVEAU
               </span>
             )}
+            {o.hors_critere && (
+              <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded text-[10px] font-bold">HORS CRITÈRES</span>
+            )}
             {o.statut !== 'active' && <span className={`${s.cls} px-1.5 py-0.5 rounded text-[10px] font-semibold`}>{s.l}</span>}
             {o.recherche === 'R2' && <VerdictBadge verdict={o.verdict_reglementaire} />}
           </div>
@@ -95,8 +98,8 @@ function OppCard({ o, onOpen }) {
       <div className="mt-3 flex items-baseline justify-between gap-2">
         <span className="text-navy font-extrabold">
           {o.type_offre === 'location'
-            ? (o.loyer_annuel ? `${fmtNum(o.loyer_annuel)} €/an` : '—')
-            : (o.prix ? fmtNum(o.prix) + ' €' : '—')}
+            ? (o.loyer_annuel ? `${fmtNum(o.loyer_annuel)} €/an` : (o.hors_critere ? 'Loyer : nous consulter' : '—'))
+            : (o.prix ? fmtNum(o.prix) + ' €' : (o.hors_critere ? 'Prix : nous consulter' : '—'))}
         </span>
         <span className="text-gray-400 text-xs">
           {o.surface_totale ? `${fmtNum(o.surface_totale)} m²` : ''}
@@ -125,6 +128,12 @@ function OppCard({ o, onOpen }) {
         )}
         {o.points_forts && <p className="text-green-600 truncate">+ {o.points_forts}</p>}
       </div>
+
+      {o.hors_critere && o.motif_hors_critere && (
+        <p className="mt-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-100 rounded px-2 py-1.5">
+          {o.motif_hors_critere}
+        </p>
+      )}
 
       <div className="mt-3 pt-2 border-t border-gray-50 flex items-center justify-between">
         <span className="text-gray-300 text-[11px]">{o.source} · détecté le {fmtDate(o.detecte_le)}</span>
@@ -191,6 +200,13 @@ function DetailModal({ opp, onClose, onStatutChange }) {
           Voir l'annonce <ExternalLink size={12} />
         </a>
       </div>
+
+      {opp.hors_critere && opp.motif_hors_critere && (
+        <div className="mb-5 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
+          <p className="text-amber-700 font-bold text-xs uppercase tracking-wide mb-1">Piste hors critères</p>
+          <p className="text-gray-700">{opp.motif_hors_critere}</p>
+        </div>
+      )}
 
       {/* Statut */}
       <div className="mb-5">
@@ -373,9 +389,7 @@ export default function Pipeline() {
   const villes = useMemo(() =>
     [...new Set((opps || []).map(o => o.ville).filter(Boolean))].sort(), [opps])
 
-  const filtered = useMemo(() => {
-    if (!opps) return []
-    let list = opps.filter(o => o.recherche === tab)
+  const filterAndSort = (list) => {
     if (fStatut === 'travail') list = list.filter(o => STATUTS_TRAVAIL.includes(o.statut))
     else if (fStatut !== 'tous') list = list.filter(o => o.statut === fStatut)
     if (fVille) list = list.filter(o => o.ville === fVille)
@@ -387,12 +401,20 @@ export default function Pipeline() {
       date: (a, b) => new Date(b.detecte_le) - new Date(a.detecte_le),
     }
     return [...list].sort(tri[fTri])
-  }, [opps, tab, fStatut, fVille, fScoreMin, fPrixMax, fTri])
+  }
+
+  const filtered = useMemo(() =>
+    opps ? filterAndSort(opps.filter(o => o.recherche === tab && !o.hors_critere)) : [],
+    [opps, tab, fStatut, fVille, fScoreMin, fPrixMax, fTri])
+
+  const horsCriteres = useMemo(() =>
+    opps ? filterAndSort(opps.filter(o => o.recherche === tab && o.hors_critere)) : [],
+    [opps, tab, fStatut, fVille, fScoreMin, fPrixMax, fTri])
 
   if (opps === null) return <Spinner />
 
-  const actives = (r) => opps.filter(o => o.recherche === r && STATUTS_TRAVAIL.includes(o.statut)).length
-  const nouveaux = opps.filter(o => isNouveau(o) && o.statut === 'active').length
+  const actives = (r) => opps.filter(o => o.recherche === r && !o.hors_critere && STATUTS_TRAVAIL.includes(o.statut)).length
+  const nouveaux = opps.filter(o => isNouveau(o) && !o.hors_critere && o.statut === 'active').length
 
   return (
     <div>
@@ -465,6 +487,19 @@ export default function Pipeline() {
       ) : (
         <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map(o => <OppCard key={o.id} o={o} onOpen={setDetail} />)}
+        </div>
+      )}
+
+      {/* Pistes hors critères */}
+      {horsCriteres.length > 0 && (
+        <div className="mt-8">
+          <p className="text-amber-700 font-bold text-sm mb-1">Pistes hors critères</p>
+          <p className="text-gray-400 text-xs mb-3">
+            Dossiers exceptionnels suivis malgré une règle non satisfaite — le motif est indiqué sur chaque carte.
+          </p>
+          <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {horsCriteres.map(o => <OppCard key={o.id} o={o} onOpen={setDetail} />)}
+          </div>
         </div>
       )}
 

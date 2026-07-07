@@ -57,6 +57,7 @@ quotidien complet en le suivant à la lettre. **Supabase est l'unique source de 
 - Varier les requêtes (ville × type × budget) par rapport aux runs précédents (lire `runs.requetes`) ; consigner les requêtes du jour dans `runs.requetes`.
 - **Fraîcheur** : prioriser le publié/modifié récent. Re-vérifier les `active` de plus de 14 jours ; annonce disparue → `statut='expiree'` (jamais supprimée, jamais re-proposée).
 - **Anti-hallucination — règle d'or** : chaque ligne insérée = une annonce réelle dont le lien a été **ouvert (WebFetch réussi) pendant le run**. Jamais d'annonce de mémoire. Donnée absente = "à vérifier". `prix` (ou `loyer_annuel`), `surface_totale` et `lien` obligatoires, sinon pas d'insertion. Contre-vérifier chaque lien avant insertion.
+- **Pistes hors critères (exception encadrée)** : un dossier EXCEPTIONNEL qui coche toutes les cases d'une recherche sauf UNE règle bloquante (ex. prix non affiché « nous consulter ») peut être inséré avec `hors_critere=true` et `motif_hors_critere` (règle non satisfaite + pourquoi le dossier mérite le suivi + action à mener). Maximum 1-2 par run, uniquement si vraiment remarquable (ex. PC purgé pour résidence hôtelière). Le lien doit quand même avoir été ouvert et vérifié ; `score` peut rester NULL si inévaluable. Ces pistes apparaissent dans une sous-section dédiée du dashboard, hors compteurs.
 
 ## DÉROULÉ DU RUN
 
