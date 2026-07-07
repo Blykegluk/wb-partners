@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   Building2, Settings, LogOut, LayoutDashboard, ChevronDown,
-  Calculator, CreditCard, BarChart3, Menu, X,
+  Calculator, CreditCard, BarChart3, Menu, X, Radar,
 } from 'lucide-react'
 import { useAuth } from '../contexts/Auth'
 import { useSociete } from '../contexts/Societe'
@@ -13,6 +13,7 @@ const NAV = [
   { k: 'patrimoine', l: 'Biens', I: Building2 },
   { k: 'finances', l: 'Finances', I: CreditCard },
   { k: 'analyse', l: 'Analyse', I: BarChart3 },
+  { k: 'pipeline', l: 'Pipeline', I: Radar },
   { k: 'outils', l: 'Outils', I: Calculator },
 ]
 

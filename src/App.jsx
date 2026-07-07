@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard'
 import Patrimoine from './pages/Patrimoine'
 import FinancesHub from './pages/FinancesHub'
 import Analyse from './pages/Analyse'
+import Pipeline from './pages/Pipeline'
 import Outils from './pages/Outils'
 import Parametres from './pages/Parametres'
 
@@ -17,6 +18,7 @@ const PAGES = {
   patrimoine: Patrimoine,
   finances: FinancesHub,
   analyse: Analyse,
+  pipeline: Pipeline,
   outils: Outils,
   parametres: Parametres,
 }
