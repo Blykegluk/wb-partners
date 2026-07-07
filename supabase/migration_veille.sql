@@ -69,6 +69,10 @@ create table public.runs (
   erreurs text
 );
 
+-- Migration runs_rapport (2026-07-07) : rapport quotidien markdown,
+-- consultable sur le dashboard (bouton Rapports)
+alter table public.runs add column rapport text;
+
 -- ── RLS ─────────────────────────────────────────────────────────
 alter table public.opportunites enable row level security;
 alter table public.commentaires enable row level security;
