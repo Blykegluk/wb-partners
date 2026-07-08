@@ -420,7 +420,7 @@ function MapView({ opps, onOpen }) {
       {geo.length === 0 ? (
         <Empty icon={<MapIcon size={40} />} text="Aucune opportunité géolocalisée pour cette sélection." />
       ) : (
-        <Card className="overflow-hidden" style={{ height: 'clamp(420px, calc(100vh - 340px), 720px)' }}>
+        <Card className="overflow-hidden" style={{ height: 'clamp(420px, calc(100vh - 340px), 720px)', isolation: 'isolate' }}>
           <MapContainer center={center} zoom={11} style={{ height: '100%', width: '100%' }} scrollWheelZoom>
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
