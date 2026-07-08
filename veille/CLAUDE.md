@@ -69,6 +69,7 @@ quotidien complet en le suivant à la lettre. **Supabase est l'unique source de 
 2. Lire `opportunites` (clés, statuts). Dédoublonnage par `cle_unique` (adresse normalisée minuscule sans accents + surface arrondie à 5 m² + prix arrondi à 10 k€ ; fallback titre+surface+prix+source). Upsert : clé existante → mettre à jour `verifie_le` et le prix s'il a changé (ancien prix consigné en commentaire système, `auteur` NULL, ex. "Prix modifié : 590 k → 550 k").
 3. Exécuter les 3 recherches (méthode recommandée : 3 agents en parallèle avec les règles anti-hallucination dans leur prompt, puis contre-vérification de chaque lien).
 4. Scorer chaque nouveauté (/100) : `score_detail` jsonb par critère + `justification_score` (1-2 phrases) + `points_forts` / `points_vigilance`.
+4bis. **Géocoder** chaque nouveauté pour la vue carte : appeler `https://api-adresse.data.gouv.fr/search/?q=<adresse>&postcode=<CP>&limit=1`, stocker `latitude`/`longitude` (coordinates = [lng, lat]). Si l'adresse exacte n'est pas communiquée, géocoder au niveau quartier/ville et mettre `geo_approx=true`. Si rien d'exploitable, laisser lat/lng NULL.
 5. Insérer les nouveautés, expirer les disparues.
 6. Insérer la ligne `runs` (date_run, requetes jsonb par recherche, annonces_analysees, nouvelles, expirees, erreurs).
 7. Ne JAMAIS modifier/supprimer les commentaires des associés, ni écraser un `statut` posé à la main (le pipeline ne touche `statut` que pour `active`→`expiree`).

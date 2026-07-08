@@ -45,6 +45,11 @@ create table public.opportunites (
 alter table public.opportunites add column hors_critere boolean not null default false;
 alter table public.opportunites add column motif_hors_critere text;
 
+-- Migration opportunites_geoloc (2026-07-07) : vue carte, code couleur = score
+alter table public.opportunites add column latitude numeric;
+alter table public.opportunites add column longitude numeric;
+alter table public.opportunites add column geo_approx boolean not null default false;
+
 create index opportunites_recherche_idx on public.opportunites (recherche);
 create index opportunites_statut_idx on public.opportunites (statut);
 create index opportunites_score_idx on public.opportunites (score desc);

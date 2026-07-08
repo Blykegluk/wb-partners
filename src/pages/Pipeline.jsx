@@ -1,7 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
+import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
 import {
   Radar, ExternalLink, MessageSquare, Send, MapPin, Sparkles,
   SlidersHorizontal, Store, Hotel, KeyRound, FileText, ChevronLeft,
+  LayoutGrid, Map as MapIcon,
 } from 'lucide-react'
 import { marked } from 'marked'
 import { supabase } from '../lib/supabase'
@@ -33,6 +36,9 @@ const statutCfg = (v) => STATUTS.find(s => s.v === v) || { l: v, cls: 'bg-gray-1
 const isNouveau = (o) => o.detecte_le && (Date.now() - new Date(o.detecte_le).getTime()) < 48 * 3600 * 1000
 
 const fmtNum = (n) => n == null ? '—' : new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(n)
+
+const scoreColor = (score) =>
+  score == null ? '#94a3b8' : score >= 70 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444'
 
 // ── Petits composants ────────────────────────────────────────
 
@@ -397,12 +403,100 @@ function RapportsModal({ runs, onClose }) {
   )
 }
 
+// ── Vue carte ────────────────────────────────────────────────
+
+function MapView({ opps, onOpen }) {
+  const geo = opps.filter(o => o.latitude && o.longitude)
+  const sansGeo = opps.length - geo.length
+
+  // Centre Île-de-France ; recentré sur le barycentre si des points existent
+  const center = geo.length
+    ? [geo.reduce((s, o) => s + Number(o.latitude), 0) / geo.length,
+       geo.reduce((s, o) => s + Number(o.longitude), 0) / geo.length]
+    : [48.8566, 2.3522]
+
+  return (
+    <>
+      {geo.length === 0 ? (
+        <Empty icon={<MapIcon size={40} />} text="Aucune opportunité géolocalisée pour cette sélection." />
+      ) : (
+        <Card className="overflow-hidden" style={{ height: 'clamp(420px, calc(100vh - 340px), 720px)' }}>
+          <MapContainer center={center} zoom={11} style={{ height: '100%', width: '100%' }} scrollWheelZoom>
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            {geo.map(o => {
+              const c = scoreColor(o.score)
+              return (
+                <CircleMarker
+                  key={o.id}
+                  center={[Number(o.latitude), Number(o.longitude)]}
+                  radius={o.geo_approx ? 9 : 11}
+                  pathOptions={{
+                    color: c, fillColor: c,
+                    fillOpacity: o.geo_approx ? 0.35 : 0.8,
+                    weight: 2, dashArray: o.geo_approx ? '3 3' : null,
+                  }}
+                >
+                  <Popup>
+                    <div className="text-xs leading-relaxed min-w-[190px]">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full text-white font-bold shrink-0" style={{ background: c }}>
+                          {o.score ?? '—'}
+                        </span>
+                        <span className="font-bold">{o.recherche} · {RECHERCHES[o.recherche].label}</span>
+                      </div>
+                      <p className="font-semibold">{o.adresse || 'Adresse à confirmer'}</p>
+                      <p className="text-gray-500">{o.code_postal} {o.ville}</p>
+                      <p className="mt-1">
+                        {o.type_offre === 'location'
+                          ? (o.loyer_annuel ? <strong>{fmtNum(o.loyer_annuel)} €/an</strong> : 'Loyer : nous consulter')
+                          : (o.prix ? <strong>{fmtNum(o.prix)} €</strong> : 'Prix : nous consulter')}
+                        {o.surface_totale ? ` · ${fmtNum(o.surface_totale)} m²` : ''}
+                      </p>
+                      {o.geo_approx && <p className="text-amber-600 mt-1">Localisation approximative (adresse non communiquée)</p>}
+                      <button
+                        onClick={() => onOpen(o)}
+                        className="mt-2 bg-navy text-white px-2.5 py-1 rounded font-semibold cursor-pointer"
+                      >
+                        Voir la fiche
+                      </button>
+                    </div>
+                  </Popup>
+                </CircleMarker>
+              )
+            })}
+          </MapContainer>
+        </Card>
+      )}
+
+      {/* Légende par score */}
+      <div className="flex flex-wrap gap-x-5 gap-y-2 mt-4 text-xs text-gray-500">
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-green-500" /> Score ≥ 70</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-orange-500" /> 50–69</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-red-500" /> &lt; 50</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-gray-400" /> Non scoré</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full border-2 border-dashed border-gray-400" /> Localisation approximative</span>
+      </div>
+
+      {sansGeo > 0 && (
+        <p className="text-gray-400 text-[11px] mt-2">
+          {sansGeo} opportunité{sansGeo > 1 ? 's' : ''} sans coordonnées (adresse non communiquée) — visible{sansGeo > 1 ? 's' : ''} en vue liste uniquement.
+        </p>
+      )}
+    </>
+  )
+}
+
 // ── Page ─────────────────────────────────────────────────────
 
 export default function Pipeline() {
   const [opps, setOpps] = useState(null)
   const [runs, setRuns] = useState([])
   const [tab, setTab] = useState('R1')
+  const [view, setView] = useState('liste')
+  const [mapRech, setMapRech] = useState({ R1: true, R2: true, R3: true })
   const [detail, setDetail] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
   const [showRapports, setShowRapports] = useState(false)
@@ -452,6 +546,10 @@ export default function Pipeline() {
     opps ? filterAndSort(opps.filter(o => o.recherche === tab && o.hors_critere)) : [],
     [opps, tab, fStatut, fVille, fScoreMin, fPrixMax, fTri])
 
+  const mapOpps = useMemo(() =>
+    opps ? filterAndSort(opps.filter(o => mapRech[o.recherche])) : [],
+    [opps, mapRech, fStatut, fVille, fScoreMin, fPrixMax, fTri])
+
   if (opps === null) return <Spinner />
 
   const lastRun = runs[0] || null
@@ -484,16 +582,22 @@ export default function Pipeline() {
         </div>
       </Card>
 
-      {/* Onglets R1 / R2 / R3 */}
-      <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
-        {Object.entries(RECHERCHES).map(([k, { label, I }]) => (
-          <button key={k} onClick={() => setTab(k)}
-            className={`px-3.5 py-2 rounded-lg text-sm font-semibold cursor-pointer whitespace-nowrap inline-flex items-center gap-1.5 transition-colors ${
-              tab === k ? 'bg-navy text-white' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
+      {/* Barre : bascule Liste/Carte + Rapports + Filtres */}
+      <div className="flex gap-1.5 mb-4 items-center">
+        <div className="inline-flex bg-white border border-gray-200 rounded-lg p-0.5">
+          <button onClick={() => setView('liste')}
+            className={`px-3 py-1.5 rounded-md text-sm font-semibold cursor-pointer inline-flex items-center gap-1.5 transition-colors ${
+              view === 'liste' ? 'bg-navy text-white' : 'text-gray-500 hover:text-gray-700'
             }`}>
-            <I size={14} />{k} · {label}
+            <LayoutGrid size={14} /><span className="hidden sm:inline">Liste</span>
           </button>
-        ))}
+          <button onClick={() => setView('carte')}
+            className={`px-3 py-1.5 rounded-md text-sm font-semibold cursor-pointer inline-flex items-center gap-1.5 transition-colors ${
+              view === 'carte' ? 'bg-navy text-white' : 'text-gray-500 hover:text-gray-700'
+            }`}>
+            <MapIcon size={14} /><span className="hidden sm:inline">Carte</span>
+          </button>
+        </div>
         <button onClick={() => setShowRapports(true)}
           className="ml-auto px-3 py-2 rounded-lg text-sm cursor-pointer inline-flex items-center gap-1.5 bg-white text-gray-400 border border-gray-200 hover:bg-gray-50">
           <FileText size={14} /><span className="hidden sm:inline">Rapports</span>
@@ -505,6 +609,35 @@ export default function Pipeline() {
           <SlidersHorizontal size={14} /><span className="hidden sm:inline">Filtres</span>
         </button>
       </div>
+
+      {/* Sélecteur de recherche : onglets (liste) ou cases superposables (carte) */}
+      {view === 'liste' ? (
+        <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
+          {Object.entries(RECHERCHES).map(([k, { label, I }]) => (
+            <button key={k} onClick={() => setTab(k)}
+              className={`px-3.5 py-2 rounded-lg text-sm font-semibold cursor-pointer whitespace-nowrap inline-flex items-center gap-1.5 transition-colors ${
+                tab === k ? 'bg-navy text-white' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
+              }`}>
+              <I size={14} />{k} · {label}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1 items-center">
+          <span className="text-gray-400 text-xs shrink-0 mr-1">Afficher :</span>
+          {Object.entries(RECHERCHES).map(([k, { label, I }]) => {
+            const on = mapRech[k]
+            return (
+              <button key={k} onClick={() => setMapRech(m => ({ ...m, [k]: !m[k] }))}
+                className={`px-3 py-2 rounded-lg text-sm font-semibold cursor-pointer whitespace-nowrap inline-flex items-center gap-1.5 transition-colors border ${
+                  on ? 'bg-navy text-white border-navy' : 'bg-white text-gray-400 border-gray-200 hover:bg-gray-50'
+                }`}>
+                <I size={14} />{k} · {label}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* Filtres */}
       {showFilters && (
@@ -522,31 +655,37 @@ export default function Pipeline() {
         </Card>
       )}
 
-      {/* Sous-titre de section */}
-      <p className="text-gray-400 text-xs mb-3">
-        {RECHERCHES[tab].sub} — {filtered.length} opportunité{filtered.length > 1 ? 's' : ''}
-      </p>
-
-      {/* Cartes */}
-      {filtered.length === 0 ? (
-        <Empty icon={<Radar size={40} />} text="Aucune opportunité ne correspond aux filtres." />
+      {view === 'carte' ? (
+        <MapView opps={mapOpps} onOpen={setDetail} />
       ) : (
-        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filtered.map(o => <OppCard key={o.id} o={o} onOpen={setDetail} />)}
-        </div>
-      )}
-
-      {/* Pistes hors critères */}
-      {horsCriteres.length > 0 && (
-        <div className="mt-8">
-          <p className="text-amber-700 font-bold text-sm mb-1">Pistes hors critères</p>
+        <>
+          {/* Sous-titre de section */}
           <p className="text-gray-400 text-xs mb-3">
-            Dossiers exceptionnels suivis malgré une règle non satisfaite — le motif est indiqué sur chaque carte.
+            {RECHERCHES[tab].sub} — {filtered.length} opportunité{filtered.length > 1 ? 's' : ''}
           </p>
-          <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            {horsCriteres.map(o => <OppCard key={o.id} o={o} onOpen={setDetail} />)}
-          </div>
-        </div>
+
+          {/* Cartes */}
+          {filtered.length === 0 ? (
+            <Empty icon={<Radar size={40} />} text="Aucune opportunité ne correspond aux filtres." />
+          ) : (
+            <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              {filtered.map(o => <OppCard key={o.id} o={o} onOpen={setDetail} />)}
+            </div>
+          )}
+
+          {/* Pistes hors critères */}
+          {horsCriteres.length > 0 && (
+            <div className="mt-8">
+              <p className="text-amber-700 font-bold text-sm mb-1">Pistes hors critères</p>
+              <p className="text-gray-400 text-xs mb-3">
+                Dossiers exceptionnels suivis malgré une règle non satisfaite — le motif est indiqué sur chaque carte.
+              </p>
+              <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                {horsCriteres.map(o => <OppCard key={o.id} o={o} onOpen={setDetail} />)}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <p className="text-gray-300 text-[11px] text-center mt-10 max-w-xl mx-auto">
