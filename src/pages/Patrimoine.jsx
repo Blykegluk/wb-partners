@@ -6,6 +6,7 @@ import { fmt, fmtDate, googleMapsUrl, DOC_TYPES } from '../lib/utils'
 import { rendementBrut, rendementNet, cashflowMensuel } from '../lib/calculs'
 import { pdfAvisEcheance, pdfFacture, pdfQuittance, pdfRelance, pdfMiseEnDemeure, pdfCommandement } from '../lib/pdf'
 import SmartUpload from '../components/SmartUpload'
+import DetentionBien from '../components/DetentionBien'
 import { openDocument, removeFile } from '../lib/storage'
 import Carte from './Carte'
 import { PageHeader, Card, Modal, Field, Sel, Check, Grid2, Grid3, Btn, Badge, Empty, AddressField } from '../components/UI'
@@ -353,6 +354,8 @@ export default function Patrimoine({ navigate }) {
                 </div>
               </div>
             </Card>
+
+            <DetentionBien bien={detail} />
           </div>
         )}
 
