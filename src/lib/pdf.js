@@ -1,53 +1,62 @@
 import { MONTHS, MONTHS_SHORT, getLoyerPourMois, fmt, fmtPct } from './utils'
 import { rendementBrut, rendementNet, cashflowMensuel, agregatsBiens, partSociete, quotePartPersonne, estAcquis } from './calculs'
 
-// Print the generated HTML by injecting it into an off-screen iframe and
-// calling print() on its contentWindow. Crucial implementation details:
-//   1. The iframe MUST have real dimensions (a 0x0 iframe doesn't render
-//      content, so print() prints a blank page or fails silently).
-//   2. We position it off-screen (-99999px) instead of using display:none
-//      or visibility:hidden — those can also prevent content rendering.
-//   3. We use srcdoc instead of document.write — modern, fires 'load'
-//      reliably across all browsers.
-//   4. The 'load' listener is attached BEFORE setting srcdoc, otherwise
-//      we may miss the event.
-//   5. Logs to console so the user can diagnose if something still fails.
+// Print a generated document by injecting it directly into the current page,
+// then printing the page itself.
+//
+// Every other approach was unreliable here:
+//   - window.open() is blocked whenever the caller awaited something first
+//     (the user-gesture context is gone), which is the case for the fiche
+//     patrimoniale — it fetches from Supabase before printing.
+//   - An off-screen iframe printed the PARENT document instead of its own
+//     content: blank page, with the app's title and URL in the print header.
+//
+// Injecting into the live document removes both failure modes: no popup, no
+// second browsing context, no timing dependency. A print stylesheet (see
+// index.css) hides the application and reveals only #wb-print-host while the
+// print dialog is open.
+const PRINT_HOST_ID = 'wb-print-host'
+
 const openPrint = (html) => {
-  console.log('[WB Print] openPrint called, HTML length:', html.length)
+  const parsed = new DOMParser().parseFromString(html, 'text/html')
+  const styles = Array.from(parsed.querySelectorAll('style'))
+    .map(s => s.textContent)
+    .join('\n')
+  const bodyHtml = parsed.body ? parsed.body.innerHTML : ''
+  const docTitle = parsed.querySelector('title')?.textContent?.trim()
 
-  // Clean up leftover iframes from previous runs.
-  document.querySelectorAll('iframe[data-wb-print]').forEach(el => el.remove())
-
-  const iframe = document.createElement('iframe')
-  iframe.setAttribute('data-wb-print', '1')
-  // A4 dimensions, positioned off-screen so the user never sees it.
-  iframe.style.cssText = 'position:fixed;top:0;left:-99999px;width:21cm;height:29.7cm;border:0;'
-
-  let printed = false
-  const triggerPrint = (reason) => {
-    if (printed) return
-    printed = true
-    console.log('[WB Print] Triggering print (' + reason + ')')
-    try {
-      iframe.contentWindow.focus()
-      iframe.contentWindow.print()
-      console.log('[WB Print] print() returned normally')
-    } catch (e) {
-      console.error('[WB Print] print() failed:', e)
-      alert("Impossible d'imprimer : " + (e?.message || 'erreur inconnue'))
-    }
-    // Leave the iframe alive long enough for the print dialog to grab it.
-    setTimeout(() => iframe.remove(), 5000)
+  if (!bodyHtml) {
+    alert("Le document n'a pas pu être généré (contenu vide).")
+    return
   }
 
-  // Attach BEFORE appending and setting srcdoc.
-  iframe.addEventListener('load', () => triggerPrint('load event'))
+  let host = document.getElementById(PRINT_HOST_ID)
+  if (!host) {
+    host = document.createElement('div')
+    host.id = PRINT_HOST_ID
+    document.body.appendChild(host)
+  }
+  host.innerHTML = `<style>${styles}</style>${bodyHtml}`
 
-  document.body.appendChild(iframe)
-  iframe.srcdoc = html
+  // Le navigateur reprend document.title dans l'en-tête d'impression et comme
+  // nom de fichier proposé : on l'aligne sur le document, puis on restaure.
+  const previousTitle = document.title
+  if (docTitle) document.title = docTitle
 
-  // Hard safety fallback if 'load' somehow never fires.
-  setTimeout(() => triggerPrint('timeout fallback'), 2500)
+  document.documentElement.classList.add('wb-printing')
+
+  const cleanup = () => {
+    document.documentElement.classList.remove('wb-printing')
+    document.title = previousTitle
+    host.innerHTML = ''
+    window.removeEventListener('afterprint', cleanup)
+  }
+  window.addEventListener('afterprint', cleanup)
+  // Filet de sécurité : certains navigateurs n'émettent pas afterprint.
+  setTimeout(cleanup, 60000)
+
+  // Laisse un tick au navigateur pour appliquer les styles avant d'imprimer.
+  setTimeout(() => window.print(), 100)
 }
 
 const baseStyle = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Helvetica Neue',Arial,sans-serif;color:#1a2d4e;padding:48px;font-size:13px;line-height:1.6}.hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1a2d4e;padding-bottom:20px;margin-bottom:36px}.logo{font-size:22px;font-weight:900;letter-spacing:4px}.logo small{display:block;font-size:10px;color:#94a3b8;font-weight:400;margin-top:2px}.doc-title h1{font-size:18px;font-weight:700;text-align:right}.doc-title p{font-size:12px;color:#64748b;text-align:right}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-bottom:28px}.bloc h3{font-size:10px;text-transform:uppercase;color:#94a3b8;margin-bottom:6px;letter-spacing:1px}.bien-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px 18px;margin-bottom:24px}table{width:100%;border-collapse:collapse;margin-bottom:20px}th{background:#1a2d4e;color:#fff;padding:10px 14px;text-align:left;font-size:11px}td{padding:10px 14px;border-bottom:1px solid #f1f5f9}.tot td{background:#eff6ff;font-weight:700;border-top:2px solid #1a2d4e}.iban{background:#1a2d4e;color:#fff;border-radius:8px;padding:14px 20px;display:flex;justify-content:space-between;margin-bottom:20px}.iban .lbl{font-size:10px;opacity:.6;margin-bottom:3px}.iban .val{font-size:14px;font-weight:600}.note{font-size:11px;color:#94a3b8;font-style:italic}.footer{text-align:center;color:#94a3b8;font-size:11px;margin-top:48px;padding-top:16px;border-top:1px solid #f1f5f9}@media print{@page{margin:1.5cm}}`
@@ -325,9 +334,26 @@ export const pdfPortfolio = (soc, biens, baux, transactions, locataires) => {
 
 // ── Fiche patrimoniale consolidée multi-sociétés ────────────
 
-export const pdfFichePatrimoniale = ({ userName, societes }) => {
+export const pdfFichePatrimoniale = ({ userName, userEmail, societes }) => {
   const now = new Date()
   const generatedAt = now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+  const generatedAtFull = now.toLocaleString('fr-FR', {
+    day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  })
+
+  // Identifie la personne correspondant à l'utilisateur qui génère la fiche
+  // (rapprochement par email puis par nom), pour produire sa quote-part
+  // consolidée sur l'ensemble des sociétés.
+  const toutesPersonnes = []
+  societes.forEach(({ personnes }) => {
+    (personnes || []).forEach(p => {
+      if (!toutesPersonnes.some(x => x.id === p.id)) toutesPersonnes.push(p)
+    })
+  })
+  const norm = (s) => (s || '').trim().toLowerCase()
+  const moi = toutesPersonnes.find(p => userEmail && norm(p.email) === norm(userEmail))
+    || toutesPersonnes.find(p => userName && norm(p.nom) === norm(userName))
+    || null
 
   // Global totals across all sociétés — pondérés par la détention réelle.
   let totalBiens = 0
@@ -346,6 +372,87 @@ export const pdfFichePatrimoniale = ({ userName, societes }) => {
     if (agg.partielle) detentionPartielle = true
   })
   const patrimoineNet = totalPatrimoine - totalDette
+
+  // Quote-part consolidée de l'utilisateur, société par société.
+  const maQuotePart = moi
+    ? societes.map(({ societe: soc, biens, actionnaires, bienActionnaires }) => {
+        const lien = (actionnaires || []).find(a => a.personne_id === moi.id)
+        const qp = quotePartPersonne({
+          personneId: moi.id,
+          pctSociete: lien?.pourcentage || 0,
+          biens,
+          bienActionnaires: bienActionnaires || [],
+        })
+        return { soc, pct: Number(lien?.pourcentage || 0), qp }
+      }).filter(r => r.pct > 0 || r.qp.valeurDirecte > 0)
+    : []
+
+  const totalMaQuotePart = maQuotePart.reduce((acc, r) => ({
+    valeur: acc.valeur + r.qp.valeur,
+    dette: acc.dette + r.qp.dette,
+    net: acc.net + r.qp.patrimoineNet,
+    loyer: acc.loyer + r.qp.loyerMensuel,
+    cashflow: acc.cashflow + r.qp.cashflow,
+  }), { valeur: 0, dette: 0, net: 0, loyer: 0, cashflow: 0 })
+
+  const maQuotePartHtml = maQuotePart.length > 0 ? `
+    <h3 class="section-title">Votre quote-part — ${moi.nom}</h3>
+    <p style="font-size:11px;color:#64748b;margin-bottom:12px">
+      Part vous revenant, cumulant votre participation au capital de chaque société
+      et vos éventuelles détentions directes de biens.
+    </p>
+    <table style="margin-bottom:12px">
+      <thead><tr>
+        <th>Société</th>
+        <th style="text-align:right">Participation</th>
+        <th style="text-align:right">Valeur</th>
+        <th style="text-align:right">Dette</th>
+        <th style="text-align:right">Net</th>
+        <th style="text-align:right">Cashflow/mois</th>
+      </tr></thead>
+      <tbody>
+        ${maQuotePart.map(r => `<tr>
+          <td><strong>${r.soc.nom_affiche || r.soc.nom}</strong></td>
+          <td style="text-align:right;font-weight:700">${r.pct.toFixed(2)}%</td>
+          <td style="text-align:right">${fmt(r.qp.valeur)}</td>
+          <td style="text-align:right">${fmt(r.qp.dette)}</td>
+          <td style="text-align:right;font-weight:600">${fmt(r.qp.patrimoineNet)}</td>
+          <td style="text-align:right;${r.qp.cashflow >= 0 ? 'color:#22c55e' : 'color:#ef4444'}">${fmt(r.qp.cashflow)}</td>
+        </tr>`).join('')}
+        <tr class="tot">
+          <td colspan="2"><strong>Total consolidé</strong></td>
+          <td style="text-align:right"><strong>${fmt(totalMaQuotePart.valeur)}</strong></td>
+          <td style="text-align:right"><strong>${fmt(totalMaQuotePart.dette)}</strong></td>
+          <td style="text-align:right"><strong>${fmt(totalMaQuotePart.net)}</strong></td>
+          <td style="text-align:right;${totalMaQuotePart.cashflow >= 0 ? 'color:#22c55e' : 'color:#ef4444'}"><strong>${fmt(totalMaQuotePart.cashflow)}</strong></td>
+        </tr>
+      </tbody>
+    </table>
+  ` : ''
+
+  // Sommaire des sociétés couvertes.
+  const sommaireHtml = `
+    <h3 class="section-title">Périmètre du document</h3>
+    <table style="margin-bottom:36px">
+      <thead><tr>
+        <th>Société</th>
+        <th>Forme / RCS</th>
+        <th style="text-align:right">Biens</th>
+        <th style="text-align:right">Patrimoine net</th>
+      </tr></thead>
+      <tbody>
+        ${societes.map(({ societe: soc, biens, bienActionnaires }) => {
+          const a = agregatsBiens(biens, bienActionnaires || [])
+          return `<tr>
+            <td><strong>${soc.nom_affiche || soc.nom}</strong></td>
+            <td><span style="font-size:10px;color:#64748b">${soc.rcs || soc.siret || '—'}</span></td>
+            <td style="text-align:right">${biens.length}</td>
+            <td style="text-align:right;font-weight:600">${fmt(a.patrimoineNet)}</td>
+          </tr>`
+        }).join('')}
+      </tbody>
+    </table>
+  `
 
   // Per-société sections
   const societesHtml = societes.map(({ societe: soc, biens, actionnaires, baux, bienActionnaires, personnes }) => {
@@ -481,20 +588,41 @@ export const pdfFichePatrimoniale = ({ userName, societes }) => {
       ${agg.nbEnCours > 0 ? `<p style="font-size:10px;color:#f59e0b;font-style:italic;margin:-8px 0 24px">${agg.nbEnCours} bien${agg.nbEnCours > 1 ? 's' : ''} sous compromis (${fmt(agg.valeurEnCours)} à l'acquisition, ${fmt(agg.engagementEnCours)} d'emprunt prévu) — exclu${agg.nbEnCours > 1 ? 's' : ''} des totaux tant que l'acte n'est pas signé.</p>` : ''}
     ` : '<p style="font-style:italic;color:#94a3b8;font-size:11px;margin-bottom:24px">Aucun bien enregistré pour cette société.</p>'
 
+    // Fiche d'identité juridique complète de la société.
+    const idLine = (label, value) => value
+      ? `<div class="id-row"><span class="id-lbl">${label}</span><span class="id-val">${value}</span></div>`
+      : ''
+    const adresseComplete = [
+      soc.adresse,
+      [soc.code_postal, soc.ville].filter(Boolean).join(' '),
+    ].filter(Boolean).join(', ')
+
     return `
       <div class="soc-section">
         <h3 class="soc-title">${soc.nom_affiche || soc.nom}</h3>
-        <div class="soc-identity">
-          ${soc.siret ? `<span><strong>SIRET</strong> ${soc.siret}</span>` : ''}
-          ${soc.rcs ? `<span><strong>RCS</strong> ${soc.rcs}</span>` : ''}
-          ${soc.capital ? `<span><strong>Capital</strong> ${soc.capital}</span>` : ''}
-          ${soc.adresse ? `<span>${soc.adresse}${soc.code_postal || soc.ville ? `, ${soc.code_postal || ''} ${soc.ville || ''}` : ''}</span>` : ''}
+
+        <h4 class="sub-title">Identité juridique</h4>
+        <div class="id-grid">
+          ${idLine('Dénomination', soc.nom)}
+          ${idLine('Capital social', soc.capital)}
+          ${idLine('SIRET', soc.siret)}
+          ${idLine('RCS', soc.rcs)}
+          ${idLine('Code APE', soc.ape)}
+          ${idLine('TVA intracom.', soc.tva_intracommunautaire)}
+          ${idLine('Siège social', adresseComplete)}
+          ${idLine('Téléphone', soc.telephone)}
+          ${idLine('Email', soc.email)}
+          ${idLine('Banque', soc.nom_banque)}
+          ${idLine('IBAN', soc.iban)}
+          ${idLine('BIC', soc.bic)}
         </div>
+
+        <h4 class="sub-title">Synthèse patrimoniale</h4>
         <div class="soc-summary">
-          <div><div class="lbl">Biens</div><div class="val">${biens.length}</div></div>
+          <div><div class="lbl">Biens acquis</div><div class="val">${biens.length - agg.nbEnCours}</div></div>
           <div><div class="lbl">Valeur d'acquisition</div><div class="val">${fmt(socPatrimoine)}</div></div>
           <div><div class="lbl">Encours emprunt</div><div class="val">${fmt(socDette)}</div></div>
-          <div><div class="lbl">Patrimoine net</div><div class="val" style="color:#1a2d4e">${fmt(socPatrimoine - socDette)}</div></div>
+          <div><div class="lbl">Patrimoine net</div><div class="val" style="color:#1a2d4e">${fmt(socNet)}</div></div>
           <div><div class="lbl">Loyer annuel</div><div class="val">${fmt(socLoyer)}</div></div>
           <div><div class="lbl">Taux d'occupation</div><div class="val">${tauxOcc}%</div></div>
         </div>
@@ -517,23 +645,37 @@ export const pdfFichePatrimoniale = ({ userName, societes }) => {
     .global-summary .item.accent{background:#eff6ff;color:#1a2d4e}
     .soc-section{margin-bottom:48px;page-break-inside:avoid}
     .soc-title{font-size:18px;font-weight:800;color:#1a2d4e;border-bottom:3px solid #1a2d4e;padding-bottom:8px;margin-bottom:8px}
-    .soc-identity{display:flex;gap:18px;flex-wrap:wrap;color:#64748b;font-size:11px;margin-bottom:18px}
-    .soc-identity strong{color:#94a3b8;font-size:10px;text-transform:uppercase;margin-right:4px}
     .soc-summary{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:24px}
     .soc-summary > div{background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px;text-align:center}
     .soc-summary .lbl{font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px}
     .soc-summary .val{font-size:14px;font-weight:700;color:#1a2d4e;margin-top:2px}
-    @media print{.soc-section{page-break-inside:avoid}}
+    .section-title{font-size:14px;font-weight:700;color:#1a2d4e;border-bottom:2px solid #1a2d4e;padding-bottom:6px;margin:32px 0 16px}
+    .sub-title{font-size:11px;font-weight:700;color:#1a2d4e;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px}
+    .id-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 28px;margin-bottom:24px}
+    .id-row{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:11px}
+    .id-lbl{color:#94a3b8;text-transform:uppercase;font-size:9px;letter-spacing:.5px;padding-top:2px;white-space:nowrap}
+    .id-val{color:#1a2d4e;font-weight:600;text-align:right;word-break:break-word}
+    .cover-id{max-width:420px;margin:36px auto 0;text-align:left}
+    .cover-id .id-row{border-bottom:1px solid #e2e8f0}
+    @media print{.soc-section{page-break-inside:avoid}.cover{page-break-after:always}}
   </style></head><body>
 
     <div class="cover">
+      <img src="https://wbpartners.fr/logo.png" alt="" width="64" height="64" style="border-radius:14px;margin-bottom:20px" />
       <h1>FICHE PATRIMONIALE</h1>
       <h2>${userName || 'Patrimoine consolidé'}</h2>
-      <p class="meta">Éditée le ${generatedAt}</p>
-      <p class="meta">${societes.length} société${societes.length > 1 ? 's' : ''} — ${totalBiens} bien${totalBiens > 1 ? 's' : ''} enregistré${totalBiens > 1 ? 's' : ''}</p>
+      <div class="cover-id">
+        <div class="id-row"><span class="id-lbl">Établie pour</span><span class="id-val">${userName || '—'}</span></div>
+        ${userEmail ? `<div class="id-row"><span class="id-lbl">Contact</span><span class="id-val">${userEmail}</span></div>` : ''}
+        <div class="id-row"><span class="id-lbl">Éditée le</span><span class="id-val">${generatedAtFull}</span></div>
+        <div class="id-row"><span class="id-lbl">Périmètre</span><span class="id-val">${societes.length} société${societes.length > 1 ? 's' : ''} — ${totalBiens} bien${totalBiens > 1 ? 's' : ''}</span></div>
+        <div class="id-row"><span class="id-lbl">Patrimoine net</span><span class="id-val">${fmt(patrimoineNet)}</span></div>
+        ${moi ? `<div class="id-row"><span class="id-lbl">Votre quote-part</span><span class="id-val">${fmt(totalMaQuotePart.net)}</span></div>` : ''}
+      </div>
+      <p class="meta" style="margin-top:40px">Document confidentiel — usage interne</p>
     </div>
 
-    <h3 style="font-size:14px;font-weight:700;color:#1a2d4e;border-bottom:2px solid #1a2d4e;padding-bottom:6px;margin:32px 0 16px">Synthèse globale</h3>
+    <h3 class="section-title">Synthèse globale</h3>
     <div class="global-summary">
       <div class="item"><div class="val">${fmt(totalPatrimoine)}</div><div class="lbl">Valeur d'acquisition</div></div>
       <div class="item"><div class="val">${fmt(totalDette)}</div><div class="lbl">Encours emprunt</div></div>
@@ -542,11 +684,17 @@ export const pdfFichePatrimoniale = ({ userName, societes }) => {
       <div class="item"><div class="val" style="${totalCashflow >= 0 ? 'color:#22c55e' : 'color:#ef4444'}">${fmt(totalCashflow)}</div><div class="lbl">Cashflow mensuel</div></div>
       <div class="item"><div class="val">${totalBiens}</div><div class="lbl">Biens totaux</div></div>
     </div>
-    ${detentionPartielle ? `<p style="font-size:10px;color:#94a3b8;font-style:italic;margin:-24px 0 36px">Certains biens ne sont pas détenus à 100 % : tous les montants ci-dessus sont ramenés à la quote-part réellement détenue par chaque société.</p>` : ''}
+    ${detentionPartielle ? `<p style="font-size:10px;color:#94a3b8;font-style:italic;margin:-24px 0 24px">Certains biens ne sont pas détenus à 100 % : tous les montants ci-dessus sont ramenés à la quote-part réellement détenue par chaque société.</p>` : ''}
+
+    ${sommaireHtml}
+
+    ${maQuotePartHtml}
 
     ${societesHtml}
 
-    <div class="footer">Document généré par WB Partners — ${generatedAt}<br>
-    <span style="font-size:9px">Les montants reflètent les valeurs d'acquisition enregistrées, ramenées à la quote-part réellement détenue. Les valeurs de marché actuelles peuvent différer.</span></div>
+    <div class="footer">
+      Fiche patrimoniale éditée par WB Partners le ${generatedAtFull}${userName ? ` pour ${userName}` : ''}<br>
+      <span style="font-size:9px">Les montants reflètent les valeurs d'acquisition enregistrées, ramenées à la quote-part réellement détenue, et excluent les biens dont l'acte n'est pas signé. Les valeurs de marché actuelles peuvent différer. Document sans valeur contractuelle.</span>
+    </div>
   </body></html>`)
 }

@@ -55,6 +55,22 @@ html, body {
   letter-spacing: -0.5px;
 }
 
+/* ── Impression des documents générés ──────────────────────────
+   openPrint() (src/lib/pdf.js) injecte le document dans #wb-print-host
+   puis imprime la page. Hors impression le conteneur est masqué ; pendant
+   l'impression on masque l'application et on ne laisse que le document. */
+#wb-print-host { display: none; }
+
+@media print {
+  html.wb-printing body > *:not(#wb-print-host) { display: none !important; }
+  html.wb-printing #wb-print-host { display: block !important; }
+  html.wb-printing, html.wb-printing body {
+    background: #fff;
+    margin: 0;
+    padding: 0;
+  }
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }

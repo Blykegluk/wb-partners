@@ -46,7 +46,7 @@ export default function FichePatrimoniale() {
       )
 
       const userName = user?.user_metadata?.full_name || user?.email || ''
-      pdfFichePatrimoniale({ userName, societes: data })
+      pdfFichePatrimoniale({ userName, userEmail: user?.email || '', societes: data })
     } catch (e) {
       setError(e.message || 'Erreur lors de la génération.')
     } finally {
