@@ -152,6 +152,40 @@ export function Card({ children, className = '', ...props }) {
   return <div className={`bg-white rounded-xl border border-gray-100 shadow-sm ${className}`} {...props}>{children}</div>
 }
 
+// ── KPI ──────────────────────────────────────────────────────
+//
+// Tuile de chiffre clé, uniforme dans toute l'application. `Card` ne porte
+// pas de padding par défaut : passer par ce composant évite les écarts de
+// gabarit d'un écran à l'autre (certaines pages oubliaient le padding).
+//
+//   tone : 'navy' (défaut) | 'positive' | 'negative' | 'brand' | 'warn'
+//   sub  : ligne de contexte optionnelle sous la valeur
+
+const KPI_TONES = {
+  navy: 'text-navy',
+  positive: 'text-emerald-600',
+  negative: 'text-red-500',
+  brand: 'text-blue-500',
+  warn: 'text-amber-500',
+}
+
+export function Kpi({ label, value, sub, tone = 'navy', className = '', ...props }) {
+  return (
+    <Card className={`p-5 ${className}`} {...props}>
+      <p className="text-xs text-gray-400 mb-1 font-medium">{label}</p>
+      <p className={`text-xl font-extrabold ${KPI_TONES[tone] || KPI_TONES.navy} ${sub ? 'mb-1' : ''}`}>
+        {value}
+      </p>
+      {sub && <p className="text-xs text-gray-400">{sub}</p>}
+    </Card>
+  )
+}
+
+export function KpiRow({ children, cols = 3, className = '' }) {
+  const grid = { 2: 'sm:grid-cols-2', 3: 'sm:grid-cols-3', 4: 'sm:grid-cols-4' }[cols] || 'sm:grid-cols-3'
+  return <div className={`grid grid-cols-1 ${grid} gap-4 mb-6 ${className}`}>{children}</div>
+}
+
 // ── Address autocomplete ─────────────────────────────────────
 
 export function AddressField({ label, value, onChange, onSelect }) {

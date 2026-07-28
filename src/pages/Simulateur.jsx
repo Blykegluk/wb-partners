@@ -71,7 +71,7 @@ export default function Simulateur() {
       {tab === 'calc' ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Form */}
-          <Card>
+          <Card className="p-5">
             <h3 className="text-sm font-bold text-navy mb-4">Paramètres</h3>
             <Field label="Nom du scénario" value={form.nom} onChange={e => set('nom', e.target.value)} placeholder="ex: Local Rue de la Paix" />
             <Grid2>

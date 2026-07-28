@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useSociete } from '../contexts/Societe'
 import { fmt, MONTHS, getLoyerPourMois } from '../lib/utils'
-import { PageHeader, Card } from '../components/UI'
+import { PageHeader, Card, Kpi, KpiRow } from '../components/UI'
 
 const TVA_RATE = 0.2
 
@@ -59,28 +59,17 @@ export default function TVA() {
       </PageHeader>
 
       {/* KPI row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-        <Card className="p-4 text-center">
-          <p className="text-xs text-gray-400 uppercase font-semibold">Loyers HT</p>
-          <p className="text-xl font-bold text-navy mt-1">{fmt(totaux.loyersHT)}</p>
-        </Card>
-        <Card className="p-4 text-center">
-          <p className="text-xs text-emerald-600 uppercase font-semibold">TVA collectée</p>
-          <p className="text-xl font-bold text-emerald-600 mt-1">{fmt(totaux.tvaCollectee)}</p>
-        </Card>
-        <Card className="p-4 text-center">
-          <p className="text-xs text-blue-600 uppercase font-semibold">TVA déductible</p>
-          <p className="text-xl font-bold text-blue-600 mt-1">{fmt(totaux.tvaDeductible)}</p>
-        </Card>
-        <Card className="p-4 text-center">
-          <p className="text-xs uppercase font-semibold" style={{ color: totaux.solde >= 0 ? '#dc2626' : '#22c55e' }}>
-            {totaux.solde >= 0 ? 'TVA à reverser' : 'Crédit de TVA'}
-          </p>
-          <p className="text-xl font-bold mt-1" style={{ color: totaux.solde >= 0 ? '#dc2626' : '#22c55e' }}>
-            {fmt(Math.abs(totaux.solde))}
-          </p>
-        </Card>
-      </div>
+      <KpiRow cols={4}>
+        <Kpi label="Loyers HT" value={fmt(totaux.loyersHT)} sub="Base de calcul" />
+        <Kpi label="TVA collectée" value={fmt(totaux.tvaCollectee)} tone="positive" sub="Sur les loyers" />
+        <Kpi label="TVA déductible" value={fmt(totaux.tvaDeductible)} tone="brand" sub="Sur les charges" />
+        <Kpi
+          label={totaux.solde >= 0 ? 'TVA à reverser' : 'Crédit de TVA'}
+          value={fmt(Math.abs(totaux.solde))}
+          tone={totaux.solde >= 0 ? 'negative' : 'positive'}
+          sub="Solde de la période"
+        />
+      </KpiRow>
 
       {/* Monthly table */}
       <Card className="overflow-x-auto">

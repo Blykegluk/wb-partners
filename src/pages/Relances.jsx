@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useSociete } from '../contexts/Societe'
 import { fmt, MONTHS, today } from '../lib/utils'
 import { pdfRelance, pdfMiseEnDemeure, pdfCommandement } from '../lib/pdf'
-import { PageHeader, Card, Badge, Btn, Empty } from '../components/UI'
+import { PageHeader, Card, Badge, Btn, Empty, Kpi } from '../components/UI'
 
 const PALIERS = [
   { min: 30, label: 'Commandement de payer', color: 'bg-red-100 text-red-700', severity: 3 },
@@ -66,27 +66,12 @@ export default function Relances({ navigate }) {
       <PageHeader title="Relances" sub="Gestion des impayés par paliers" />
 
       {/* Stats */}
-      <div className="grid grid-cols-5 gap-4 mb-6">
-        <Card>
-          <p className="text-xs text-gray-400 uppercase tracking-wide">Total impayés</p>
-          <p className="text-2xl font-bold text-navy mt-1">{stats.total}</p>
-        </Card>
-        <Card>
-          <p className="text-xs text-gray-400 uppercase tracking-wide">Montant total</p>
-          <p className="text-2xl font-bold text-red-600 mt-1">{fmt(stats.montant)}</p>
-        </Card>
-        <Card>
-          <p className="text-xs text-yellow-600 uppercase tracking-wide">Amiables</p>
-          <p className="text-2xl font-bold text-yellow-600 mt-1">{stats.amiable}</p>
-        </Card>
-        <Card>
-          <p className="text-xs text-orange-600 uppercase tracking-wide">Mises en demeure</p>
-          <p className="text-2xl font-bold text-orange-600 mt-1">{stats.med}</p>
-        </Card>
-        <Card>
-          <p className="text-xs text-red-600 uppercase tracking-wide">Commandements</p>
-          <p className="text-2xl font-bold text-red-600 mt-1">{stats.cmd}</p>
-        </Card>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+        <Kpi label="Total impayés" value={stats.total} sub="Échéances en retard" />
+        <Kpi label="Montant total" value={fmt(stats.montant)} tone="negative" sub="À recouvrer" />
+        <Kpi label="Amiables" value={stats.amiable} tone="warn" sub="Palier 1" />
+        <Kpi label="Mises en demeure" value={stats.med} tone="warn" sub="Palier 2" />
+        <Kpi label="Commandements" value={stats.cmd} tone="negative" sub="Palier 3" />
       </div>
 
       {impayes.length === 0 ? (

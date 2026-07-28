@@ -3,7 +3,7 @@ import { Wallet } from 'lucide-react'
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { useSociete } from '../contexts/Societe'
 import { fmt, MONTHS_SHORT } from '../lib/utils'
-import { PageHeader, Card, Sel } from '../components/UI'
+import { PageHeader, Card, Sel, Kpi, KpiRow } from '../components/UI'
 
 export default function Tresorerie() {
   const { biens, baux, transactions } = useSociete()
@@ -56,25 +56,19 @@ export default function Tresorerie() {
       </PageHeader>
 
       {/* Summary */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <Card>
-          <p className="text-xs text-gray-400 uppercase tracking-wide">Total entrées</p>
-          <p className="text-2xl font-bold text-green-600 mt-1">{fmt(totalEntrees)}</p>
-        </Card>
-        <Card>
-          <p className="text-xs text-gray-400 uppercase tracking-wide">Total sorties</p>
-          <p className="text-2xl font-bold text-red-500 mt-1">{fmt(totalSorties)}</p>
-        </Card>
-        <Card>
-          <p className="text-xs text-gray-400 uppercase tracking-wide">Solde annuel</p>
-          <p className={`text-2xl font-bold mt-1 ${soldeAnnuel >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {fmt(soldeAnnuel)}
-          </p>
-        </Card>
-      </div>
+      <KpiRow cols={3}>
+        <Kpi label="Total entrées" value={fmt(totalEntrees)} tone="positive" sub="Loyers encaissés" />
+        <Kpi label="Total sorties" value={fmt(totalSorties)} tone="negative" sub="Annuités, charges, taxe foncière" />
+        <Kpi
+          label="Solde annuel"
+          value={fmt(soldeAnnuel)}
+          tone={soldeAnnuel >= 0 ? 'positive' : 'negative'}
+          sub={`Cumul ${year}`}
+        />
+      </KpiRow>
 
       {/* Bar chart - Entrées vs Sorties */}
-      <Card className="mb-6">
+      <Card className="p-5 mb-6">
         <h3 className="text-sm font-bold text-navy mb-4">Entrées vs Sorties mensuelles</h3>
         <ResponsiveContainer width="100%" height={320}>
           <BarChart data={data}>
@@ -92,7 +86,7 @@ export default function Tresorerie() {
       </Card>
 
       {/* Line chart - Solde cumulé */}
-      <Card>
+      <Card className="p-5">
         <h3 className="text-sm font-bold text-navy mb-4">Solde cumulé</h3>
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={data}>

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Receipt, Download } from 'lucide-react'
 import { useSociete } from '../contexts/Societe'
 import { fmt } from '../lib/utils'
-import { PageHeader, Card, Sel, Btn, Empty } from '../components/UI'
+import { PageHeader, Card, Sel, Btn, Empty, Kpi, KpiRow } from '../components/UI'
 
 const STORAGE_KEY = 'wb_fiscal_overrides'
 
@@ -95,22 +95,13 @@ export default function Fiscal() {
       </PageHeader>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <Card>
-          <p className="text-xs text-gray-400 uppercase tracking-wide">Revenus bruts</p>
-          <p className="text-2xl font-bold text-navy mt-1">{fmt(totals.revenusBruts)}</p>
-        </Card>
-        <Card>
-          <p className="text-xs text-gray-400 uppercase tracking-wide">Charges déductibles</p>
-          <p className="text-2xl font-bold text-red-500 mt-1">{fmt(totals.chargesDeductibles)}</p>
-        </Card>
-        <Card>
-          <p className="text-xs text-gray-400 uppercase tracking-wide">Résultat net</p>
-          <p className={`text-2xl font-bold mt-1 ${totals.resultatNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {fmt(totals.resultatNet)}
-          </p>
-        </Card>
-      </div>
+      <KpiRow cols={3}>
+        <Kpi label="Revenus bruts" value={fmt(totals.revenusBruts)} sub={`Loyers encaissés ${year}`} />
+        <Kpi label="Charges déductibles" value={fmt(totals.chargesDeductibles)} tone="negative"
+          sub="Intérêts, taxe foncière, charges" />
+        <Kpi label="Résultat net" value={fmt(totals.resultatNet)}
+          tone={totals.resultatNet >= 0 ? 'positive' : 'negative'} sub="Base imposable" />
+      </KpiRow>
 
       {biens.length === 0 ? (
         <Empty icon={<Receipt size={40} />} text="Aucun bien enregistré." />

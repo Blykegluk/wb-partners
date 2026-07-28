@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useSociete } from '../contexts/Societe'
 import { fmt, fmtDate, MONTHS_SHORT, getLoyerPourMois, today } from '../lib/utils'
 import { estAcquis } from '../lib/calculs'
-import { Card, Empty } from '../components/UI'
+import { Card, Empty, Kpi, KpiRow } from '../components/UI'
 
 const now = new Date()
 
@@ -75,19 +75,12 @@ export default function Finances() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        {[
-          { l: `Attendu ${selectedYear}`, v: fmt(totalAttendu), c: 'text-blue-500', sub: 'Total loyers + charges' },
-          { l: 'Encaissé', v: fmt(totalEncaisse), c: 'text-emerald-500', sub: `${totalAttendu > 0 ? Math.round(totalEncaisse / totalAttendu * 100) : 0}% du total` },
-          { l: 'Impayés', v: fmt(totalImpaye), c: 'text-red-500', sub: 'À recouvrer' },
-        ].map((k, i) => (
-          <Card key={i} className="p-5">
-            <p className="text-xs text-gray-400 mb-1 font-medium">{k.l}</p>
-            <p className={`text-xl font-extrabold ${k.c} mb-1`}>{k.v}</p>
-            <p className="text-xs text-gray-400">{k.sub}</p>
-          </Card>
-        ))}
-      </div>
+      <KpiRow cols={3} className="mb-8">
+        <Kpi label={`Attendu ${selectedYear}`} value={fmt(totalAttendu)} tone="brand" sub="Total loyers + charges" />
+        <Kpi label="Encaissé" value={fmt(totalEncaisse)} tone="positive"
+          sub={`${totalAttendu > 0 ? Math.round(totalEncaisse / totalAttendu * 100) : 0}% du total`} />
+        <Kpi label="Impayés" value={fmt(totalImpaye)} tone="negative" sub="À recouvrer" />
+      </KpiRow>
 
       {/* Biens sous compromis : aucun flux tant que l'acte n'est pas signé */}
       {biensEnCours.length > 0 && (
