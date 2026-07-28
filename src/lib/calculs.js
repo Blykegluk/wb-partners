@@ -36,6 +36,38 @@ export const cashflowMensuel = (bien) => {
   )
 }
 
+// ── Acquisition ──────────────────────────────────────────────
+
+/**
+ * Le bien est-il effectivement acquis à la date de référence ?
+ *
+ * Tant que l'acte n'est pas signé, la société ne perçoit ni ne débourse
+ * rien au titre du bien (hors apports des associés) : aucun loyer, aucune
+ * charge, aucune annuité ne doit être comptée. Une date d'acquisition
+ * future signale précisément cette situation.
+ *
+ * Un bien sans date renseignée est considéré comme acquis (comportement
+ * historique : la donnée est facultative).
+ */
+export const estAcquis = (bien, ref = new Date()) => {
+  if (!bien?.date_acquisition) return true
+  // Comparaison à la journée : un bien acquis aujourd'hui compte.
+  const d = new Date(bien.date_acquisition)
+  if (isNaN(d.getTime())) return true
+  const jour = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate())
+  const acq = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  return acq <= jour
+}
+
+/**
+ * Nombre de jours avant l'acquisition (0 si déjà acquis).
+ */
+export const joursAvantAcquisition = (bien, ref = new Date()) => {
+  if (estAcquis(bien, ref)) return 0
+  const d = new Date(bien.date_acquisition)
+  return Math.ceil((d - ref) / 86400000)
+}
+
 // ── Détention ────────────────────────────────────────────────
 //
 // Un bien sans ligne dans bien_actionnaires est détenu à 100 % par la
@@ -67,19 +99,32 @@ export const partDirectePersonne = (bienId, personneId, bienActionnaires = []) =
  * détenue par la société. Retourne aussi les valeurs brutes (100 %) pour
  * pouvoir afficher les deux.
  */
-export const agregatsBiens = (biens = [], bienActionnaires = []) => {
+export const agregatsBiens = (biens = [], bienActionnaires = [], ref = new Date()) => {
   const acc = {
     valeurBrute: 0, valeurNette: 0,
     detteBrute: 0, detteNette: 0,
     loyerMensuelBrut: 0, loyerMensuelNet: 0,
     cashflowBrut: 0, cashflowNet: 0,
-    partielle: false, // au moins un bien n'est pas détenu à 100 %
+    partielle: false,      // au moins un bien n'est pas détenu à 100 %
+    // Biens sous compromis, pas encore signés : suivis à part, exclus des
+    // agrégats ci-dessus.
+    nbEnCours: 0,
+    valeurEnCours: 0,
+    engagementEnCours: 0,  // emprunt prévu, non encore décaissé
   }
   biens.forEach(b => {
     const part = partSociete(b.id, bienActionnaires)
     if (part < 0.9999) acc.partielle = true
     const prix = b.prix_achat || 0
     const dette = b.montant_emprunt || 0
+
+    if (!estAcquis(b, ref)) {
+      acc.nbEnCours += 1
+      acc.valeurEnCours += prix * part
+      acc.engagementEnCours += dette * part
+      return
+    }
+
     const loyer = b.loyer_mensuel || 0
     const cf = cashflowMensuel(b)
 
@@ -111,6 +156,7 @@ export const quotePartPersonne = ({
   pctSociete = 0,
   biens = [],
   bienActionnaires = [],
+  ref = new Date(),
 }) => {
   const r = {
     valeur: 0, dette: 0, loyerMensuel: 0, cashflow: 0,
@@ -118,7 +164,9 @@ export const quotePartPersonne = ({
   }
   const fracSoc = Number(pctSociete || 0) / 100
 
-  biens.forEach(b => {
+  // Les biens non encore acquis sont exclus : aucune quote-part ne peut en
+  // découler tant que l'acte n'est pas signé.
+  biens.filter(b => estAcquis(b, ref)).forEach(b => {
     const prix = b.prix_achat || 0
     const dette = b.montant_emprunt || 0
     const loyer = b.loyer_mensuel || 0

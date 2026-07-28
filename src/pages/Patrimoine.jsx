@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { Building2, Plus, Trash2, Upload, MapPin, FileText, Users, FolderOpen, Receipt, ArrowRight, Link, Euro, ChevronLeft, ChevronDown, Download, ExternalLink, Map, List, Printer, Zap } from 'lucide-react'
+import { Building2, Plus, Trash2, Upload, MapPin, FileText, Users, FolderOpen, Receipt, ArrowRight, Link, Euro, ChevronLeft, ChevronDown, Download, ExternalLink, Map, List, Printer, Zap, Clock } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useSociete } from '../contexts/Societe'
 import { fmt, fmtDate, googleMapsUrl, DOC_TYPES } from '../lib/utils'
-import { rendementBrut, rendementNet, cashflowMensuel } from '../lib/calculs'
+import { rendementBrut, rendementNet, cashflowMensuel, estAcquis } from '../lib/calculs'
 import { pdfAvisEcheance, pdfFacture, pdfQuittance, pdfRelance, pdfMiseEnDemeure, pdfCommandement } from '../lib/pdf'
 import SmartUpload from '../components/SmartUpload'
 import DetentionBien from '../components/DetentionBien'
@@ -274,7 +274,18 @@ export default function Patrimoine({ navigate }) {
               {detail.statut_bien && detail.statut_bien !== 'Actif' && (
                 <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-semibold">{detail.statut_bien}</span>
               )}
+              {!estAcquis(detail) && (
+                <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1">
+                  <Clock size={11} /> Acquisition prévue le {fmtDate(detail.date_acquisition)}
+                </span>
+              )}
             </div>
+            {!estAcquis(detail) && (
+              <p className="text-xs text-amber-600 mt-1.5">
+                L'acte n'étant pas signé, ce bien ne génère aucun flux : ses loyers, charges et
+                annuités sont exclus des totaux de la société.
+              </p>
+            )}
             <div className="flex items-center gap-4 text-sm text-gray-500">
               <span className="flex items-center gap-1">
                 <MapPin size={13} />
@@ -722,6 +733,11 @@ export default function Patrimoine({ navigate }) {
                         {b.activite && <span className="text-xs text-gray-400">{b.activite}</span>}
                         {b.statut_bien && b.statut_bien !== 'Actif' && (
                           <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-semibold">{b.statut_bien}</span>
+                        )}
+                        {!estAcquis(b) && (
+                          <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1">
+                            <Clock size={11} /> Acquisition le {fmtDate(b.date_acquisition)}
+                          </span>
                         )}
                       </div>
                       <div className="flex items-center gap-4 text-sm text-gray-500">

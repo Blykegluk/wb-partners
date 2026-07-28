@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Calendar } from 'lucide-react'
+import { Calendar, Clock } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useSociete } from '../contexts/Societe'
-import { fmt, MONTHS_SHORT, getLoyerPourMois, today } from '../lib/utils'
+import { fmt, fmtDate, MONTHS_SHORT, getLoyerPourMois, today } from '../lib/utils'
+import { estAcquis } from '../lib/calculs'
 import { Card, Empty } from '../components/UI'
 
 const now = new Date()
@@ -12,7 +13,15 @@ export default function Finances() {
   const [selectedYear, setSelectedYear] = useState(now.getFullYear())
 
   const years = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1]
-  const bauxActifs = baux.filter(b => b.actif)
+  // Un bien dont l'acte n'est pas signé ne génère aucune échéance : la
+  // société ne perçoit ni ne débourse rien tant que l'acquisition n'est pas
+  // effective.
+  const bauxActifs = baux.filter(b => {
+    if (!b.actif) return false
+    const bien = biens.find(x => x.id === b.bien_id)
+    return !bien || estAcquis(bien)
+  })
+  const biensEnCours = biens.filter(b => !estAcquis(b))
 
   const getStatutMois = (bailId, mois, annee) =>
     transactions.find(t => t.bail_id === bailId && t.mois === mois && t.annee === annee)
@@ -80,8 +89,33 @@ export default function Finances() {
         ))}
       </div>
 
+      {/* Biens sous compromis : aucun flux tant que l'acte n'est pas signé */}
+      {biensEnCours.length > 0 && (
+        <Card className="p-4 mb-4 border-amber-200 bg-amber-50/40">
+          <div className="flex items-start gap-3">
+            <Clock size={16} className="text-amber-500 mt-0.5 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-navy">
+                {biensEnCours.length} bien{biensEnCours.length > 1 ? 's' : ''} en cours d'acquisition
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Aucun loyer ni aucune charge n'est comptabilisé tant que l'acte n'est pas signé.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                {biensEnCours.map(b => (
+                  <span key={b.id} className="text-xs text-gray-500">
+                    <strong className="text-navy">{b.reference || b.adresse}</strong>
+                    {b.date_acquisition ? ` — signature prévue le ${fmtDate(b.date_acquisition)}` : ''}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Échéancier */}
-      {bauxActifs.length === 0 ? <Empty icon={<Calendar size={40} />} text="Aucun bail actif." /> : (
+      {bauxActifs.length === 0 ? <Empty icon={<Calendar size={40} />} text="Aucun bail actif sur un bien acquis." /> : (
         <Card className="overflow-auto">
           <table className="w-full border-collapse" style={{ minWidth: 900 }}>
             <thead>

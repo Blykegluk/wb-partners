@@ -1,5 +1,5 @@
 import { MONTHS, MONTHS_SHORT, getLoyerPourMois, fmt, fmtPct } from './utils'
-import { rendementBrut, rendementNet, cashflowMensuel, agregatsBiens, partSociete, quotePartPersonne } from './calculs'
+import { rendementBrut, rendementNet, cashflowMensuel, agregatsBiens, partSociete, quotePartPersonne, estAcquis } from './calculs'
 
 // Print the generated HTML by injecting it into an off-screen iframe and
 // calling print() on its contentWindow. Crucial implementation details:
@@ -447,6 +447,17 @@ export const pdfFichePatrimoniale = ({ userName, societes }) => {
           ${biens.map(b => {
             const part = partSociete(b.id, bact)
             const pct = part * 100
+            const acquis = estAcquis(b)
+            // Un bien sous compromis n'apporte aucun flux : on l'affiche pour
+            // mémoire, sans montants, et il est exclu du sous-total.
+            if (!acquis) {
+              return `<tr style="color:#94a3b8">
+            <td><strong>${b.reference || b.adresse?.slice(0, 30) || '—'}</strong><br><span style="font-size:10px;color:#f59e0b">Sous compromis — signature prévue le ${b.date_acquisition ? new Date(b.date_acquisition).toLocaleDateString('fr-FR') : '—'}</span></td>
+            <td>${b.ville || '—'}</td>
+            <td style="text-align:right">${pct.toFixed(2)}%</td>
+            <td colspan="4" style="text-align:center;font-style:italic;font-size:10px">Non comptabilisé — acte non signé</td>
+          </tr>`
+            }
             return `<tr>
             <td><strong>${b.reference || b.adresse?.slice(0, 30) || '—'}</strong>${b.reference ? `<br><span style="font-size:10px;color:#94a3b8">${b.adresse?.slice(0, 40) || ''}</span>` : ''}</td>
             <td>${b.ville || '—'}</td>
@@ -466,7 +477,8 @@ export const pdfFichePatrimoniale = ({ userName, societes }) => {
           </tr>
         </tbody>
       </table>
-      ${agg.partielle ? `<p style="font-size:10px;color:#94a3b8;font-style:italic;margin:-16px 0 24px">Les montants sont ramenés à la quote-part réellement détenue par la société. Valeur à 100 % des biens : ${fmt(agg.valeurBrute)}.</p>` : ''}
+      ${agg.partielle ? `<p style="font-size:10px;color:#94a3b8;font-style:italic;margin:-16px 0 8px">Les montants sont ramenés à la quote-part réellement détenue par la société. Valeur à 100 % des biens acquis : ${fmt(agg.valeurBrute)}.</p>` : ''}
+      ${agg.nbEnCours > 0 ? `<p style="font-size:10px;color:#f59e0b;font-style:italic;margin:-8px 0 24px">${agg.nbEnCours} bien${agg.nbEnCours > 1 ? 's' : ''} sous compromis (${fmt(agg.valeurEnCours)} à l'acquisition, ${fmt(agg.engagementEnCours)} d'emprunt prévu) — exclu${agg.nbEnCours > 1 ? 's' : ''} des totaux tant que l'acte n'est pas signé.</p>` : ''}
     ` : '<p style="font-style:italic;color:#94a3b8;font-size:11px;margin-bottom:24px">Aucun bien enregistré pour cette société.</p>'
 
     return `

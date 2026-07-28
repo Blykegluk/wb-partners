@@ -6,7 +6,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceD
 import { useAuth } from '../contexts/Auth'
 import { useSociete } from '../contexts/Societe'
 import { fmt, MONTHS_SHORT, getLoyerActuel } from '../lib/utils'
-import { agregatsBiens, partSociete } from '../lib/calculs'
+import { agregatsBiens, partSociete, estAcquis } from '../lib/calculs'
 
 const NAVY = '#16294a'
 const BRAND = '#3f6ad8'
@@ -68,7 +68,10 @@ export default function Apercu({ navigate }) {
   const agg = agregatsBiens(biens, bienActionnaires)
   const valeurPatrimoine = agg.valeurNette
   const cashflowMensualise = agg.cashflowNet
+  // Un bail rattaché à un bien non encore acquis ne produit aucun loyer.
   const loyersMensuels = bauxActifs.reduce((s, b) => {
+    const bien = biens.find(x => x.id === b.bien_id)
+    if (bien && !estAcquis(bien)) return s
     const part = partSociete(b.bien_id, bienActionnaires)
     return s + (getLoyerActuel(b) || b.loyer_ht || 0) * part
   }, 0)
@@ -190,7 +193,12 @@ export default function Apercu({ navigate }) {
         <KpiCard
           label="Valeur du patrimoine"
           value={valeurPatrimoine ? fmt(valeurPatrimoine) : '—'}
-          hint={biens.length ? `${biens.length} bien${biens.length > 1 ? 's' : ''}` : null}
+          hint={
+            agg.nbEnCours > 0
+              ? `+ ${agg.nbEnCours} en cours d'acquisition (${fmt(agg.valeurEnCours)})`
+              : biens.length ? `${biens.length} bien${biens.length > 1 ? 's' : ''}` : null
+          }
+          hintColor={agg.nbEnCours > 0 ? AMBER : undefined}
         />
         <KpiCard
           label="Loyers mensuels"

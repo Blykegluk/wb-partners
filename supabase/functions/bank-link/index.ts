@@ -15,6 +15,24 @@ const baseHeaders = () => ({
   "Bridge-Version": BRIDGE_VERSION,
 });
 
+// Retrouve un utilisateur Bridge par son external_user_id (= societe_id).
+// L'API ignore le filtre en query string : on pagine et on filtre ici.
+async function findBridgeUser(externalUserId: string): Promise<string | null> {
+  let url: string | null = `${BRIDGE_BASE}/users?limit=500`;
+  while (url) {
+    const res = await fetch(url, { headers: baseHeaders() });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const hit = (data.resources || []).find(
+      (u: { external_user_id?: string }) => u.external_user_id === externalUserId,
+    );
+    if (hit) return hit.uuid;
+    const next = data.pagination?.next_uri;
+    url = next ? (next.startsWith("http") ? next : `https://api.bridgeapi.io${next}`) : null;
+  }
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
@@ -30,7 +48,12 @@ Deno.serve(async (req) => {
 
     let bridgeUserUuid = existing?.bridge_user_uuid;
 
-    // 1. Create Bridge user if needed
+    // 1. Create the Bridge user, or reuse the existing one.
+    //
+    // Un utilisateur Bridge survit à la suppression de la ligne
+    // bank_connections : on ne peut donc pas se fier à la seule absence de
+    // bridge_user_uuid en base. Si la création échoue parce qu'il existe
+    // déjà, on le retrouve par son external_user_id au lieu d'échouer.
     if (!bridgeUserUuid) {
       const res = await fetch(`${BRIDGE_BASE}/users`, {
         method: "POST",
@@ -38,8 +61,24 @@ Deno.serve(async (req) => {
         body: JSON.stringify({ external_user_id: societe_id }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || data.error || JSON.stringify(data));
-      bridgeUserUuid = data.uuid;
+
+      if (res.ok) {
+        bridgeUserUuid = data.uuid;
+      } else {
+        const code = data.errors?.[0]?.code || data.code || "";
+        if (String(code).includes("already_exists")) {
+          bridgeUserUuid = await findBridgeUser(societe_id);
+          if (!bridgeUserUuid) {
+            throw new Error(
+              "Un utilisateur Bridge existe déjà pour cette société mais reste introuvable. Contactez le support Bridge.",
+            );
+          }
+        } else {
+          throw new Error(
+            data.errors?.[0]?.message || data.message || data.error || JSON.stringify(data),
+          );
+        }
+      }
     }
 
     // 2. Get user auth token
