@@ -1,5 +1,11 @@
 import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  rapprocher,
+  type ContexteBail,
+  type Echeance,
+  type Mouvement,
+} from "../_shared/rapprochement.ts";
 
 const BRIDGE_CLIENT_ID = Deno.env.get("BRIDGE_CLIENT_ID");
 const BRIDGE_CLIENT_SECRET = Deno.env.get("BRIDGE_CLIENT_SECRET");
@@ -8,11 +14,9 @@ const BRIDGE_BASE = "https://api.bridgeapi.io/v3/aggregation";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-// Historique récupéré à chaque synchronisation.
+// Historique récupéré à chaque synchronisation. La fenêtre de rapprochement,
+// elle, est définie dans _shared/rapprochement.ts.
 const JOURS_HISTORIQUE = 365;
-// Fenêtre de rapprochement : un loyer peut être payé en avance ou en retard.
-const JOURS_AVANT = 10;
-const JOURS_APRES = 120;
 
 const authHeaders = (token: string) => ({
   "Content-Type": "application/json",
@@ -138,21 +142,40 @@ Deno.serve(async (req) => {
     }
 
     // ── 3. Rapprochement ──────────────────────────────────
-    // Règles volontairement prudentes : un rapprochement automatique erroné
-    // couperait une relance légitime. Les cas douteux restent « à qualifier ».
+    // Délégué au moteur de scoring partagé (_shared/rapprochement.ts), qui
+    // combine montant, fenêtre temporelle, libellé et nature d'opération,
+    // puis affecte globalement les meilleurs couples. Les cas ambigus ne
+    // sont pas tranchés : ils remontent en suggestions.
     const { data: baux } = await supabase.from("baux")
-      .select("id, loyer_ht, charges").eq("societe_id", societe_id).eq("actif", true);
+      .select("id, locataire_id").eq("societe_id", societe_id).eq("actif", true);
 
     let rapproches = 0;
+    let suggeres = 0;
 
     if (baux && baux.length > 0) {
       const bailIds = baux.map((b) => b.id);
-      const { data: echeances } = await supabase.from("transactions")
-        .select("*").in("bail_id", bailIds).in("statut", ["impayé", "en_attente"]);
 
-      // Crédits en euros, non annulés, sur un compte suivi, pas déjà rapprochés.
+      const { data: echeances } = await supabase.from("transactions")
+        .select("id, bail_id, mois, annee, montant_loyer, montant_charges")
+        .in("bail_id", bailIds).in("statut", ["impayé", "en_attente"]);
+
+      // Noms rattachés à chaque bail : servent au signal « libellé ».
+      const { data: locataires } = await supabase.from("locataires")
+        .select("id, raison_sociale, nom, prenom").eq("societe_id", societe_id);
+
+      const contextes = new Map<string, ContexteBail>();
+      for (const b of baux) {
+        const loc = (locataires || []).find((l) => l.id === b.locataire_id);
+        contextes.set(b.id, {
+          bail_id: b.id,
+          noms: [loc?.raison_sociale, loc?.nom, `${loc?.prenom ?? ""} ${loc?.nom ?? ""}`]
+            .filter((x): x is string => !!x && x.trim().length > 0),
+        });
+      }
+
+      // Crédits en euros, non annulés, sur un compte suivi, non rapprochés.
       const { data: credits } = await supabase.from("bank_transactions")
-        .select("*")
+        .select("id, date, montant, libelle, libelle_brut, operation_type, bank_account_id")
         .eq("societe_id", societe_id)
         .eq("statut_rapprochement", "a_qualifier")
         .eq("supprime", false)
@@ -164,48 +187,37 @@ Deno.serve(async (req) => {
         return !compte || compte.suivi !== false;
       });
 
-      const utilises = new Set<string>();
+      const { affectations, suggestions } = rapprocher(
+        (echeances || []) as Echeance[],
+        disponibles as Mouvement[],
+        contextes,
+      );
 
-      for (const ech of echeances || []) {
-        const attendu = Number(ech.montant_loyer || 0) + Number(ech.montant_charges || 0);
-        const loyerSeul = Number(ech.montant_loyer || 0);
-        if (attendu <= 0) continue;
-
-        // Échéance due le 1er du mois concerné.
-        const echeanceDue = new Date(Date.UTC(ech.annee, ech.mois, 1));
-        const debut = new Date(echeanceDue.getTime() - JOURS_AVANT * 86400000);
-        const fin = new Date(echeanceDue.getTime() + JOURS_APRES * 86400000);
-
-        const candidat = disponibles.find((c) => {
-          if (utilises.has(c.id)) return false;
-          const d = new Date(c.date);
-          // Fenêtre glissante : corrige le défaut de la version précédente,
-          // qui exigeait que le virement tombe dans le mois de l'échéance et
-          // ne rapprochait donc jamais un paiement en retard.
-          if (d < debut || d > fin) return false;
-          const m = Number(c.montant);
-          const tol = Math.max(attendu * 0.02, 2);
-          return Math.abs(m - attendu) <= tol || Math.abs(m - loyerSeul) <= tol;
-        });
-
-        if (!candidat) continue;
-
-        utilises.add(candidat.id);
-
+      for (const a of affectations) {
+        const mvt = disponibles.find((c) => c.id === a.transaction_id);
         await supabase.from("bank_transactions").update({
           statut_rapprochement: "rapproche_auto",
-          transaction_id: ech.id,
-          score_confiance: 0.8,
+          transaction_id: a.echeance_id,
+          score_confiance: Math.round(a.score * 100) / 100,
+          suggestions: null,
           rapproche_le: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        }).eq("id", candidat.id);
+        }).eq("id", a.transaction_id);
 
         await supabase.from("transactions").update({
           statut: "payé",
-          date_paiement: candidat.date,
-        }).eq("id", ech.id);
+          date_paiement: mvt?.date ?? new Date().toISOString().slice(0, 10),
+        }).eq("id", a.echeance_id);
 
         rapproches++;
+      }
+
+      // Mémorise les pistes pour l'écran Banque, sans rien décider.
+      for (const [mvtId, liste] of suggestions) {
+        await supabase.from("bank_transactions")
+          .update({ suggestions: liste, updated_at: new Date().toISOString() })
+          .eq("id", mvtId);
+        suggeres++;
       }
     }
 
@@ -223,6 +235,7 @@ Deno.serve(async (req) => {
       comptes: comptes.length,
       mouvements: mouvements.length,
       rapproches,
+      suggeres,
       a_qualifier: aQualifier ?? 0,
     }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error) {

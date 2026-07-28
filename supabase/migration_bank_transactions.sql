@@ -93,3 +93,7 @@ create policy "Editors can update bank_transactions"
   on bank_transactions for update using (can_edit_societe(societe_id));
 create policy "Editors can delete bank_transactions"
   on bank_transactions for delete using (can_edit_societe(societe_id));
+
+-- Phase 2 : suggestions de rapprochement calculées à la synchronisation,
+-- consommées par l'écran Banque : [{ transaction_id, score, raisons[] }]
+alter table bank_transactions add column if not exists suggestions jsonb;
