@@ -118,3 +118,20 @@ update bien_actionnaires b
 set personne_id = a.personne_id
 from actionnaires a
 where b.personne_id is null and b.actionnaire_id = a.id and a.personne_id is not null;
+
+
+-- ── Contrainte d'identité ───────────────────────────────────
+-- La contrainte d'origine exigeait actionnaire_id OU nom_externe. Les
+-- nouvelles lignes ne portant que personne_id, tout ajout de co-détenteur
+-- était rejeté. On exige désormais au moins une source d'identité parmi les
+-- trois (">= 1" et non "= 1" : les lignes reprises par le backfill portent
+-- légitimement actionnaire_id ET personne_id).
+
+alter table bien_actionnaires drop constraint if exists bien_actionnaires_identite_check;
+
+alter table bien_actionnaires add constraint bien_actionnaires_identite_check check (
+  (personne_id is not null)::int
+  + (actionnaire_id is not null)::int
+  + ((nom_externe is not null) and (length(trim(nom_externe)) > 0))::int
+  >= 1
+);
