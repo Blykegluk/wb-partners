@@ -88,12 +88,29 @@ export function referenceAttendue(bailId: string, mois: number, annee: number): 
   return `LOY ${code} ${String(mois + 1).padStart(2, "0")}${annee}`;
 }
 
+/**
+ * Empreinte d'un libellé bancaire : jetons significatifs, dédoublonnés et
+ * triés. Deux virements du même émetteur partagent la même empreinte même si
+ * la banque intercale une date ou une référence variable.
+ *
+ * Renvoie "" si le libellé ne contient rien de discriminant — auquel cas il
+ * ne faut surtout rien mémoriser.
+ */
+export function empreinte(libelle: string | null | undefined): string {
+  const tk = Array.from(new Set(tokens(libelle || "")))
+    .filter((t) => !/^\d+$/.test(t))   // écarte les dates et numéros
+    .sort();
+  return tk.length >= 2 ? tk.join(" ") : "";
+}
+
 // ── Score d'un couple ───────────────────────────────────────
 
 export function scorer(
   ech: Echeance,
   mvt: Mouvement,
   ctx: ContexteBail | undefined,
+  /** empreinte → bail_id, alimenté par les rapprochements manuels passés. */
+  appris?: Map<string, string>,
 ): { score: number; raisons: string[] } {
   const raisons: string[] = [];
 
@@ -146,10 +163,22 @@ export function scorer(
   const libelleNorm = normaliser(libelle);
   let scoreLibelle = 0;
 
+  // Émetteur déjà rapproché manuellement sur ce bail : signal le plus fort
+  // après la référence de virement, puisqu'il vient d'une confirmation humaine.
+  const emp = empreinte(libelle);
+  const bailAppris = emp && appris ? appris.get(emp) : undefined;
+
   const ref = referenceAttendue(ech.bail_id, ech.mois, ech.annee);
   if (ref && libelleNorm.includes(ref)) {
     scoreLibelle = 0.40;
     raisons.push("Référence de virement reconnue");
+  } else if (bailAppris === ech.bail_id) {
+    scoreLibelle = 0.35;
+    raisons.push("Émetteur déjà rattaché à ce bail");
+  } else if (bailAppris && bailAppris !== ech.bail_id) {
+    // Cet émetteur est connu pour un AUTRE bail : signal négatif net.
+    scoreLibelle = -0.30;
+    raisons.push("Émetteur habituellement rattaché à un autre bail");
   } else if (ctx) {
     const tokensLibelle = new Set(tokens(libelle));
     let meilleur = 0;
@@ -204,12 +233,13 @@ export function rapprocher(
   echeances: Echeance[],
   mouvements: Mouvement[],
   contextes: Map<string, ContexteBail>,
+  appris?: Map<string, string>,
 ): ResultatRapprochement {
   // Tous les couples plausibles, meilleurs scores d'abord.
   const couples: Array<{ ech: Echeance; mvt: Mouvement; score: number; raisons: string[] }> = [];
   for (const ech of echeances) {
     for (const mvt of mouvements) {
-      const { score, raisons } = scorer(ech, mvt, contextes.get(ech.bail_id));
+      const { score, raisons } = scorer(ech, mvt, contextes.get(ech.bail_id), appris);
       if (score > 0) couples.push({ ech, mvt, score, raisons });
     }
   }

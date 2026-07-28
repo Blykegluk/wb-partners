@@ -187,10 +187,18 @@ Deno.serve(async (req) => {
         return !compte || compte.suivi !== false;
       });
 
+      // Émetteurs déjà rattachés à un bail lors de qualifications manuelles.
+      const { data: apprisRows } = await supabase.from("rapprochement_appris")
+        .select("empreinte, bail_id").eq("societe_id", societe_id);
+      const appris = new Map<string, string>(
+        (apprisRows || []).map((r) => [r.empreinte as string, r.bail_id as string]),
+      );
+
       const { affectations, suggestions } = rapprocher(
         (echeances || []) as Echeance[],
         disponibles as Mouvement[],
         contextes,
+        appris,
       );
 
       for (const a of affectations) {

@@ -9,7 +9,7 @@ import { Card, Empty, Kpi, KpiRow } from '../components/UI'
 const now = new Date()
 
 export default function Finances() {
-  const { baux, biens, locataires, transactions, selected, reload } = useSociete()
+  const { baux, biens, locataires, transactions, bankTransactions, selected, reload } = useSociete()
   const [selectedYear, setSelectedYear] = useState(now.getFullYear())
 
   const years = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1]
@@ -22,6 +22,14 @@ export default function Finances() {
     return !bien || estAcquis(bien)
   })
   const biensEnCours = biens.filter(b => !estAcquis(b))
+
+  // Échéances soldées par un virement rapproché : permet de distinguer un
+  // « payé » constaté en banque d'un « payé » saisi à la main.
+  const rapprocheParId = new Map(
+    bankTransactions
+      .filter(t => t.transaction_id && t.statut_rapprochement?.startsWith('rapproche'))
+      .map(t => [t.transaction_id, t.statut_rapprochement])
+  )
 
   const getStatutMois = (bailId, mois, annee) =>
     transactions.find(t => t.bail_id === bailId && t.mois === mois && t.annee === annee)
@@ -165,7 +173,14 @@ export default function Finances() {
                           </div>
                           {tx ? (
                             statut === 'payé'
-                              ? <span className="text-[9px] text-green-500">✓</span>
+                              ? (
+                                rapprocheParId.get(tx.id)
+                                  ? <span className="text-[9px] text-green-600 font-semibold"
+                                      title={`Rapproché ${rapprocheParId.get(tx.id) === 'rapproche_auto' ? 'automatiquement' : 'manuellement'} avec un virement`}>
+                                      ✓ rappr.
+                                    </span>
+                                  : <span className="text-[9px] text-green-500" title="Marqué payé manuellement, sans virement rapproché">✓</span>
+                              )
                               : <button onClick={() => markPaid(tx.id)} className="text-[9px] text-red-500 cursor-pointer bg-transparent border-none hover:underline">→ payé</button>
                           ) : !isFuture ? (
                             <button onClick={() => createAndMark(b, mois, selectedYear)} className="text-[9px] text-red-500 cursor-pointer bg-transparent border-none hover:underline">+ Enreg.</button>

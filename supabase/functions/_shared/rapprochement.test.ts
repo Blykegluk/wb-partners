@@ -1,4 +1,4 @@
-import { rapprocher, scorer, normaliser } from './rapprochement.ts'
+import { rapprocher, scorer, normaliser, empreinte } from './rapprochement.ts'
 
 const ech = (id: string, bail: string, mois: number, annee: number, loyer: number, charges: number) =>
   ({ id, bail_id: bail, mois, annee, montant_loyer: loyer, montant_charges: charges })
@@ -53,6 +53,25 @@ t('score sous le seuil auto', s.score < 0.75)
 
 console.log('\n8. Normalisation des accents')
 t('accents et casse neutralises', normaliser('Ref. Pharmacie des Epars') === 'REF PHARMACIE DES EPARS')
+
+console.log('\n9. APPRENTISSAGE : empreinte stable malgre une reference variable')
+t('meme empreinte', empreinte('VIR SEPA SCM BORDIER ET CHICHE 07 2026')
+                 === empreinte('VIR INST SCM BORDIER ET CHICHE REF 998877'))
+t('libelle non discriminant -> vide', empreinte('VIR SEPA') === '')
+
+console.log('\n10. APPRENTISSAGE : leve une ambiguite que le libelle seul ne leve pas')
+const emp = empreinte('VIR SEPA CABINET MEDICAL')
+const appris = new Map([[emp, 'bail-B']])
+r = rapprocher([ech('e11','bail-A',6,2026,1000,0), ech('e12','bail-B',6,2026,1000,0)],
+               [mvt('m8','2026-07-05',1000,'VIR SEPA CABINET MEDICAL')], ctx, appris)
+t('rapproche sur le bail appris', r.affectations[0]?.echeance_id === 'e12')
+
+console.log('\n11. APPRENTISSAGE : emetteur connu pour un AUTRE bail -> penalise')
+const sA = scorer(ech('e13','bail-A',6,2026,1000,0),
+                  mvt('m9','2026-07-05',1000,'VIR SEPA CABINET MEDICAL'), ctx.get('bail-A'), appris)
+const sB = scorer(ech('e14','bail-B',6,2026,1000,0),
+                  mvt('m9','2026-07-05',1000,'VIR SEPA CABINET MEDICAL'), ctx.get('bail-B'), appris)
+t('le bon bail score plus haut', sB.score > sA.score)
 
 console.log(`\n${ok} reussis, ${ko} echoues`)
 process.exit(ko === 0 ? 0 : 1)

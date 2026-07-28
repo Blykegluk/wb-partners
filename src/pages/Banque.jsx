@@ -7,6 +7,9 @@ import { useSociete } from '../contexts/Societe'
 import { useAuth } from '../contexts/Auth'
 import { fmt, fmtDate, MONTHS } from '../lib/utils'
 import { PageHeader, Card, Btn, Empty, Modal, Kpi, KpiRow } from '../components/UI'
+// Même module que l'Edge Function : l'empreinte apprise ici doit être
+// rigoureusement identique à celle que le moteur recherchera.
+import { empreinte } from '../../supabase/functions/_shared/rapprochement.ts'
 
 const FUNCTIONS_URL = import.meta.env.VITE_SUPABASE_URL + '/functions/v1'
 
@@ -90,7 +93,8 @@ export default function Banque({ navigate }) {
     setSyncing(false)
   }
 
-  // Rapprochement manuel : lie le mouvement à l'échéance et solde celle-ci.
+  // Rapprochement manuel : lie le mouvement à l'échéance, solde celle-ci, et
+  // mémorise l'émetteur pour que le prochain virement se rapproche seul.
   const rapprocherManuel = async (mvt, echeanceId) => {
     const { error: e1 } = await supabase.from('bank_transactions').update({
       statut_rapprochement: 'rapproche_manuel',
@@ -106,6 +110,28 @@ export default function Banque({ navigate }) {
       date_paiement: mvt.date,
     }).eq('id', echeanceId)
     if (e2) { setErreur(e2.message); return }
+
+    // Apprentissage — best effort : une erreur ici ne doit pas invalider le
+    // rapprochement, qui est déjà enregistré.
+    const ech = transactions.find(t => t.id === echeanceId)
+    const emp = empreinte(mvt.libelle)
+    if (ech?.bail_id && emp) {
+      const { data: existant } = await supabase.from('rapprochement_appris')
+        .select('id, occurrences').eq('societe_id', selected.id).eq('empreinte', emp).maybeSingle()
+      if (existant) {
+        await supabase.from('rapprochement_appris').update({
+          bail_id: ech.bail_id,
+          occurrences: (existant.occurrences || 1) + 1,
+          derniere_utilisation: new Date().toISOString(),
+        }).eq('id', existant.id)
+      } else {
+        await supabase.from('rapprochement_appris').insert({
+          societe_id: selected.id,
+          bail_id: ech.bail_id,
+          empreinte: emp,
+        })
+      }
+    }
 
     setQualifier(null)
     reload()

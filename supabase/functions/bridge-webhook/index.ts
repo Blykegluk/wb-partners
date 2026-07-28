@@ -22,13 +22,35 @@ const SUPABASE_SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 // configuré côté Bridge et injecté ici.
 const BRIDGE_WEBHOOK_SECRET = Deno.env.get("BRIDGE_WEBHOOK_SECRET");
 
+// Comparaison à temps constant : évite de fuiter la signature attendue par
+// le temps de réponse.
+function egalConstant(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 async function verifySignature(rawBody: string, header: string | null): Promise<boolean> {
   if (!BRIDGE_WEBHOOK_SECRET) return true; // pas de secret configuré → skip
   if (!header) return false;
-  // Bridge envoie "v1=<hex(hmac_sha256(rawBody, secret))>"
-  const parts = header.split(",").map((p) => p.trim().split("="));
-  const v1 = parts.find(([k]) => k === "v1")?.[1];
-  if (!v1) return false;
+
+  // En-tête « BridgeApi-Signature: v1=<hex>[,v1=<hex>] ».
+  //
+  // Après une rotation de secret depuis le dashboard, l'ancien secret reste
+  // actif 24 h : Bridge émet alors UNE signature par secret valide. Il faut
+  // donc accepter si l'une quelconque correspond — ne tester que la première
+  // rejetterait des webhooks légitimes pendant toute la fenêtre de rotation.
+  // Les schémas autres que v1 sont ignorés (protection anti-downgrade).
+  const signatures = header
+    .split(",")
+    .map((p) => p.trim().split("="))
+    .filter(([k]) => k === "v1")
+    .map(([, v]) => (v || "").trim().toLowerCase())
+    .filter(Boolean);
+
+  if (signatures.length === 0) return false;
+
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
@@ -38,14 +60,11 @@ async function verifySignature(rawBody: string, header: string | null): Promise<
     ["sign"],
   );
   const sig = await crypto.subtle.sign("HMAC", key, enc.encode(rawBody));
-  const hex = Array.from(new Uint8Array(sig))
+  const attendu = Array.from(new Uint8Array(sig))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
-  // Comparaison à temps constant
-  if (hex.length !== v1.length) return false;
-  let diff = 0;
-  for (let i = 0; i < hex.length; i++) diff |= hex.charCodeAt(i) ^ v1.charCodeAt(i);
-  return diff === 0;
+
+  return signatures.some((s) => egalConstant(attendu, s));
 }
 
 Deno.serve(async (req) => {
