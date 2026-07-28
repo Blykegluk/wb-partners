@@ -9,22 +9,24 @@ import Apercu from './pages/Apercu'
 import Patrimoine from './pages/Patrimoine'
 import FinancesHub from './pages/FinancesHub'
 import Analyse from './pages/Analyse'
+import Opportunites from './pages/Opportunites'
 import Pipeline from './pages/Pipeline'
 import Outils from './pages/Outils'
 import Parametres from './pages/Parametres'
 import SmartUpload from './components/SmartUpload'
 
 // New route names — Refonte « Clarté ».
-// « Opportunités » (Refonte) est prévu comme Veille + Simulateur ; la page
-// Pipeline existante en devient la vue Veille par défaut.
-// Les anciennes clés (dashboard/finances/outils/pipeline) sont conservées
-// comme alias pour ne pas casser les liens internes existants.
+// « Opportunités » regroupe la Veille (ex page Pipeline) et le Simulateur ;
+// « Analyse » accueille la Fiche patrimoniale. La section « Outils » a
+// disparu de la navigation : ses écrans ont été redistribués.
+// Les anciennes clés sont conservées comme alias pour ne pas casser les
+// liens internes existants.
 const PAGES = {
   apercu: Apercu,
   patrimoine: Patrimoine,
   flux: FinancesHub,
   analyse: Analyse,
-  opportunites: Pipeline,
+  opportunites: Opportunites,
   parametres: Parametres,
   // Aliases (transitional)
   dashboard: Apercu,

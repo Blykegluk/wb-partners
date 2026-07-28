@@ -1,14 +1,25 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Tresorerie from './Tresorerie'
 import Fiscal from './Fiscal'
+import FichePatrimoniale from './FichePatrimoniale'
 
 const TABS = [
   { key: 'tresorerie', label: 'Trésorerie' },
   { key: 'fiscal', label: 'Fiscal' },
+  { key: 'fiche', label: 'Fiche patrimoniale' },
 ]
 
-export default function Analyse({ navigate }) {
+export default function Analyse({ navigate, navState, setNavState }) {
   const [tab, setTab] = useState('tresorerie')
+
+  // Permet d'atterrir directement sur un onglet depuis un lien profond
+  // (ex. navigate('analyse', { tab: 'fiche' })).
+  useEffect(() => {
+    if (navState?.tab && TABS.find(t => t.key === navState.tab)) {
+      setTab(navState.tab)
+      setNavState?.(null)
+    }
+  }, [navState, setNavState])
 
   return (
     <div>
@@ -25,6 +36,9 @@ export default function Analyse({ navigate }) {
       </div>
       <div style={{ display: tab === 'fiscal' ? 'block' : 'none' }}>
         <Fiscal navigate={navigate} />
+      </div>
+      <div style={{ display: tab === 'fiche' ? 'block' : 'none' }}>
+        <FichePatrimoniale />
       </div>
     </div>
   )

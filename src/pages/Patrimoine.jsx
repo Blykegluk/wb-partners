@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Building2, Plus, Trash2, Upload, MapPin, FileText, Users, FolderOpen, Receipt, ArrowRight, Link, Euro, ChevronLeft, ChevronDown, Download, ExternalLink, Map, List, Printer, Zap, Clock } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Building2, Plus, Trash2, Upload, MapPin, FileText, Users, FolderOpen, Receipt, ArrowRight, Link, Euro, ChevronLeft, ChevronDown, Download, ExternalLink, Map, List, Printer, Zap, Clock, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useSociete } from '../contexts/Societe'
 import { fmt, fmtDate, googleMapsUrl, DOC_TYPES } from '../lib/utils'
@@ -9,6 +9,7 @@ import SmartUpload from '../components/SmartUpload'
 import DetentionBien from '../components/DetentionBien'
 import { openDocument, removeFile } from '../lib/storage'
 import Carte from './Carte'
+import Revisions from './Revisions'
 import { PageHeader, Card, Modal, Field, Sel, Check, Grid2, Grid3, Btn, Badge, Empty, AddressField } from '../components/UI'
 
 const EMPTY_BIEN = {
@@ -38,12 +39,21 @@ const TABS = [
   { key: 'charges', label: 'Charges', icon: Receipt },
 ]
 
-export default function Patrimoine({ navigate }) {
+export default function Patrimoine({ navigate, navState, setNavState }) {
   const { biens, baux, locataires, documents, transactions, appelsCharges, selected, canEdit, reload } = useSociete()
 
   const [detailId, setDetailId] = useState(null)
   const [tab, setTab] = useState('infos')
-  const [viewMode, setViewMode] = useState('list') // 'list' | 'carte'
+  const [viewMode, setViewMode] = useState('list') // 'list' | 'carte' | 'revisions'
+
+  // Lien profond depuis l'Aperçu : navigate('patrimoine', { tab: 'revisions' })
+  useEffect(() => {
+    if (navState?.tab === 'revisions') {
+      setDetailId(null)
+      setViewMode('revisions')
+      setNavState?.(null)
+    }
+  }, [navState, setNavState])
   const [showUpload, setShowUpload] = useState(false)
   const [uploadBienId, setUploadBienId] = useState(null)
   const [locDetail, setLocDetail] = useState(null)
@@ -700,6 +710,10 @@ export default function Patrimoine({ navigate }) {
               className={`p-2 rounded-md cursor-pointer transition-colors ${viewMode === 'carte' ? 'bg-white shadow-sm text-navy' : 'text-gray-400 hover:text-gray-600'}`}>
               <Map size={16} />
             </button>
+            <button onClick={() => setViewMode('revisions')} title="Révisions de loyer"
+              className={`p-2 rounded-md cursor-pointer transition-colors ${viewMode === 'revisions' ? 'bg-white shadow-sm text-navy' : 'text-gray-400 hover:text-gray-600'}`}>
+              <RefreshCw size={16} />
+            </button>
           </div>
           {canEdit && (
             <>
@@ -713,7 +727,9 @@ export default function Patrimoine({ navigate }) {
           )}
         </PageHeader>
 
-        {viewMode === 'carte' ? (
+        {viewMode === 'revisions' ? (
+          <Revisions navigate={navigate} />
+        ) : viewMode === 'carte' ? (
           <Carte />
         ) : biens.length === 0 ? (
           <Empty icon={<Building2 size={40} />} text="Aucun bien. Ajoutez votre premier bien immobilier." />
