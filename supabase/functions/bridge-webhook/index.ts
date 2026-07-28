@@ -103,11 +103,7 @@ Deno.serve(async (req) => {
 
     if (type === "item.created" && societeId) {
       await supabase.from("bank_connections")
-        .update({
-          status: "connected",
-          bridge_item_id: itemId,
-          updated_at: new Date().toISOString(),
-        })
+        .update({ status: "connected", item_id: itemId })
         .eq("societe_id", societeId);
     } else if (
       (type === "item.refreshed" || type === "item.account.updated") &&
@@ -125,7 +121,7 @@ Deno.serve(async (req) => {
       }).catch((err) => console.error("[Bridge webhook] bank-sync trigger failed:", err));
     } else if ((type === "item.deleted" || type === "user.deleted") && societeId) {
       await supabase.from("bank_connections")
-        .update({ status: "deleted", updated_at: new Date().toISOString() })
+        .update({ status: "deleted" })
         .eq("societe_id", societeId);
     }
 
