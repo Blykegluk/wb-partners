@@ -58,7 +58,7 @@ function KpiCard({ label, value, hint, hintColor, tone, onClick }) {
 // ── Component ─────────────────────────────────────────────────
 export default function Apercu({ navigate }) {
   const { user } = useAuth()
-  const { biens, locataires, baux, transactions, bienActionnaires } = useSociete()
+  const { biens, locataires, baux, transactions, bienActionnaires, bankConnection } = useSociete()
 
   const bauxActifs = baux.filter(b => b.actif)
 
@@ -158,6 +158,40 @@ export default function Apercu({ navigate }) {
   const nbActions = aTraiter.length
   const today = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).format(now)
 
+  // ── Pastille de synchronisation bancaire ───────────────────
+  // Reflète l'état réel de bank_connections pour la société courante.
+  const banque = (() => {
+    const st = bankConnection?.status
+    if (st === 'connected') {
+      const nom = bankConnection.institution_name || 'Banque'
+      let quand = 'jamais synchronisée'
+      if (bankConnection.last_sync) {
+        const diffMin = Math.round((now - new Date(bankConnection.last_sync)) / 60000)
+        if (diffMin < 2) quand = "à l'instant"
+        else if (diffMin < 60) quand = `il y a ${diffMin} min`
+        else if (diffMin < 48 * 60) quand = `il y a ${Math.round(diffMin / 60)} h`
+        else quand = `il y a ${Math.round(diffMin / 1440)} j`
+      }
+      return {
+        bg: '#e3efe7', fg: POSITIVE,
+        label: `${nom} · ${quand}`,
+        title: 'Compte bancaire connecté — cliquez pour gérer la connexion',
+      }
+    }
+    if (st === 'pending') {
+      return {
+        bg: '#fdf9ef', fg: AMBER,
+        label: 'Connexion bancaire à finaliser',
+        title: "L'autorisation bancaire n'a pas été menée à son terme — cliquez pour la reprendre",
+      }
+    }
+    return {
+      bg: '#f2f4f7', fg: FAINT,
+      label: 'Banque non connectée',
+      title: 'Aucun compte bancaire connecté — cliquez pour en connecter un',
+    }
+  })()
+
   return (
     <div style={{ padding: '32px 36px', minWidth: 0 }}>
       {/* Header */}
@@ -172,13 +206,15 @@ export default function Apercu({ navigate }) {
           </p>
         </div>
         <div className="flex gap-2.5 items-center">
-          <span
-            className="flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1.5 rounded-full"
-            style={{ background: '#e3efe7', color: POSITIVE }}
+          <button
+            onClick={() => navigate('parametres', { tab: 'banque' })}
+            className="flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1.5 rounded-full border-0 cursor-pointer transition-opacity hover:opacity-80"
+            style={{ background: banque.bg, color: banque.fg }}
+            title={banque.title}
           >
-            <span className="w-[7px] h-[7px] rounded-full" style={{ background: POSITIVE }} />
-            Banque non connectée
-          </span>
+            <span className="w-[7px] h-[7px] rounded-full" style={{ background: banque.fg }} />
+            {banque.label}
+          </button>
           <div
             className="w-9 h-9 rounded-full text-white text-[13px] font-bold flex items-center justify-center"
             style={{ background: NAVY }}
@@ -335,19 +371,29 @@ export default function Apercu({ navigate }) {
                   </p>
                 </div>
               )}
-              <div className="flex gap-2.5 items-start">
-                <CircleDashed size={15} style={{ color: AMBER, marginTop: 2 }} className="shrink-0" />
-                <p className="m-0 leading-[1.5]" style={{ color: '#39414d' }}>
-                  Connectez votre banque pour activer le rapprochement automatique.{' '}
-                  <button
-                    onClick={() => navigate('flux', { tab: 'banque' })}
-                    className="p-0 border-none bg-transparent cursor-pointer font-semibold"
-                    style={{ color: BRAND }}
-                  >
-                    Configurer
-                  </button>
-                </p>
-              </div>
+              {bankConnection?.status === 'connected' ? (
+                <div className="flex gap-2.5 items-start">
+                  <Check size={15} style={{ color: POSITIVE, marginTop: 2 }} className="shrink-0" />
+                  <p className="m-0 leading-[1.5]" style={{ color: '#39414d' }}>
+                    Compte <strong>{bankConnection.institution_name || 'bancaire'}</strong> connecté —
+                    les mouvements sont récupérés automatiquement.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex gap-2.5 items-start">
+                  <CircleDashed size={15} style={{ color: AMBER, marginTop: 2 }} className="shrink-0" />
+                  <p className="m-0 leading-[1.5]" style={{ color: '#39414d' }}>
+                    Connectez votre banque pour activer le rapprochement automatique.{' '}
+                    <button
+                      onClick={() => navigate('parametres', { tab: 'banque' })}
+                      className="p-0 border-none bg-transparent cursor-pointer font-semibold"
+                      style={{ color: BRAND }}
+                    >
+                      Configurer
+                    </button>
+                  </p>
+                </div>
+              )}
               {rapprochesJuillet === 0 && (
                 <div className="flex gap-2.5 items-start">
                   <Check size={15} style={{ color: POSITIVE, marginTop: 2 }} className="shrink-0" />

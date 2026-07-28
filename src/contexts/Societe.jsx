@@ -27,6 +27,8 @@ export function SocieteProvider({ children }) {
   // Annuaire partagé : toutes les personnes accessibles, toutes sociétés
   // confondues (une personne n'est jamais rattachée à une seule société).
   const [personnes, setPersonnes] = useState([])
+  // Connexion bancaire de la société sélectionnée (null si aucune).
+  const [bankConnection, setBankConnection] = useState(null)
   const [loadingData, setLoadingData] = useState(false)
   const hasLoadedData = useRef(false)
 
@@ -77,7 +79,7 @@ export function SocieteProvider({ children }) {
     if (!hasLoadedData.current) setLoadingData(true)
     const sid = selected.id
 
-    const [b, l, ba, d, m, rev, evt, ac, act, bact, pers] = await Promise.all([
+    const [b, l, ba, d, m, rev, evt, ac, act, bact, pers, bank] = await Promise.all([
       supabase.from('biens').select('*').eq('societe_id', sid).order('created_at'),
       supabase.from('locataires').select('*').eq('societe_id', sid).order('created_at'),
       supabase.from('baux').select('*').eq('societe_id', sid).order('created_at'),
@@ -90,6 +92,7 @@ export function SocieteProvider({ children }) {
       supabase.from('bien_actionnaires').select('*').eq('societe_id', sid).order('pourcentage', { ascending: false }),
       // Pas de filtre société : l'annuaire est partagé, la RLS se charge du périmètre.
       supabase.from('personnes').select('*').order('nom'),
+      supabase.from('bank_connections').select('*').eq('societe_id', sid).maybeSingle(),
     ])
 
     setBiens(b.data || [])
@@ -103,6 +106,7 @@ export function SocieteProvider({ children }) {
     setActionnaires(act.data || [])
     setBienActionnaires(bact.data || [])
     setPersonnes(pers.data || [])
+    setBankConnection(bank.data || null)
 
     // Transactions via baux ids
     const bauxIds = (ba.data || []).map(x => x.id)
@@ -131,7 +135,7 @@ export function SocieteProvider({ children }) {
     <SocieteContext.Provider value={{
       societes, loadingSocietes, loadSocietes,
       selected, selectSociete, role, canEdit, isAdmin,
-      biens, locataires, baux, transactions, documents, membres, revisions, evenements, appelsCharges, actionnaires, bienActionnaires, personnes,
+      biens, locataires, baux, transactions, documents, membres, revisions, evenements, appelsCharges, actionnaires, bienActionnaires, personnes, bankConnection,
       loadingData, reload,
     }}>
       {children}

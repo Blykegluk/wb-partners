@@ -14,10 +14,18 @@ const TABS = [
   { key: 'banque', label: 'Banque' },
 ]
 
-export default function Parametres() {
+export default function Parametres({ navState, setNavState }) {
   const { user } = useAuth()
   const { selected, membres, isAdmin, reload } = useSociete()
   const [tab, setTab] = useState('societe')
+
+  // Lien profond : navigate('parametres', { tab: 'banque' })
+  useEffect(() => {
+    if (navState?.tab && TABS.find(t => t.key === navState.tab)) {
+      setTab(navState.tab)
+      setNavState?.(null)
+    }
+  }, [navState, setNavState])
 
   return (
     <div>
