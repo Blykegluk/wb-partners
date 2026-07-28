@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Upload, FileText, CheckCircle, Plus, ArrowRight, AlertTriangle, Scissors } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useSociete } from '../contexts/Societe'
@@ -8,7 +8,7 @@ import { Modal, Field, Sel, Grid2, Grid3, Btn } from './UI'
 
 // ── Steps: idle → extracting → confirm → done ──────────────
 
-export default function SmartUpload({ onClose, bienId: initialBienId }) {
+export default function SmartUpload({ onClose, bienId: initialBienId, initialFile }) {
   const { biens, locataires, baux, transactions, selected, reload } = useSociete()
 
   const [step, setStep] = useState('idle') // idle | extracting | confirm_bail | confirm_amort | confirm_charges | confirm_quittance | confirm_generic | error
@@ -18,6 +18,12 @@ export default function SmartUpload({ onClose, bienId: initialBienId }) {
   const [saving, setSaving] = useState(false)
   const [trimInfo, setTrimInfo] = useState(null)
   const [drag, setDrag] = useState(false)
+
+  // If a file was pre-supplied (e.g. dropped on the sidebar IA inbox), pick it up on mount.
+  useEffect(() => {
+    if (initialFile) handleFile(initialFile)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Change detected type
   const TYPE_MAP = { bail: 'confirm_bail', amortissement: 'confirm_amort', appel_charges: 'confirm_charges', quittance: 'confirm_quittance', autre: 'confirm_generic' }

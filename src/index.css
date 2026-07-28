@@ -1,16 +1,58 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --color-navy: #1a2d4e;
+  --font-sans: 'Instrument Sans', system-ui, -apple-system, sans-serif;
+
+  /* Refonte « Clarté » — design tokens */
+  --color-navy: #16294a;
+  --color-navy-hover: #243b63;
   --color-navy-light: #243b63;
   --color-navy-dark: #0f1d33;
+
+  --color-brand: #3f6ad8;
+  --color-brand-soft: #eef2fb;
+
+  --color-positive: #2e7d4f;
+  --color-positive-soft: #e3efe7;
+
+  --color-negative: #d64545;
+  --color-negative-soft: #fff7f6;
+  --color-negative-border: #f4d9d5;
+  --color-negative-fill: #ffe4e1;
+
+  --color-warn: #c99a3c;
+  --color-warn-soft: #fdf9ef;
+  --color-warn-border: #f0e3c4;
+
+  --color-bg: #f7f8fa;
+  --color-card-border: #e8ebf0;
+  --color-border-strong: #dde1e8;
+  --color-divider: #f2f4f7;
+  --color-tab-track: #eef0f4;
+
+  --color-text-body: #39414d;
+  --color-text-muted: #5b6472;
+  --color-text-faint: #8a94a3;
+  --color-text-ghost: #b8bfc9;
+
+  --color-accent-blue: #9db8ec;
+  --color-accent-green: #8fdcae;
+  --color-accent-amber: #e8c987;
 }
 
-body {
+html, body {
   margin: 0;
+  background: var(--color-bg);
   font-family: var(--font-sans);
+  color: var(--color-text-body);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-variant-numeric: tabular-nums;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
 }
 
 @keyframes spin {
