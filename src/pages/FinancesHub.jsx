@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import Finances from './Finances'
 import Transactions from './Transactions'
+import Banque from './Banque'
 import Relances from './Relances'
 import TVA from './TVA'
 
 const TABS = [
   { key: 'echeancier', label: 'Échéancier' },
+  { key: 'banque', label: 'Banque' },
   { key: 'transactions', label: 'Transactions' },
   { key: 'relances', label: 'Relances' },
   { key: 'tva', label: 'Balance TVA' },
@@ -35,6 +37,9 @@ export default function FinancesHub({ navigate, navState, setNavState }) {
 
       <div style={{ display: tab === 'echeancier' ? 'block' : 'none' }}>
         <Finances navigate={navigate} />
+      </div>
+      <div style={{ display: tab === 'banque' ? 'block' : 'none' }}>
+        <Banque navigate={navigate} />
       </div>
       <div style={{ display: tab === 'transactions' ? 'block' : 'none' }}>
         <Transactions navigate={navigate} />

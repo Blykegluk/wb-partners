@@ -175,7 +175,8 @@ export default function Apercu({ navigate }) {
       return {
         bg: '#e3efe7', fg: POSITIVE,
         label: `${nom} · ${quand}`,
-        title: 'Compte bancaire connecté — cliquez pour gérer la connexion',
+        title: 'Compte bancaire connecté — cliquez pour voir les mouvements',
+        onClick: () => navigate('flux', { tab: 'banque' }),
       }
     }
     if (st === 'pending') {
@@ -183,12 +184,14 @@ export default function Apercu({ navigate }) {
         bg: '#fdf9ef', fg: AMBER,
         label: 'Connexion bancaire à finaliser',
         title: "L'autorisation bancaire n'a pas été menée à son terme — cliquez pour la reprendre",
+        onClick: () => navigate('parametres', { tab: 'banque' }),
       }
     }
     return {
       bg: '#f2f4f7', fg: FAINT,
       label: 'Banque non connectée',
       title: 'Aucun compte bancaire connecté — cliquez pour en connecter un',
+      onClick: () => navigate('parametres', { tab: 'banque' }),
     }
   })()
 
@@ -207,7 +210,7 @@ export default function Apercu({ navigate }) {
         </div>
         <div className="flex gap-2.5 items-center">
           <button
-            onClick={() => navigate('parametres', { tab: 'banque' })}
+            onClick={banque.onClick}
             className="flex items-center gap-1.5 text-[12px] font-semibold px-3 py-1.5 rounded-full border-0 cursor-pointer transition-opacity hover:opacity-80"
             style={{ background: banque.bg, color: banque.fg }}
             title={banque.title}
@@ -375,8 +378,14 @@ export default function Apercu({ navigate }) {
                 <div className="flex gap-2.5 items-start">
                   <Check size={15} style={{ color: POSITIVE, marginTop: 2 }} className="shrink-0" />
                   <p className="m-0 leading-[1.5]" style={{ color: '#39414d' }}>
-                    Compte <strong>{bankConnection.institution_name || 'bancaire'}</strong> connecté —
-                    les mouvements sont récupérés automatiquement.
+                    Compte <strong>{bankConnection.institution_name || 'bancaire'}</strong> connecté —{' '}
+                    <button
+                      onClick={() => navigate('flux', { tab: 'banque' })}
+                      className="p-0 border-none bg-transparent cursor-pointer font-semibold"
+                      style={{ color: BRAND }}
+                    >
+                      voir les mouvements
+                    </button>
                   </p>
                 </div>
               ) : (

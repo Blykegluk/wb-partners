@@ -29,6 +29,8 @@ export function SocieteProvider({ children }) {
   const [personnes, setPersonnes] = useState([])
   // Connexion bancaire de la société sélectionnée (null si aucune).
   const [bankConnection, setBankConnection] = useState(null)
+  const [bankAccounts, setBankAccounts] = useState([])
+  const [bankTransactions, setBankTransactions] = useState([])
   const [loadingData, setLoadingData] = useState(false)
   const hasLoadedData = useRef(false)
 
@@ -79,7 +81,7 @@ export function SocieteProvider({ children }) {
     if (!hasLoadedData.current) setLoadingData(true)
     const sid = selected.id
 
-    const [b, l, ba, d, m, rev, evt, ac, act, bact, pers, bank] = await Promise.all([
+    const [b, l, ba, d, m, rev, evt, ac, act, bact, pers, bank, bkAcc, bkTx] = await Promise.all([
       supabase.from('biens').select('*').eq('societe_id', sid).order('created_at'),
       supabase.from('locataires').select('*').eq('societe_id', sid).order('created_at'),
       supabase.from('baux').select('*').eq('societe_id', sid).order('created_at'),
@@ -93,6 +95,11 @@ export function SocieteProvider({ children }) {
       // Pas de filtre société : l'annuaire est partagé, la RLS se charge du périmètre.
       supabase.from('personnes').select('*').order('nom'),
       supabase.from('bank_connections').select('*').eq('societe_id', sid).maybeSingle(),
+      supabase.from('bank_accounts').select('*').eq('societe_id', sid).order('nom'),
+      // 500 derniers mouvements : suffisant pour l'écran Banque, borné pour
+      // ne pas alourdir le chargement de l'application.
+      supabase.from('bank_transactions').select('*').eq('societe_id', sid)
+        .eq('supprime', false).order('date', { ascending: false }).limit(500),
     ])
 
     setBiens(b.data || [])
@@ -107,6 +114,8 @@ export function SocieteProvider({ children }) {
     setBienActionnaires(bact.data || [])
     setPersonnes(pers.data || [])
     setBankConnection(bank.data || null)
+    setBankAccounts(bkAcc.data || [])
+    setBankTransactions(bkTx.data || [])
 
     // Transactions via baux ids
     const bauxIds = (ba.data || []).map(x => x.id)
@@ -135,7 +144,8 @@ export function SocieteProvider({ children }) {
     <SocieteContext.Provider value={{
       societes, loadingSocietes, loadSocietes,
       selected, selectSociete, role, canEdit, isAdmin,
-      biens, locataires, baux, transactions, documents, membres, revisions, evenements, appelsCharges, actionnaires, bienActionnaires, personnes, bankConnection,
+      biens, locataires, baux, transactions, documents, membres, revisions, evenements, appelsCharges, actionnaires, bienActionnaires, personnes,
+      bankConnection, bankAccounts, bankTransactions,
       loadingData, reload,
     }}>
       {children}
