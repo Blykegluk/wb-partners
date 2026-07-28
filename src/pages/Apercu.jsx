@@ -6,7 +6,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceD
 import { useAuth } from '../contexts/Auth'
 import { useSociete } from '../contexts/Societe'
 import { fmt, MONTHS_SHORT, getLoyerActuel } from '../lib/utils'
-import { cashflowMensuel } from '../lib/calculs'
+import { agregatsBiens, partSociete } from '../lib/calculs'
 
 const NAVY = '#16294a'
 const BRAND = '#3f6ad8'
@@ -58,16 +58,19 @@ function KpiCard({ label, value, hint, hintColor, tone, onClick }) {
 // ── Component ─────────────────────────────────────────────────
 export default function Apercu({ navigate }) {
   const { user } = useAuth()
-  const { biens, locataires, baux, transactions } = useSociete()
+  const { biens, locataires, baux, transactions, bienActionnaires } = useSociete()
 
   const bauxActifs = baux.filter(b => b.actif)
 
   // ── KPIs ────────────────────────────────────────────────────
-  const valeurPatrimoine = biens.reduce((s, b) => s + (b.prix_achat || b.valeur_actuelle || 0), 0)
-  const loyersMensuels = bauxActifs.reduce((s, b) => s + (getLoyerActuel(b) || b.loyer_ht || 0), 0)
-  const cashflowMensualise = bauxActifs.reduce((s, b) => {
-    const bien = biens.find(x => x.id === b.bien_id)
-    return s + (bien ? cashflowMensuel(bien, b) : 0)
+  // Pondérés par la quote-part réellement détenue par la société : un bien
+  // détenu à 50 % ne pèse que pour moitié dans le patrimoine et le cashflow.
+  const agg = agregatsBiens(biens, bienActionnaires)
+  const valeurPatrimoine = agg.valeurNette
+  const cashflowMensualise = agg.cashflowNet
+  const loyersMensuels = bauxActifs.reduce((s, b) => {
+    const part = partSociete(b.bien_id, bienActionnaires)
+    return s + (getLoyerActuel(b) || b.loyer_ht || 0) * part
   }, 0)
   const impayes = transactions.filter(t => t.statut === 'impayé')
   const totalImpayes = impayes.reduce((s, t) => s + (t.montant_loyer || 0) + (t.montant_charges || 0), 0)
@@ -121,17 +124,18 @@ export default function Apercu({ navigate }) {
       const entrees = transactions
         .filter(t => t.annee === currentYear && t.mois === m && t.statut === 'payé')
         .reduce((s, t) => s + (t.montant_loyer || 0) + (t.montant_charges || 0), 0)
-      // Sorties estimées : annuités + charges non refacturables mensualisées
-      const sorties = bauxActifs.reduce((s, b) => {
-        const bien = biens.find(x => x.id === b.bien_id)
-        return s + (bien?.annuites || 0) + (bien?.charges_non_refacturables || 0) / 12
+      // Sorties estimées : annuités + charges non refacturables mensualisées,
+      // ramenées à la quote-part détenue par la société.
+      const sorties = biens.reduce((s, bien) => {
+        const part = partSociete(bien.id, bienActionnaires)
+        return s + ((bien.annuites || 0) + (bien.charges_non_refacturables || 0) / 12) * part
       }, 0)
       return { mois: MONTHS_SHORT[m], solde: 0, entrees, sorties, net: entrees - sorties }
     })
     let cum = 0
     monthly.forEach(row => { cum += row.net; row.solde = Math.round(cum) })
     return monthly
-  }, [transactions, bauxActifs, biens, currentYear])
+  }, [transactions, biens, bienActionnaires, currentYear])
 
   // ── Traité cette nuit (simulé depuis données réelles) ──────
   const rapprochesJuillet = transactions.filter(t => t.mois === currentMonth && t.annee === currentYear && t.statut === 'payé').length

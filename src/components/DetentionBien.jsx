@@ -4,22 +4,22 @@ import { supabase } from '../lib/supabase'
 import { useSociete } from '../contexts/Societe'
 import { Card, Modal, Field, Sel, Btn } from './UI'
 
-// Valeur spéciale du menu déroulant pour saisir un détenteur libre.
-const AUTRE = '__autre__'
+// Valeur spéciale du menu déroulant : créer une nouvelle fiche à la volée.
+const NOUVEAU = '__nouveau__'
 
-const EMPTY = { source: '', nom_externe: '', pourcentage: '', notes: '' }
+const EMPTY = { personne_id: '', nom_nouveau: '', type_nouveau: 'physique', pourcentage: '', notes: '' }
 
 /**
  * Détention d'un bien.
  *
  * Par défaut un bien est réputé détenu à 100 % par la société courante.
- * Dès qu'une ligne est ajoutée, la répartition devient explicite : chaque
- * ligne pointe soit un actionnaire déjà enregistré sur la société, soit un
- * détenteur externe saisi librement. Le reliquat (100 % − somme des lignes)
- * est présenté comme restant détenu par la société.
+ * Dès qu'une ligne est ajoutée, la répartition devient explicite. Les
+ * détenteurs proviennent de l'annuaire partagé `personnes` : la même
+ * personne est réutilisable sur tous les biens et toutes les sociétés,
+ * sans doublon.
  */
 export default function DetentionBien({ bien }) {
-  const { selected, actionnaires, bienActionnaires, canEdit, reload } = useSociete()
+  const { selected, personnes, actionnaires, bienActionnaires, canEdit, reload } = useSociete()
 
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -31,18 +31,26 @@ export default function DetentionBien({ bien }) {
 
   const totalTiers = lignes.reduce((s, x) => s + Number(x.pourcentage || 0), 0)
   const totalRounded = Math.round(totalTiers * 100) / 100
-  const partSociete = Math.round((100 - totalTiers) * 100) / 100
+  const partSocietePct = Math.round((100 - totalTiers) * 100) / 100
   const isOver = totalTiers > 100.01
 
   const societeNom = selected?.nom_affiche || selected?.nom || 'La société'
 
+  const personneOf = (ligne) =>
+    personnes.find(p => p.id === ligne.personne_id) || null
+
   const labelOf = (ligne) => {
-    if (ligne.actionnaire_id) {
-      const a = actionnaires.find(x => x.id === ligne.actionnaire_id)
-      return a?.nom || 'Actionnaire supprimé'
-    }
-    return ligne.nom_externe
+    const p = personneOf(ligne)
+    if (p) return p.nom
+    // Lignes historiques créées avant l'annuaire partagé.
+    if (ligne.nom_externe) return ligne.nom_externe
+    const a = actionnaires.find(x => x.id === ligne.actionnaire_id)
+    return a?.nom || 'Détenteur supprimé'
   }
+
+  // Est-ce que cette personne est aussi actionnaire de la société courante ?
+  const estActionnaire = (personneId) =>
+    actionnaires.some(a => a.personne_id === personneId)
 
   const openAdd = () => {
     setEditing(null)
@@ -54,8 +62,9 @@ export default function DetentionBien({ bien }) {
   const openEdit = (ligne) => {
     setEditing(ligne)
     setF({
-      source: ligne.actionnaire_id || AUTRE,
-      nom_externe: ligne.nom_externe || '',
+      personne_id: ligne.personne_id || '',
+      nom_nouveau: '',
+      type_nouveau: 'physique',
       pourcentage: ligne.pourcentage ?? '',
       notes: ligne.notes || '',
     })
@@ -65,9 +74,9 @@ export default function DetentionBien({ bien }) {
 
   const save = async () => {
     setError('')
-    if (!f.source) { setError('Sélectionnez un détenteur.') ; return }
-    if (f.source === AUTRE && !f.nom_externe.trim()) {
-      setError('Précisez le nom du détenteur.')
+    if (!f.personne_id) { setError('Sélectionnez un détenteur.'); return }
+    if (f.personne_id === NOUVEAU && !f.nom_nouveau.trim()) {
+      setError('Indiquez le nom du nouveau détenteur.')
       return
     }
     const pct = Number(f.pourcentage)
@@ -77,19 +86,35 @@ export default function DetentionBien({ bien }) {
     }
 
     // Empêche de dépasser 100 % en cumulé (hors ligne en cours d'édition).
-    const autresLignes = lignes.filter(x => x.id !== editing?.id)
-    const cumul = autresLignes.reduce((s, x) => s + Number(x.pourcentage || 0), 0) + pct
+    const autres = lignes.filter(x => x.id !== editing?.id)
+    const cumul = autres.reduce((s, x) => s + Number(x.pourcentage || 0), 0) + pct
     if (cumul > 100.01) {
       setError(`Total supérieur à 100 % (${cumul.toFixed(2).replace('.', ',')} %). Réduisez cette part.`)
       return
     }
 
     setSaving(true)
+
+    // Création d'une fiche à la volée si besoin.
+    let personneId = f.personne_id
+    if (personneId === NOUVEAU) {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: np, error: pe } = await supabase.from('personnes').insert({
+        created_by: user.id,
+        nom: f.nom_nouveau.trim(),
+        type: f.type_nouveau,
+      }).select().single()
+      if (pe) { setError(pe.message); setSaving(false); return }
+      personneId = np.id
+    }
+
     const payload = {
       societe_id: selected.id,
       bien_id: bien.id,
-      actionnaire_id: f.source === AUTRE ? null : f.source,
-      nom_externe: f.source === AUTRE ? f.nom_externe.trim() : null,
+      personne_id: personneId,
+      // Les colonnes historiques restent nulles pour les nouvelles lignes.
+      actionnaire_id: null,
+      nom_externe: null,
       pourcentage: pct,
       notes: f.notes.trim() || null,
     }
@@ -111,17 +136,20 @@ export default function DetentionBien({ bien }) {
     reload()
   }
 
-  // Actionnaires déjà utilisés (hors ligne en édition) → non re-sélectionnables.
-  const dejaUtilises = lignes
-    .filter(x => x.id !== editing?.id && x.actionnaire_id)
-    .map(x => x.actionnaire_id)
+  // Personnes déjà détentrices de ce bien (hors ligne en édition).
+  const dejaUtilisees = lignes
+    .filter(x => x.id !== editing?.id && x.personne_id)
+    .map(x => x.personne_id)
 
-  const optionsSource = [
+  const optionsPersonnes = [
     { v: '', l: 'Sélectionner un détenteur' },
-    ...actionnaires
-      .filter(a => !dejaUtilises.includes(a.id))
-      .map(a => ({ v: a.id, l: `${a.nom} (${Number(a.pourcentage).toFixed(2).replace('.', ',')} % de la société)` })),
-    { v: AUTRE, l: 'Autre — préciser…' },
+    ...personnes
+      .filter(p => !dejaUtilisees.includes(p.id))
+      .map(p => ({
+        v: p.id,
+        l: estActionnaire(p.id) ? `${p.nom} — actionnaire ${societeNom}` : p.nom,
+      })),
+    { v: NOUVEAU, l: '➕ Nouveau détenteur…' },
   ]
 
   return (
@@ -155,8 +183,8 @@ export default function DetentionBien({ bien }) {
         <>
           {/* Barre de répartition */}
           <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden mb-3 flex">
-            {partSociete > 0 && (
-              <div className="h-full bg-navy" style={{ width: `${Math.max(0, partSociete)}%` }} />
+            {partSocietePct > 0 && (
+              <div className="h-full bg-navy" style={{ width: `${Math.max(0, partSocietePct)}%` }} />
             )}
             {lignes.map((l, i) => (
               <div
@@ -169,7 +197,7 @@ export default function DetentionBien({ bien }) {
 
           <div className="space-y-2">
             {/* Part société (reliquat) */}
-            {partSociete > 0.001 && (
+            {partSocietePct > 0.001 && (
               <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-3">
                 <div className="w-9 h-9 rounded-full bg-navy/5 flex items-center justify-center flex-shrink-0">
                   <Building2 size={15} className="text-navy" />
@@ -179,44 +207,50 @@ export default function DetentionBien({ bien }) {
                   <p className="text-xs text-gray-400">Part restante de la société</p>
                 </div>
                 <p className="text-lg font-bold text-navy flex-shrink-0">
-                  {partSociete.toFixed(2).replace('.', ',')} %
+                  {partSocietePct.toFixed(2).replace('.', ',')} %
                 </p>
               </div>
             )}
 
             {/* Co-détenteurs */}
-            {lignes.map(l => (
-              <div key={l.id} className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-3">
-                <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
-                  <Users size={15} className="text-blue-500" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-navy truncate">{labelOf(l)}</p>
-                    <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 flex-shrink-0">
-                      {l.actionnaire_id ? 'Actionnaire' : 'Externe'}
-                    </span>
+            {lignes.map(l => {
+              const p = personneOf(l)
+              return (
+                <div key={l.id} className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-3">
+                  <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
+                    <Users size={15} className="text-blue-500" />
                   </div>
-                  {l.notes && <p className="text-xs text-gray-400 italic mt-0.5 truncate">{l.notes}</p>}
-                </div>
-                <p className="text-lg font-bold text-navy flex-shrink-0">
-                  {Number(l.pourcentage).toFixed(2).replace('.', ',')} %
-                </p>
-                {canEdit && (
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <button
-                      onClick={() => openEdit(l)}
-                      className="text-xs font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 text-blue-500 cursor-pointer"
-                    >
-                      Modifier
-                    </button>
-                    <button onClick={() => del(l)} className="text-gray-300 hover:text-red-500 cursor-pointer">
-                      <Trash2 size={15} />
-                    </button>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-navy truncate">{labelOf(l)}</p>
+                      {l.personne_id && estActionnaire(l.personne_id) && (
+                        <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-blue-50 text-blue-500 flex-shrink-0">
+                          Actionnaire
+                        </span>
+                      )}
+                    </div>
+                    {p?.email && <p className="text-xs text-gray-400 truncate">{p.email}</p>}
+                    {l.notes && <p className="text-xs text-gray-400 italic mt-0.5 truncate">{l.notes}</p>}
                   </div>
-                )}
-              </div>
-            ))}
+                  <p className="text-lg font-bold text-navy flex-shrink-0">
+                    {Number(l.pourcentage).toFixed(2).replace('.', ',')} %
+                  </p>
+                  {canEdit && (
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => openEdit(l)}
+                        className="text-xs font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 text-blue-500 cursor-pointer"
+                      >
+                        Modifier
+                      </button>
+                      <button onClick={() => del(l)} className="text-gray-300 hover:text-red-500 cursor-pointer">
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
 
           {isOver && (
@@ -235,17 +269,32 @@ export default function DetentionBien({ bien }) {
         >
           <Sel
             label="Détenteur *"
-            value={f.source}
-            onChange={e => setF(p => ({ ...p, source: e.target.value }))}
-            options={optionsSource}
+            value={f.personne_id}
+            onChange={e => setF(p => ({ ...p, personne_id: e.target.value }))}
+            options={optionsPersonnes}
           />
-          {f.source === AUTRE && (
-            <Field
-              label="Nom du détenteur *"
-              value={f.nom_externe}
-              onChange={e => setF(p => ({ ...p, nom_externe: e.target.value }))}
-              placeholder="ex: SCI Martin ou Jean Dupont"
-            />
+          {f.personne_id === NOUVEAU && (
+            <>
+              <Field
+                label="Nom / Raison sociale *"
+                value={f.nom_nouveau}
+                onChange={e => setF(p => ({ ...p, nom_nouveau: e.target.value }))}
+                placeholder="ex: SCI Martin ou Jean Dupont"
+              />
+              <Sel
+                label="Type"
+                value={f.type_nouveau}
+                onChange={e => setF(p => ({ ...p, type_nouveau: e.target.value }))}
+                options={[
+                  { v: 'physique', l: 'Personne physique' },
+                  { v: 'morale', l: 'Personne morale' },
+                ]}
+              />
+              <p className="text-xs text-gray-400 mb-3">
+                La fiche est créée dans l'annuaire et sera réutilisable sur vos autres
+                biens et sociétés. Vous pourrez la compléter dans Réglages → Actionnariat.
+              </p>
+            </>
           )}
           <Field
             label="Part de détention du bien (%) *"

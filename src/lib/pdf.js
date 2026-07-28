@@ -1,5 +1,5 @@
 import { MONTHS, MONTHS_SHORT, getLoyerPourMois, fmt, fmtPct } from './utils'
-import { rendementBrut, rendementNet, cashflowMensuel } from './calculs'
+import { rendementBrut, rendementNet, cashflowMensuel, agregatsBiens, partSociete, quotePartPersonne } from './calculs'
 
 // Print the generated HTML by injecting it into an off-screen iframe and
 // calling print() on its contentWindow. Crucial implementation details:
@@ -329,31 +329,38 @@ export const pdfFichePatrimoniale = ({ userName, societes }) => {
   const now = new Date()
   const generatedAt = now.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
 
-  // Global totals across all sociétés
+  // Global totals across all sociétés — pondérés par la détention réelle.
   let totalBiens = 0
   let totalPatrimoine = 0
   let totalLoyer = 0
   let totalCashflow = 0
   let totalDette = 0
-  societes.forEach(({ biens }) => {
-    biens.forEach(b => {
-      totalBiens++
-      totalPatrimoine += b.prix_achat || 0
-      totalLoyer += (b.loyer_mensuel || 0) * 12
-      totalCashflow += cashflowMensuel(b)
-      totalDette += b.montant_emprunt || 0
-    })
+  let detentionPartielle = false
+  societes.forEach(({ biens, bienActionnaires }) => {
+    const agg = agregatsBiens(biens, bienActionnaires || [])
+    totalBiens += biens.length
+    totalPatrimoine += agg.valeurNette
+    totalLoyer += agg.loyerMensuelNet * 12
+    totalCashflow += agg.cashflowNet
+    totalDette += agg.detteNette
+    if (agg.partielle) detentionPartielle = true
   })
   const patrimoineNet = totalPatrimoine - totalDette
 
   // Per-société sections
-  const societesHtml = societes.map(({ societe: soc, biens, actionnaires, baux }) => {
-    const socPatrimoine = biens.reduce((s, b) => s + (b.prix_achat || 0), 0)
-    const socLoyer = biens.reduce((s, b) => s + (b.loyer_mensuel || 0), 0) * 12
-    const socDette = biens.reduce((s, b) => s + (b.montant_emprunt || 0), 0)
-    const socCashflow = biens.reduce((s, b) => s + cashflowMensuel(b), 0)
+  const societesHtml = societes.map(({ societe: soc, biens, actionnaires, baux, bienActionnaires, personnes }) => {
+    const bact = bienActionnaires || []
+    const pers = personnes || []
+    const agg = agregatsBiens(biens, bact)
+    const socPatrimoine = agg.valeurNette
+    const socDette = agg.detteNette
+    const socLoyer = agg.loyerMensuelNet * 12
+    const socCashflow = agg.cashflowNet
+    const socNet = socPatrimoine - socDette
     const bauxActifs = (baux || []).filter(b => b.actif)
     const tauxOcc = biens.length ? Math.round(bauxActifs.length / biens.length * 100) : 0
+
+    const nomPersonne = (id, fallback) => pers.find(p => p.id === id)?.nom || fallback || '—'
 
     const totalPct = (actionnaires || []).reduce((s, a) => s + Number(a.pourcentage || 0), 0)
     const actionnariatHtml = (actionnaires && actionnaires.length > 0) ? `
@@ -363,25 +370,66 @@ export const pdfFichePatrimoniale = ({ userName, societes }) => {
           <th>Actionnaire</th>
           <th>Type</th>
           <th style="text-align:right">Participation</th>
+          <th style="text-align:right">Via la société</th>
+          <th style="text-align:right">Détention directe</th>
           <th style="text-align:right">Quote-part nette</th>
         </tr></thead>
         <tbody>
           ${actionnaires.map(a => {
-            const quotePart = (socPatrimoine - socDette) * Number(a.pourcentage || 0) / 100
+            const p = pers.find(x => x.id === a.personne_id)
+            const qp = quotePartPersonne({
+              personneId: a.personne_id,
+              pctSociete: a.pourcentage,
+              biens,
+              bienActionnaires: bact,
+            })
+            const nom = p?.nom || a.nom
+            const siret = p?.siret || a.siret
+            const type = p?.type || a.type
+            const contact = [p?.email, p?.telephone].filter(Boolean).join(' · ')
             return `<tr>
-              <td><strong>${a.nom}</strong>${a.siret ? `<br><span style="font-size:10px;color:#94a3b8">SIRET ${a.siret}</span>` : ''}${a.notes ? `<br><span style="font-size:10px;color:#94a3b8;font-style:italic">${a.notes}</span>` : ''}</td>
-              <td><span style="font-size:10px;text-transform:uppercase;color:#64748b">${a.type === 'morale' ? 'P. morale' : 'P. physique'}</span></td>
+              <td><strong>${nom}</strong>${siret ? `<br><span style="font-size:10px;color:#94a3b8">SIRET ${siret}</span>` : ''}${contact ? `<br><span style="font-size:10px;color:#94a3b8">${contact}</span>` : ''}${a.notes ? `<br><span style="font-size:10px;color:#94a3b8;font-style:italic">${a.notes}</span>` : ''}</td>
+              <td><span style="font-size:10px;text-transform:uppercase;color:#64748b">${type === 'morale' ? 'P. morale' : 'P. physique'}</span></td>
               <td style="text-align:right;font-weight:700">${Number(a.pourcentage).toFixed(2)}%</td>
-              <td style="text-align:right;font-weight:600;color:#1a2d4e">${fmt(quotePart)}</td>
+              <td style="text-align:right;color:#64748b">${fmt(qp.valeurIndirecte)}</td>
+              <td style="text-align:right;color:#64748b">${qp.valeurDirecte > 0 ? fmt(qp.valeurDirecte) : '—'}</td>
+              <td style="text-align:right;font-weight:600;color:#1a2d4e">${fmt(qp.patrimoineNet)}</td>
             </tr>`
           }).join('')}
           <tr class="tot"><td colspan="2"><strong>Total</strong></td>
             <td style="text-align:right"><strong style="color:${Math.abs(totalPct - 100) < 0.01 ? '#22c55e' : '#ef4444'}">${totalPct.toFixed(2)}%</strong></td>
-            <td style="text-align:right"><strong>${fmt((socPatrimoine - socDette) * totalPct / 100)}</strong></td>
+            <td colspan="2"></td>
+            <td style="text-align:right"><strong>${fmt(socNet * totalPct / 100)}</strong></td>
           </tr>
         </tbody>
       </table>
     ` : '<p style="font-style:italic;color:#94a3b8;font-size:11px;margin-bottom:24px">Aucun actionnaire enregistré pour cette société.</p>'
+
+    // Co-détenteurs de biens hors actionnariat de la société.
+    const codetenteurs = bact.filter(x => !(actionnaires || []).some(a => a.personne_id === x.personne_id))
+    const codetenteursHtml = codetenteurs.length > 0 ? `
+      <h4 style="font-size:11px;font-weight:700;color:#1a2d4e;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Co-détenteurs de biens (hors actionnariat)</h4>
+      <table style="margin-bottom:24px">
+        <thead><tr>
+          <th>Détenteur</th>
+          <th>Bien</th>
+          <th style="text-align:right">Part du bien</th>
+          <th style="text-align:right">Valeur détenue</th>
+        </tr></thead>
+        <tbody>
+          ${codetenteurs.map(x => {
+            const b = biens.find(y => y.id === x.bien_id)
+            const part = Number(x.pourcentage || 0) / 100
+            return `<tr>
+              <td><strong>${nomPersonne(x.personne_id, x.nom_externe)}</strong>${x.notes ? `<br><span style="font-size:10px;color:#94a3b8;font-style:italic">${x.notes}</span>` : ''}</td>
+              <td>${b?.reference || b?.adresse?.slice(0, 30) || '—'}</td>
+              <td style="text-align:right;font-weight:700">${Number(x.pourcentage).toFixed(2)}%</td>
+              <td style="text-align:right">${fmt((b?.prix_achat || 0) * part)}</td>
+            </tr>`
+          }).join('')}
+        </tbody>
+      </table>
+    ` : ''
 
     const biensHtml = biens.length > 0 ? `
       <h4 style="font-size:11px;font-weight:700;color:#1a2d4e;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Biens détenus (${biens.length})</h4>
@@ -389,22 +437,28 @@ export const pdfFichePatrimoniale = ({ userName, societes }) => {
         <thead><tr>
           <th>Référence / Adresse</th>
           <th>Ville</th>
+          <th style="text-align:right">Détention</th>
           <th style="text-align:right">Acquisition</th>
           <th style="text-align:right">Emprunt</th>
           <th style="text-align:right">Loyer/mois</th>
           <th style="text-align:right">Cashflow</th>
         </tr></thead>
         <tbody>
-          ${biens.map(b => `<tr>
+          ${biens.map(b => {
+            const part = partSociete(b.id, bact)
+            const pct = part * 100
+            return `<tr>
             <td><strong>${b.reference || b.adresse?.slice(0, 30) || '—'}</strong>${b.reference ? `<br><span style="font-size:10px;color:#94a3b8">${b.adresse?.slice(0, 40) || ''}</span>` : ''}</td>
             <td>${b.ville || '—'}</td>
-            <td style="text-align:right">${b.prix_achat ? fmt(b.prix_achat) : '—'}</td>
-            <td style="text-align:right">${b.montant_emprunt ? fmt(b.montant_emprunt) : '—'}</td>
-            <td style="text-align:right">${b.loyer_mensuel ? fmt(b.loyer_mensuel) : '—'}</td>
-            <td style="text-align:right;${cashflowMensuel(b) >= 0 ? 'color:#22c55e' : 'color:#ef4444'}">${fmt(cashflowMensuel(b))}</td>
-          </tr>`).join('')}
+            <td style="text-align:right;${pct < 99.99 ? 'font-weight:700;color:#f59e0b' : 'color:#94a3b8'}">${pct.toFixed(2)}%</td>
+            <td style="text-align:right">${b.prix_achat ? fmt(b.prix_achat * part) : '—'}</td>
+            <td style="text-align:right">${b.montant_emprunt ? fmt(b.montant_emprunt * part) : '—'}</td>
+            <td style="text-align:right">${b.loyer_mensuel ? fmt(b.loyer_mensuel * part) : '—'}</td>
+            <td style="text-align:right;${cashflowMensuel(b) >= 0 ? 'color:#22c55e' : 'color:#ef4444'}">${fmt(cashflowMensuel(b) * part)}</td>
+          </tr>`
+          }).join('')}
           <tr class="tot">
-            <td colspan="2"><strong>Sous-total société</strong></td>
+            <td colspan="3"><strong>Sous-total société</strong></td>
             <td style="text-align:right"><strong>${fmt(socPatrimoine)}</strong></td>
             <td style="text-align:right"><strong>${fmt(socDette)}</strong></td>
             <td style="text-align:right"><strong>${fmt(socLoyer / 12)}</strong></td>
@@ -412,6 +466,7 @@ export const pdfFichePatrimoniale = ({ userName, societes }) => {
           </tr>
         </tbody>
       </table>
+      ${agg.partielle ? `<p style="font-size:10px;color:#94a3b8;font-style:italic;margin:-16px 0 24px">Les montants sont ramenés à la quote-part réellement détenue par la société. Valeur à 100 % des biens : ${fmt(agg.valeurBrute)}.</p>` : ''}
     ` : '<p style="font-style:italic;color:#94a3b8;font-size:11px;margin-bottom:24px">Aucun bien enregistré pour cette société.</p>'
 
     return `
@@ -432,6 +487,7 @@ export const pdfFichePatrimoniale = ({ userName, societes }) => {
           <div><div class="lbl">Taux d'occupation</div><div class="val">${tauxOcc}%</div></div>
         </div>
         ${actionnariatHtml}
+        ${codetenteursHtml}
         ${biensHtml}
       </div>
     `
@@ -474,10 +530,11 @@ export const pdfFichePatrimoniale = ({ userName, societes }) => {
       <div class="item"><div class="val" style="${totalCashflow >= 0 ? 'color:#22c55e' : 'color:#ef4444'}">${fmt(totalCashflow)}</div><div class="lbl">Cashflow mensuel</div></div>
       <div class="item"><div class="val">${totalBiens}</div><div class="lbl">Biens totaux</div></div>
     </div>
+    ${detentionPartielle ? `<p style="font-size:10px;color:#94a3b8;font-style:italic;margin:-24px 0 36px">Certains biens ne sont pas détenus à 100 % : tous les montants ci-dessus sont ramenés à la quote-part réellement détenue par chaque société.</p>` : ''}
 
     ${societesHtml}
 
     <div class="footer">Document généré par WB Partners — ${generatedAt}<br>
-    <span style="font-size:9px">Les montants reflètent les valeurs d'acquisition enregistrées. Les valeurs de marché actuelles peuvent différer.</span></div>
+    <span style="font-size:9px">Les montants reflètent les valeurs d'acquisition enregistrées, ramenées à la quote-part réellement détenue. Les valeurs de marché actuelles peuvent différer.</span></div>
   </body></html>`)
 }

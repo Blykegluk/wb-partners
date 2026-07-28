@@ -116,22 +116,56 @@ function SocieteTab() {
 }
 
 // ── Actionnariat tab ────────────────────────────────────
+//
+// L'actionnariat relie une PERSONNE (annuaire partagé entre toutes les
+// sociétés) à la société courante avec un pourcentage de capital. La fiche
+// d'une personne — coordonnées, identité — est éditable ici et sert aux
+// courriers et rapports.
+const PERSONNE_NOUVELLE = '__nouvelle__'
+
+const EMPTY_FICHE = {
+  nom: '', type: 'physique', siret: '', email: '', telephone: '',
+  adresse: '', code_postal: '', ville: '', pays: 'France',
+  date_naissance: '', lieu_naissance: '', nationalite: '', notes: '',
+}
+
 function ActionnariatTab() {
-  const { selected, actionnaires, isAdmin, reload } = useSociete()
+  const { selected, actionnaires, personnes, bienActionnaires, biens, isAdmin, reload } = useSociete()
+
+  // Modale « participation au capital »
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(null)
-  const [f, setF] = useState({ nom: '', type: 'physique', siret: '', pourcentage: '', notes: '' })
+  const [f, setF] = useState({ personne_id: '', nom_nouveau: '', type_nouveau: 'physique', pourcentage: '', notes: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  // Modale « fiche personne »
+  const [ficheOpen, setFicheOpen] = useState(false)
+  const [fichePersonne, setFichePersonne] = useState(null)
+  const [fiche, setFiche] = useState(EMPTY_FICHE)
+  const [ficheSaving, setFicheSaving] = useState(false)
+  const [ficheError, setFicheError] = useState('')
 
   const total = actionnaires.reduce((s, a) => s + Number(a.pourcentage || 0), 0)
   const totalRounded = Math.round(total * 100) / 100
   const isComplete = Math.abs(total - 100) < 0.01
   const isOver = total > 100.01
 
+  const personneOf = (a) => personnes.find(p => p.id === a.personne_id) || null
+  // Repli sur les colonnes historiques pour les lignes antérieures à l'annuaire.
+  const nomOf = (a) => personneOf(a)?.nom || a.nom || '—'
+  const typeOf = (a) => personneOf(a)?.type || a.type || 'physique'
+  const siretOf = (a) => personneOf(a)?.siret || a.siret || null
+
+  // Nombre de biens co-détenus en direct par cette personne (toutes sociétés
+  // chargées) — utile pour comprendre d'où vient sa quote-part.
+  const nbBiensDirects = (personneId) =>
+    bienActionnaires.filter(x => x.personne_id === personneId).length
+
+  // ── Participation au capital ──────────────────────────
   const openAdd = () => {
     setEditing(null)
-    setF({ nom: '', type: 'physique', siret: '', pourcentage: '', notes: '' })
+    setF({ personne_id: '', nom_nouveau: '', type_nouveau: 'physique', pourcentage: '', notes: '' })
     setError('')
     setOpen(true)
   }
@@ -139,9 +173,9 @@ function ActionnariatTab() {
   const openEdit = (a) => {
     setEditing(a)
     setF({
-      nom: a.nom || '',
-      type: a.type || 'physique',
-      siret: a.siret || '',
+      personne_id: a.personne_id || '',
+      nom_nouveau: '',
+      type_nouveau: 'physique',
       pourcentage: a.pourcentage ?? '',
       notes: a.notes || '',
     })
@@ -151,16 +185,36 @@ function ActionnariatTab() {
 
   const save = async () => {
     setError('')
-    if (!f.nom.trim()) { setError('Le nom est requis.'); return }
+    if (!f.personne_id) { setError('Sélectionnez une personne.'); return }
+    if (f.personne_id === PERSONNE_NOUVELLE && !f.nom_nouveau.trim()) {
+      setError('Indiquez le nom de la personne.')
+      return
+    }
     const pct = Number(f.pourcentage)
     if (isNaN(pct) || pct < 0 || pct > 100) { setError('Le pourcentage doit être entre 0 et 100.'); return }
 
     setSaving(true)
+
+    let personneId = f.personne_id
+    if (personneId === PERSONNE_NOUVELLE) {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: np, error: pe } = await supabase.from('personnes').insert({
+        created_by: user.id,
+        nom: f.nom_nouveau.trim(),
+        type: f.type_nouveau,
+      }).select().single()
+      if (pe) { setError(pe.message); setSaving(false); return }
+      personneId = np.id
+    }
+
+    const p = personnes.find(x => x.id === personneId)
     const payload = {
       societe_id: selected.id,
-      nom: f.nom.trim(),
-      type: f.type,
-      siret: f.siret.trim() || null,
+      personne_id: personneId,
+      // Colonnes historiques tenues à jour pour compatibilité descendante.
+      nom: p?.nom || f.nom_nouveau.trim(),
+      type: p?.type || f.type_nouveau,
+      siret: p?.siret || null,
       pourcentage: pct,
       notes: f.notes.trim() || null,
     }
@@ -176,10 +230,73 @@ function ActionnariatTab() {
   }
 
   const del = async (a) => {
-    if (!confirm(`Supprimer l'actionnaire « ${a.nom} » ?`)) return
+    if (!confirm(`Retirer « ${nomOf(a)} » de l'actionnariat de ${selected?.nom} ?\n\nSa fiche reste dans l'annuaire et ses éventuelles détentions de biens sont conservées.`)) return
     await supabase.from('actionnaires').delete().eq('id', a.id)
     reload()
   }
+
+  // ── Fiche personne ────────────────────────────────────
+  const openFiche = (p) => {
+    setFichePersonne(p)
+    setFiche({
+      nom: p.nom || '', type: p.type || 'physique', siret: p.siret || '',
+      email: p.email || '', telephone: p.telephone || '',
+      adresse: p.adresse || '', code_postal: p.code_postal || '',
+      ville: p.ville || '', pays: p.pays || 'France',
+      date_naissance: p.date_naissance || '', lieu_naissance: p.lieu_naissance || '',
+      nationalite: p.nationalite || '', notes: p.notes || '',
+    })
+    setFicheError('')
+    setFicheOpen(true)
+  }
+
+  const saveFiche = async () => {
+    setFicheError('')
+    if (!fiche.nom.trim()) { setFicheError('Le nom est requis.'); return }
+    setFicheSaving(true)
+    const payload = {
+      nom: fiche.nom.trim(),
+      type: fiche.type,
+      siret: fiche.siret.trim() || null,
+      email: fiche.email.trim() || null,
+      telephone: fiche.telephone.trim() || null,
+      adresse: fiche.adresse.trim() || null,
+      code_postal: fiche.code_postal.trim() || null,
+      ville: fiche.ville.trim() || null,
+      pays: fiche.pays.trim() || null,
+      date_naissance: fiche.date_naissance || null,
+      lieu_naissance: fiche.lieu_naissance.trim() || null,
+      nationalite: fiche.nationalite.trim() || null,
+      notes: fiche.notes.trim() || null,
+    }
+    const { error: e } = await supabase.from('personnes').update(payload).eq('id', fichePersonne.id)
+    if (!e) {
+      // Garde les colonnes historiques d'actionnaires alignées sur la fiche.
+      await supabase.from('actionnaires')
+        .update({ nom: payload.nom, type: payload.type, siret: payload.siret })
+        .eq('personne_id', fichePersonne.id)
+    }
+    setFicheSaving(false)
+    if (e) { setFicheError(e.message); return }
+    setFicheOpen(false)
+    reload()
+  }
+
+  // Personnes déjà actionnaires de CETTE société (hors ligne éditée).
+  const dejaActionnaires = actionnaires
+    .filter(a => a.id !== editing?.id && a.personne_id)
+    .map(a => a.personne_id)
+
+  const optionsPersonnes = [
+    { v: '', l: 'Sélectionner une personne' },
+    ...personnes
+      .filter(p => !dejaActionnaires.includes(p.id))
+      .map(p => ({ v: p.id, l: p.type === 'morale' ? `${p.nom} (personne morale)` : p.nom })),
+    { v: PERSONNE_NOUVELLE, l: '➕ Nouvelle personne…' },
+  ]
+
+  // Personnes de l'annuaire non actionnaires de la société courante.
+  const autresPersonnes = personnes.filter(p => !actionnaires.some(a => a.personne_id === p.id))
 
   return (
     <div>
@@ -231,60 +348,121 @@ function ActionnariatTab() {
         <Empty icon={<Users size={40} />} text="Aucun actionnaire enregistré." />
       ) : (
         <div className="space-y-2">
-          {actionnaires.map(a => (
-            <Card key={a.id} className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="w-10 h-10 rounded-full bg-navy/5 flex items-center justify-center flex-shrink-0">
-                    <Users size={16} className="text-navy" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-semibold text-navy text-sm truncate">{a.nom}</p>
-                      <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
-                        {a.type === 'morale' ? 'Personne morale' : 'Personne physique'}
-                      </span>
+          {actionnaires.map(a => {
+            const p = personneOf(a)
+            const nbDirects = a.personne_id ? nbBiensDirects(a.personne_id) : 0
+            return (
+              <Card key={a.id} className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="w-10 h-10 rounded-full bg-navy/5 flex items-center justify-center flex-shrink-0">
+                      <Users size={16} className="text-navy" />
                     </div>
-                    {a.siret && <p className="text-xs text-gray-400">SIRET : {a.siret}</p>}
-                    {a.notes && <p className="text-xs text-gray-400 italic mt-0.5">{a.notes}</p>}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-navy text-sm truncate">{nomOf(a)}</p>
+                        <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">
+                          {typeOf(a) === 'morale' ? 'Personne morale' : 'Personne physique'}
+                        </span>
+                        {nbDirects > 0 && (
+                          <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-blue-50 text-blue-500">
+                            {nbDirects} bien{nbDirects > 1 ? 's' : ''} en direct
+                          </span>
+                        )}
+                      </div>
+                      {siretOf(a) && <p className="text-xs text-gray-400">SIRET : {siretOf(a)}</p>}
+                      {p?.email && <p className="text-xs text-gray-400">{p.email}</p>}
+                      {a.notes && <p className="text-xs text-gray-400 italic mt-0.5">{a.notes}</p>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <p className="text-lg font-bold text-navy">{Number(a.pourcentage).toFixed(2).replace('.', ',')}%</p>
+                    {isAdmin && (
+                      <>
+                        {p && (
+                          <button onClick={() => openFiche(p)}
+                            className="text-xs font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 text-gray-500 cursor-pointer">
+                            Fiche
+                          </button>
+                        )}
+                        <button onClick={() => openEdit(a)}
+                          className="text-xs font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 text-blue-500 cursor-pointer">
+                          Part
+                        </button>
+                        <button onClick={() => del(a)} className="text-gray-300 hover:text-red-500 cursor-pointer">
+                          <Trash2 size={15} />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
-                  <p className="text-lg font-bold text-navy">{Number(a.pourcentage).toFixed(2).replace('.', ',')}%</p>
-                  {isAdmin && (
-                    <>
-                      <button onClick={() => openEdit(a)}
-                        className="text-xs font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 text-blue-500 cursor-pointer">
-                        Modifier
-                      </button>
-                      <button onClick={() => del(a)} className="text-gray-300 hover:text-red-500 cursor-pointer">
-                        <Trash2 size={15} />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            )
+          })}
         </div>
       )}
 
+      {/* Annuaire : personnes connues non actionnaires de cette société */}
+      {autresPersonnes.length > 0 && (
+        <div className="mt-6">
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">
+            Autres personnes de l'annuaire ({autresPersonnes.length})
+          </h3>
+          <p className="text-xs text-gray-400 mb-3">
+            Personnes utilisées sur vos autres sociétés ou comme co-détenteurs de biens.
+            Elles restent sélectionnables partout, sans être ressaisies.
+          </p>
+          <div className="space-y-2">
+            {autresPersonnes.map(p => (
+              <Card key={p.id} className="p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                      <Users size={14} className="text-gray-400" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-navy truncate">{p.nom}</p>
+                      <p className="text-xs text-gray-400 truncate">
+                        {[p.email, p.ville].filter(Boolean).join(' · ') || 'Fiche incomplète'}
+                      </p>
+                    </div>
+                  </div>
+                  {isAdmin && (
+                    <button onClick={() => openFiche(p)}
+                      className="text-xs font-semibold px-2 py-1 rounded-lg hover:bg-gray-100 text-gray-500 cursor-pointer flex-shrink-0">
+                      Fiche
+                    </button>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Modale participation */}
       {open && (
-        <Modal title={editing ? 'Modifier l\'actionnaire' : 'Ajouter un actionnaire'} onClose={() => setOpen(false)}>
-          <Field label="Nom / Raison sociale *" value={f.nom}
-            onChange={e => setF(p => ({ ...p, nom: e.target.value }))}
-            placeholder="ex: Anthony Bouskila ou SCI Hoche" />
-          <Sel label="Type *" value={f.type}
-            onChange={e => setF(p => ({ ...p, type: e.target.value }))}
-            options={[
-              { v: 'physique', l: 'Personne physique' },
-              { v: 'morale', l: 'Personne morale' },
-            ]} />
-          {f.type === 'morale' && (
-            <Field label="SIRET" value={f.siret}
-              onChange={e => setF(p => ({ ...p, siret: e.target.value }))} />
+        <Modal title={editing ? 'Modifier la participation' : 'Ajouter un actionnaire'} onClose={() => setOpen(false)}>
+          <Sel label="Personne *" value={f.personne_id}
+            onChange={e => setF(p => ({ ...p, personne_id: e.target.value }))}
+            options={optionsPersonnes} />
+          {f.personne_id === PERSONNE_NOUVELLE && (
+            <>
+              <Field label="Nom / Raison sociale *" value={f.nom_nouveau}
+                onChange={e => setF(p => ({ ...p, nom_nouveau: e.target.value }))}
+                placeholder="ex: Anthony Bouskila ou SCI Hoche" />
+              <Sel label="Type *" value={f.type_nouveau}
+                onChange={e => setF(p => ({ ...p, type_nouveau: e.target.value }))}
+                options={[
+                  { v: 'physique', l: 'Personne physique' },
+                  { v: 'morale', l: 'Personne morale' },
+                ]} />
+              <p className="text-xs text-gray-400 mb-3">
+                Vous pourrez compléter ses coordonnées ensuite via le bouton « Fiche ».
+              </p>
+            </>
           )}
-          <Field label="Participation (%) *" type="number" step="0.01" min="0" max="100"
+          <Field label="Participation au capital (%) *" type="number" step="0.01" min="0" max="100"
             value={f.pourcentage}
             onChange={e => setF(p => ({ ...p, pourcentage: e.target.value }))} />
           <Field label="Notes" value={f.notes}
@@ -294,6 +472,72 @@ function ActionnariatTab() {
           <div className="flex justify-end gap-3 mt-4">
             <Btn variant="ghost" onClick={() => setOpen(false)}>Annuler</Btn>
             <Btn onClick={save} disabled={saving}>{saving ? 'Enregistrement...' : 'Enregistrer'}</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {/* Modale fiche personne */}
+      {ficheOpen && (
+        <Modal title={`Fiche — ${fichePersonne?.nom || ''}`} onClose={() => setFicheOpen(false)} width="max-w-2xl">
+          <p className="text-xs text-gray-400 mb-4">
+            Ces informations sont partagées entre toutes vos sociétés et serviront à
+            l'envoi de courriers et de rapports.
+          </p>
+
+          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Identité</h4>
+          <Grid2>
+            <Field label="Nom / Raison sociale *" value={fiche.nom}
+              onChange={e => setFiche(p => ({ ...p, nom: e.target.value }))} />
+            <Sel label="Type" value={fiche.type}
+              onChange={e => setFiche(p => ({ ...p, type: e.target.value }))}
+              options={[
+                { v: 'physique', l: 'Personne physique' },
+                { v: 'morale', l: 'Personne morale' },
+              ]} />
+          </Grid2>
+          {fiche.type === 'morale' ? (
+            <Field label="SIRET" value={fiche.siret}
+              onChange={e => setFiche(p => ({ ...p, siret: e.target.value }))} />
+          ) : (
+            <Grid2>
+              <Field label="Date de naissance" type="date" value={fiche.date_naissance}
+                onChange={e => setFiche(p => ({ ...p, date_naissance: e.target.value }))} />
+              <Field label="Lieu de naissance" value={fiche.lieu_naissance}
+                onChange={e => setFiche(p => ({ ...p, lieu_naissance: e.target.value }))} />
+            </Grid2>
+          )}
+          {fiche.type === 'physique' && (
+            <Field label="Nationalité" value={fiche.nationalite}
+              onChange={e => setFiche(p => ({ ...p, nationalite: e.target.value }))} />
+          )}
+
+          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 mt-4">Contact</h4>
+          <Grid2>
+            <Field label="Email" type="email" value={fiche.email}
+              onChange={e => setFiche(p => ({ ...p, email: e.target.value }))}
+              placeholder="prenom.nom@exemple.fr" />
+            <Field label="Téléphone" value={fiche.telephone}
+              onChange={e => setFiche(p => ({ ...p, telephone: e.target.value }))} />
+          </Grid2>
+          <Field label="Adresse" value={fiche.adresse}
+            onChange={e => setFiche(p => ({ ...p, adresse: e.target.value }))} />
+          <Grid2>
+            <Field label="Code postal" value={fiche.code_postal}
+              onChange={e => setFiche(p => ({ ...p, code_postal: e.target.value }))} />
+            <Field label="Ville" value={fiche.ville}
+              onChange={e => setFiche(p => ({ ...p, ville: e.target.value }))} />
+          </Grid2>
+          <Field label="Pays" value={fiche.pays}
+            onChange={e => setFiche(p => ({ ...p, pays: e.target.value }))} />
+          <Field label="Notes" value={fiche.notes}
+            onChange={e => setFiche(p => ({ ...p, notes: e.target.value }))} />
+
+          {ficheError && <p className="text-red-500 text-sm mb-3">{ficheError}</p>}
+          <div className="flex justify-end gap-3 mt-4">
+            <Btn variant="ghost" onClick={() => setFicheOpen(false)}>Annuler</Btn>
+            <Btn onClick={saveFiche} disabled={ficheSaving}>
+              {ficheSaving ? 'Enregistrement...' : 'Enregistrer la fiche'}
+            </Btn>
           </div>
         </Modal>
       )}

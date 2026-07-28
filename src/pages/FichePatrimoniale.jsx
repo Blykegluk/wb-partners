@@ -21,19 +21,26 @@ export default function FichePatrimoniale() {
     setLoading(true)
 
     try {
-      // Fetch biens, actionnaires, baux for every accessible société in parallel.
+      // L'annuaire des personnes est global (une personne peut être actionnaire
+      // de plusieurs sociétés) : une seule requête pour tout le document.
+      const { data: personnes } = await supabase.from('personnes').select('*')
+
+      // Fetch biens, actionnaires, baux, détention for every accessible société.
       const data = await Promise.all(
         societes.map(async (soc) => {
-          const [biens, actionnaires, baux] = await Promise.all([
+          const [biens, actionnaires, baux, bienActionnaires] = await Promise.all([
             supabase.from('biens').select('*').eq('societe_id', soc.id).order('created_at'),
             supabase.from('actionnaires').select('*').eq('societe_id', soc.id).order('pourcentage', { ascending: false }),
             supabase.from('baux').select('*').eq('societe_id', soc.id),
+            supabase.from('bien_actionnaires').select('*').eq('societe_id', soc.id),
           ])
           return {
             societe: soc,
             biens: biens.data || [],
             actionnaires: actionnaires.data || [],
             baux: baux.data || [],
+            bienActionnaires: bienActionnaires.data || [],
+            personnes: personnes || [],
           }
         })
       )
