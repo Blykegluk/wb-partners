@@ -217,6 +217,16 @@ export const attenduMois = (bail, mois, annee) => {
   return getLoyerPourMois(bail, mois, annee) + Number(bail.charges || 0)
 }
 
+/**
+ * Coefficient de passage HT → TTC d'un bail.
+ *
+ * L'échéancier est tenu en HT, la banque encaisse du TTC. Toute comparaison
+ * entre les deux doit passer par là, faute de quoi un bail assujetti paraît
+ * surpayé de 20 %.
+ */
+export const coefTva = (bail) =>
+  bail?.tva_applicable === false ? 1 : 1 + Number(bail?.taux_tva ?? 20) / 100
+
 /** Baux générant effectivement des flux : actifs, sur un bien déjà acquis. */
 export const bauxProductifs = (baux = [], biens = []) =>
   baux.filter((b) => {
@@ -230,6 +240,14 @@ export const ecartsEncaissement = ({
 }) => {
   const actifs = bauxProductifs(baux, biens)
   const echeanceParId = new Map(transactions.map((t) => [t.id, t]))
+  const bailParId = new Map(baux.map((b) => [b.id, b]))
+
+  // Tout est ramené en TTC : c'est la seule unité dans laquelle l'échéancier
+  // et les relevés bancaires sont comparables.
+  const duTTC = (ech) => {
+    const ht = Number(ech.montant_loyer || 0) + Number(ech.montant_charges || 0)
+    return ht * coefTva(bailParId.get(ech.bail_id))
+  }
 
   const rapproches = bankTransactions.filter(
     (t) => t.transaction_id && t.statut_rapprochement?.startsWith('rapproche'),
@@ -237,14 +255,14 @@ export const ecartsEncaissement = ({
 
   const mois = Array.from({ length: 12 }, (_, m) => ({
     mois: m,
-    attendu: actifs.reduce((s, b) => s + attenduMois(b, m, annee), 0),
+    attendu: actifs.reduce((s, b) => s + attenduMois(b, m, annee) * coefTva(b), 0),
     declare: 0,
     encaisse: 0,
   }))
 
   for (const t of transactions) {
     if (t.annee !== annee || t.statut !== 'payé') continue
-    mois[t.mois].declare += Number(t.montant_loyer || 0) + Number(t.montant_charges || 0)
+    mois[t.mois].declare += duTTC(t)
   }
 
   for (const mvt of rapproches) {
@@ -264,21 +282,28 @@ export const ecartsEncaissement = ({
   // Encaissement supposé : l'échéance est soldée sans qu'aucun virement ne
   // l'atteste. Légitime pour un paiement en espèces ou une compensation, à
   // vérifier dans tous les autres cas.
-  const declareSansVirement = transactions.filter(
-    (t) => t.annee === annee && t.statut === 'payé' && !idsRapprochees.has(t.id),
-  )
+  const declareSansVirement = transactions
+    .filter((t) => t.annee === annee && t.statut === 'payé' && !idsRapprochees.has(t.id))
+    .map((t) => ({ ...t, duTTC: duTTC(t) }))
 
-  const impayees = transactions.filter((t) => t.annee === annee && t.statut === 'impayé')
+  const impayees = transactions
+    .filter((t) => t.annee === annee && t.statut === 'impayé')
+    .map((t) => ({ ...t, duTTC: duTTC(t) }))
 
   // Le moteur de rapprochement tolère un écart de montant : un virement
   // partiel ou un trop-perçu passe donc pour rapproché. Il faut le montrer.
   const ecartsMontant = rapproches.reduce((acc, mvt) => {
     const ech = echeanceParId.get(mvt.transaction_id)
     if (!ech || ech.annee !== annee) return acc
-    const du = Number(ech.montant_loyer || 0) + Number(ech.montant_charges || 0)
+    const du = duTTC(ech)
     const recu = Number(mvt.amount || 0)
-    if (Math.abs(recu - du) < 0.01) return acc
-    return [...acc, { mouvement: mvt, echeance: ech, du, recu, delta: recu - du }]
+    // Un centime d'arrondi n'est pas un écart.
+    if (Math.abs(recu - du) < 0.02) return acc
+    return [...acc, {
+      mouvement: mvt, echeance: ech, du, recu,
+      delta: recu - du,
+      motif: mvt.motif_ecart || null,
+    }]
   }, [])
 
   // Argent reçu que rien n'explique.

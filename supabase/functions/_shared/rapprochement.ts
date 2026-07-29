@@ -16,8 +16,11 @@ export interface Echeance {
   bail_id: string;
   mois: number;          // 0-11
   annee: number;
+  /** Montants tenus en HT, comme dans tout l'échéancier. */
   montant_loyer: number;
   montant_charges: number;
+  /** Taux de TVA du bail, en points (20 = 20 %). 0 si non assujetti. */
+  taux_tva?: number;
 }
 
 export interface Mouvement {
@@ -120,9 +123,18 @@ export function scorer(
   if (attendu <= 0 || montant <= 0) return { score: 0, raisons: [] };
 
   // 1. Montant — éliminatoire.
-  const ecartTotal = Math.abs(montant - attendu) / attendu;
-  const ecartLoyer = loyerSeul > 0 ? Math.abs(montant - loyerSeul) / loyerSeul : 1;
-  const ecart = Math.min(ecartTotal, ecartLoyer);
+  //
+  // L'échéancier est tenu en HT, la banque encaisse du TTC. Comparer les deux
+  // directement condamnait tout bail assujetti : 8 500 attendus contre 10 200
+  // reçus font 20 % d'écart, très au-delà de la tolérance la plus large.
+  //
+  // On retient l'écart le plus faible parmi les montants plausibles : total ou
+  // loyer seul — le locataire règle parfois les charges à part — et TTC ou HT,
+  // ce dernier couvrant le cas d'un locataire qui omet la taxe.
+  const coef = 1 + Number(ech.taux_tva || 0) / 100;
+  const references = [attendu * coef, loyerSeul * coef, attendu, loyerSeul]
+    .filter((r) => r > 0);
+  const ecart = Math.min(...references.map((r) => Math.abs(montant - r) / r));
 
   let scoreMontant: number;
   if (ecart < 0.0001) {

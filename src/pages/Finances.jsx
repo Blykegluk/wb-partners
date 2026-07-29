@@ -90,18 +90,23 @@ export default function Finances({ navigate }) {
       </div>
 
       {/* KPIs */}
-      <KpiRow cols={4} className="mb-8">
-        <Kpi label={`Attendu ${selectedYear}`} value={fmt(totalAttendu)} tone="brand" sub="Total loyers + charges" />
-        {/* Deux colonnes distinctes à dessein : une échéance peut être marquée
-            payée sans qu'aucun virement ne soit arrivé. */}
-        <Kpi label="Déclaré payé" value={fmt(totalEncaisse)} tone="navy"
+      {/* Tout cet écran est en HT. Le rapprochement avec la banque, qui encaisse
+          du TTC, se fait dans l'onglet Écarts : afficher les deux unités côte à
+          côte ici inviterait précisément à la comparaison fausse. */}
+      <KpiRow cols={3} className="mb-3">
+        <Kpi label={`Attendu ${selectedYear} HT`} value={fmt(totalAttendu)} tone="brand" sub="Total loyers + charges" />
+        <Kpi label="Déclaré payé HT" value={fmt(totalEncaisse)} tone="positive"
           sub={`${totalAttendu > 0 ? Math.round(totalEncaisse / totalAttendu * 100) : 0}% du total`} />
-        <Kpi label="Encaissé en banque" value={fmt(totalEncaisseBanque)} tone="positive"
-          sub="Virements effectivement rapprochés"
-          className="cursor-pointer hover:border-blue-200"
-          onClick={() => navigate?.('flux', { tab: 'ecarts' })} />
-        <Kpi label="Impayés" value={fmt(totalImpaye)} tone="negative" sub="À recouvrer" />
+        <Kpi label="Impayés HT" value={fmt(totalImpaye)} tone="negative" sub="À recouvrer" />
       </KpiRow>
+      <p className="text-xs text-gray-400 mb-8">
+        « Déclaré payé » compte les échéances cochées, y compris à la main.{' '}
+        <button onClick={() => navigate?.('flux', { tab: 'ecarts' })}
+          className="font-semibold text-blue-500 hover:underline cursor-pointer">
+          Voir ce qui est réellement entré en banque
+        </button>
+        {totalEncaisseBanque > 0 && ` — ${fmt(totalEncaisseBanque)} TTC rapprochés à ce jour.`}
+      </p>
 
       {/* Biens sous compromis : aucun flux tant que l'acte n'est pas signé */}
       {biensEnCours.length > 0 && (

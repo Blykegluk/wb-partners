@@ -7,6 +7,7 @@ import { useSociete } from '../contexts/Societe'
 import { useAuth } from '../contexts/Auth'
 import { fmt, fmtDate, MONTHS } from '../lib/utils'
 import { categoriesPour, libelleCategorie } from '../lib/categoriesBancaires'
+import { coefTva } from '../lib/calculs'
 import { PageHeader, Card, Btn, Empty, Modal, Kpi, KpiRow, Sel, Field } from '../components/UI'
 // Même module que l'Edge Function : l'empreinte apprise ici doit être
 // rigoureusement identique à celle que le moteur recherchera.
@@ -98,10 +99,14 @@ export default function Banque({ navigate }) {
 
   // Rapprochement manuel : lie le mouvement à l'échéance, solde celle-ci, et
   // mémorise l'émetteur pour que le prochain virement se rapproche seul.
-  const rapprocherManuel = async (mvt, echeanceId) => {
+  const rapprocherManuel = async (mvt, echeanceId, motifEcart = null) => {
     const { error: e1 } = await supabase.from('bank_transactions').update({
       statut_rapprochement: 'rapproche_manuel',
       transaction_id: echeanceId,
+      motif_ecart: motifEcart,
+      // Un mouvement d'abord classé par nature puis rapproché : la nature
+      // n'a plus lieu d'être, l'échéance la porte.
+      categorie: null,
       suggestions: null,
       rapproche_le: new Date().toISOString(),
       rapproche_par: user?.id || null,
@@ -151,6 +156,7 @@ export default function Banque({ navigate }) {
     await supabase.from('bank_transactions').update({
       statut_rapprochement: 'a_qualifier',
       transaction_id: null,
+      motif_ecart: null,
       score_confiance: null,
       rapproche_le: null,
       rapproche_par: null,
@@ -385,10 +391,16 @@ export default function Banque({ navigate }) {
                         </div>
                       ) : t.statut_rapprochement === 'qualifie' ? (
                         <div className="flex items-center gap-1.5">
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+                          {/* Cliquable : un mouvement classé par nature doit
+                              pouvoir être rattaché à une échéance après coup. */}
+                          <button
+                            onClick={() => canEdit && setQualifier(t)}
+                            disabled={!canEdit}
+                            title="Modifier — ou rattacher à une échéance"
+                            className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 cursor-pointer hover:bg-blue-100 disabled:cursor-default">
                             <Tag size={11} />
                             {libelleCategorie(t.categorie)}
-                          </span>
+                          </button>
                           {t.bien_id && (
                             <span className="text-xs text-gray-400 truncate max-w-[180px]">
                               {(() => {
@@ -469,7 +481,7 @@ export default function Banque({ navigate }) {
               <SuggestionsQualification
                 mouvement={qualifier}
                 libelleEcheance={libelleEcheance}
-                onChoisir={(echId) => rapprocherManuel(qualifier, echId)}
+                onChoisir={(echId, motif) => rapprocherManuel(qualifier, echId, motif)}
               />
               <div className="flex items-center gap-3 my-5">
                 <div className="h-px bg-gray-100 flex-1" />
@@ -537,17 +549,104 @@ function ClasserMouvement({ mouvement, onClasser }) {
   )
 }
 
-// ── Suggestions + recherche libre d'échéance ────────────────
+// Motifs d'écart entre le virement et l'échéance. Un écart expliqué cesse
+// d'être signalé comme anomalie dans l'écran Écarts.
+const MOTIFS_ECART = [
+  'Régularisation de charges',
+  'Rattrapage de charges',
+  'Indexation du loyer',
+  'Prorata temporis',
+  'Paiement partiel',
+  'Trop-perçu',
+  'Loyer et charges réglés ensemble',
+  'Autre',
+]
+
+// ── Suggestions + choix libre d'échéance ────────────────────
+//
+// Le choix porte sur TOUTES les échéances, y compris celles déjà soldées :
+// une échéance cochée payée à la main est précisément celle qu'un virement
+// vient confirmer. N'offrir que les échéances ouvertes rendait le
+// rapprochement impossible dès lors que le suivi avait été tenu à la main.
 function SuggestionsQualification({ mouvement, libelleEcheance, onChoisir }) {
-  const { baux, locataires, transactions } = useSociete()
+  const { baux, transactions } = useSociete()
   const [tout, setTout] = useState(false)
+  const [choix, setChoix] = useState(null)
+  const [motif, setMotif] = useState('')
+  const [precision, setPrecision] = useState('')
 
   const suggestions = Array.isArray(mouvement.suggestions) ? mouvement.suggestions : []
+  const recu = Number(mouvement.amount || 0)
 
-  // Échéances encore ouvertes, pour un rattachement manuel hors suggestions.
-  const ouvertes = transactions
-    .filter(t => t.statut === 'impayé' || t.statut === 'en_attente')
-    .sort((a, b) => (b.annee - a.annee) || (b.mois - a.mois))
+  // Montant dû en TTC : le virement est TTC, l'échéance est stockée en HT.
+  const duTTC = (ech) => {
+    const bail = baux.find(b => b.id === ech.bail_id)
+    return (Number(ech.montant_loyer || 0) + Number(ech.montant_charges || 0)) * coefTva(bail)
+  }
+
+  const echeances = [...transactions].sort(
+    (a, b) => (b.annee - a.annee) || (b.mois - a.mois),
+  )
+
+  const selectionner = (echId) => {
+    const ech = transactions.find(t => t.id === echId)
+    if (!ech) return
+    const delta = recu - duTTC(ech)
+    // Montant identique : rien à expliquer, on rapproche directement.
+    if (Math.abs(delta) < 0.02) { onChoisir(echId, null); return }
+    setChoix(ech)
+    setMotif('')
+    setPrecision('')
+  }
+
+  const confirmer = () => {
+    const texte = [motif, precision.trim()].filter(Boolean).join(' — ')
+    onChoisir(choix.id, texte || null)
+  }
+
+  // Confirmation d'un rapprochement dont le montant diffère.
+  if (choix) {
+    const du = duTTC(choix)
+    const delta = recu - du
+    return (
+      <div>
+        <button onClick={() => setChoix(null)}
+          className="text-xs font-semibold text-gray-400 hover:text-navy cursor-pointer mb-3">
+          ← Choisir une autre échéance
+        </button>
+
+        <p className="text-sm font-semibold text-navy mb-3">{libelleEcheance(choix.id)}</p>
+
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="bg-gray-50 rounded-lg px-3 py-2">
+            <p className="text-[11px] text-gray-400">Dû TTC</p>
+            <p className="text-sm font-bold text-navy">{fmt(du)}</p>
+          </div>
+          <div className="bg-gray-50 rounded-lg px-3 py-2">
+            <p className="text-[11px] text-gray-400">Reçu</p>
+            <p className="text-sm font-bold text-navy">{fmt(recu)}</p>
+          </div>
+          <div className={`rounded-lg px-3 py-2 ${delta < 0 ? 'bg-red-50' : 'bg-emerald-50'}`}>
+            <p className="text-[11px] text-gray-400">Écart</p>
+            <p className={`text-sm font-bold ${delta < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+              {delta > 0 ? '+' : ''}{fmt(delta)}
+            </p>
+          </div>
+        </div>
+
+        <Sel label="Motif de l'écart" value={motif} onChange={e => setMotif(e.target.value)}
+          options={[{ v: '', l: 'Choisir...' }, ...MOTIFS_ECART.map(m => ({ v: m, l: m }))]} />
+        <Field label="Précision (facultatif)" value={precision}
+          onChange={e => setPrecision(e.target.value)}
+          placeholder="Régularisation 2025 sur les charges de copropriété" />
+
+        <Btn onClick={confirmer} disabled={!motif} className="justify-center w-full">
+          <Link2 size={15} />
+          Rapprocher malgré l'écart
+        </Btn>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -559,7 +658,7 @@ function SuggestionsQualification({ mouvement, libelleEcheance, onChoisir }) {
           <div className="space-y-2 mb-4">
             {suggestions.map(s => (
               <button key={s.transaction_id}
-                onClick={() => onChoisir(s.transaction_id)}
+                onClick={() => selectionner(s.transaction_id)}
                 className="w-full flex items-center justify-between gap-3 border border-gray-200 rounded-lg px-4 py-3 hover:border-blue-300 hover:bg-blue-50/40 cursor-pointer text-left transition-colors">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-navy truncate">
@@ -581,30 +680,41 @@ function SuggestionsQualification({ mouvement, libelleEcheance, onChoisir }) {
 
       {suggestions.length === 0 && (
         <p className="text-sm text-gray-400 mb-4">
-          Aucune piste automatique pour ce mouvement. Choisissez une échéance ci-dessous
-          si ce virement en solde une.
+          Aucune piste automatique. Choisissez l'échéance que ce virement règle —
+          l'écart de montant, s'il y en a un, se justifie à l'étape suivante.
         </p>
       )}
 
       <button onClick={() => setTout(t => !t)}
         className="text-xs font-semibold text-blue-500 hover:underline cursor-pointer mb-2">
-        {tout ? 'Masquer' : 'Choisir'} une autre échéance ({ouvertes.length} ouverte{ouvertes.length > 1 ? 's' : ''})
+        {tout ? 'Masquer' : 'Choisir'} une échéance ({echeances.length})
       </button>
 
       {tout && (
         <div className="space-y-1.5 max-h-64 overflow-y-auto mt-2">
-          {ouvertes.length === 0 ? (
-            <p className="text-xs text-gray-400 italic">Aucune échéance ouverte.</p>
-          ) : ouvertes.map(ech => (
-            <button key={ech.id}
-              onClick={() => onChoisir(ech.id)}
-              className="w-full flex items-center justify-between gap-3 rounded-lg px-3 py-2 bg-gray-50 hover:bg-gray-100 cursor-pointer text-left">
-              <span className="text-sm text-navy truncate">{libelleEcheance(ech.id)}</span>
-              <span className="text-xs font-semibold text-gray-500 whitespace-nowrap">
-                {fmt(Number(ech.montant_loyer || 0) + Number(ech.montant_charges || 0))}
-              </span>
-            </button>
-          ))}
+          {echeances.length === 0 ? (
+            <p className="text-xs text-gray-400 italic">
+              Aucune échéance enregistrée. Créez-les depuis l'échéancier.
+            </p>
+          ) : echeances.map(ech => {
+            const du = duTTC(ech)
+            const proche = Math.abs(recu - du) / (du || 1) <= 0.05
+            return (
+              <button key={ech.id}
+                onClick={() => selectionner(ech.id)}
+                className="w-full flex items-center justify-between gap-3 rounded-lg px-3 py-2 bg-gray-50 hover:bg-gray-100 cursor-pointer text-left">
+                <span className="text-sm text-navy truncate">
+                  {libelleEcheance(ech.id)}
+                  {ech.statut === 'payé' && (
+                    <span className="ml-2 text-[10px] font-bold uppercase text-gray-300">déjà soldée</span>
+                  )}
+                </span>
+                <span className={`text-xs font-semibold whitespace-nowrap ${proche ? 'text-emerald-600' : 'text-gray-500'}`}>
+                  {fmt(du)} TTC
+                </span>
+              </button>
+            )
+          })}
         </div>
       )}
     </>

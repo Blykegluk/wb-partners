@@ -10,6 +10,7 @@ const EMPTY = {
   loyer_ht: '', loyer_an1: '', loyer_an2: '', charges: '', depot: '',
   type_bail: 'commercial', utilisation: '', indice_revision: 'ILC',
   date_revision_anniversaire: '', actif: true,
+  tva_applicable: true, taux_tva: 20,
 }
 
 export default function Baux({ navigate, navState, setNavState }) {
@@ -35,10 +36,13 @@ export default function Baux({ navigate, navState, setNavState }) {
 
   const save = async () => {
     const data = { ...f }
-    for (const k of ['loyer_ht','loyer_an1','loyer_an2','charges','depot']) {
+    for (const k of ['loyer_ht','loyer_an1','loyer_an2','charges','depot','taux_tva']) {
       data[k] = data[k] === '' || data[k] === null ? null : Number(data[k])
     }
     data.actif = Boolean(data.actif)
+    data.tva_applicable = Boolean(data.tva_applicable)
+    // Colonne NOT NULL : un taux vidé vaut zéro, pas null.
+    if (data.taux_tva === null) data.taux_tva = 0
     delete data.id; delete data.created_at
 
     if (edit) {
@@ -152,6 +156,18 @@ export default function Baux({ navigate, navState, setNavState }) {
             <Sel label="Type de bail" value={f.type_bail} onChange={e => u('type_bail', e.target.value)}
               options={[{v:'commercial',l:'Commercial'},{v:'professionnel',l:'Professionnel'},{v:'habitation',l:'Habitation'}]} />
           </Grid3>
+          {/* Les montants ci-dessus sont en HT ; le locataire règle du TTC.
+              Sans ce taux, aucun virement ne peut être rapproché de son
+              échéance. */}
+          <Grid2>
+            <Sel label="TVA sur les loyers" value={f.tva_applicable ? '1' : '0'}
+              onChange={e => u('tva_applicable', e.target.value === '1')}
+              options={[{ v: '1', l: 'Assujetti' }, { v: '0', l: 'Non assujetti' }]} />
+            {f.tva_applicable && (
+              <Field label="Taux de TVA (%)" type="number" value={f.taux_tva}
+                onChange={e => num('taux_tva', e.target.value)} />
+            )}
+          </Grid2>
 
           <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3 mt-4">Dates & révision</h4>
           <Grid3>

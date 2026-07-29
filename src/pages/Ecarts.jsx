@@ -45,7 +45,9 @@ export default function Ecarts({ navigate }) {
         <div>
           <h1 className="text-2xl font-extrabold text-navy mb-0.5">Écarts</h1>
           <p className="text-gray-400 text-sm">
-            Ce qui est dû, comparé à ce qui est réellement entré en banque
+            Ce qui est dû, comparé à ce qui est réellement entré en banque —
+            <strong className="text-gray-500"> montants TTC</strong>, l'échéancier
+            étant tenu en HT
           </p>
         </div>
         <div className="flex gap-2">
@@ -76,14 +78,14 @@ export default function Ecarts({ navigate }) {
       )}
 
       <KpiRow cols={4} className="mb-8">
-        <Kpi label={`Attendu ${annee}`} value={fmt(e.total.attendu)} tone="brand"
+        <Kpi label={`Attendu ${annee} TTC`} value={fmt(e.total.attendu)} tone="brand"
           sub="Loyers et charges des baux en cours" />
         <Kpi label="Encaissé en banque" value={fmt(e.total.encaisse)} tone="positive"
           sub={`${tauxCouverture} % de l'attendu`} />
         <Kpi label="Écart" value={fmt(e.ecart)} tone={e.ecart < -0.01 ? 'negative' : 'positive'}
           sub={e.ecart < -0.01 ? 'Manque à encaisser' : 'Encaissé au moins autant que prévu'} />
         <Kpi label="Déclaré sans virement" value={fmt(
-          e.declareSansVirement.reduce((s, t) => s + Number(t.montant_loyer || 0) + Number(t.montant_charges || 0), 0)
+          e.declareSansVirement.reduce((s, t) => s + t.duTTC, 0)
         )} tone="warn" sub={`${e.declareSansVirement.length} échéance${e.declareSansVirement.length > 1 ? 's' : ''}`} />
       </KpiRow>
 
@@ -151,7 +153,7 @@ export default function Ecarts({ navigate }) {
           lignes={e.impayees.map(t => ({
             id: t.id,
             gauche: libelleEcheance(t),
-            droite: fmt(Number(t.montant_loyer || 0) + Number(t.montant_charges || 0)),
+            droite: fmt(t.duTTC),
             ton: 'text-red-500',
           }))}
           action={() => navigate?.('flux', { tab: 'transactions' })}
@@ -166,7 +168,7 @@ export default function Ecarts({ navigate }) {
           lignes={e.declareSansVirement.map(t => ({
             id: t.id,
             gauche: libelleEcheance(t),
-            droite: fmt(Number(t.montant_loyer || 0) + Number(t.montant_charges || 0)),
+            droite: fmt(t.duTTC),
             ton: 'text-amber-600',
           }))}
         />
@@ -174,13 +176,13 @@ export default function Ecarts({ navigate }) {
         <Bloc
           titre="Virements d'un montant différent de l'échéance"
           icone={<Scale size={15} className="text-blue-500" />}
-          note="Le rapprochement tolère un écart de montant : un paiement partiel ou un trop-perçu passe donc pour rapproché."
+          note="Le rapprochement tolère un écart de montant : un paiement partiel, une régularisation de charges ou une indexation passe donc pour rapproché. Le motif s'indique au moment du rapprochement."
           vide="Aucun écart de montant."
           lignes={e.ecartsMontant.map(x => ({
             id: x.mouvement.id,
-            gauche: `${libelleEcheance(x.echeance)} — dû ${fmt(x.du)}, reçu ${fmt(x.recu)}`,
+            gauche: `${libelleEcheance(x.echeance)} — dû ${fmt(x.du)}, reçu ${fmt(x.recu)}${x.motif ? ` · ${x.motif}` : ''}`,
             droite: `${x.delta > 0 ? '+' : ''}${fmt(x.delta)}`,
-            ton: x.delta < 0 ? 'text-red-500' : 'text-emerald-600',
+            ton: x.motif ? 'text-gray-400' : x.delta < 0 ? 'text-red-500' : 'text-emerald-600',
           }))}
         />
 

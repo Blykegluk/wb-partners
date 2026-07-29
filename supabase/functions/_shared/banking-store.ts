@@ -253,14 +253,28 @@ export async function rapprocherSociete(
   societeId: string,
 ): Promise<{ rapproches: number; suggeres: number }> {
   const { data: baux } = await supabase.from("baux")
-    .select("id, locataire_id").eq("societe_id", societeId).eq("actif", true);
+    .select("id, locataire_id, tva_applicable, taux_tva")
+    .eq("societe_id", societeId).eq("actif", true);
 
   if (!baux || baux.length === 0) return { rapproches: 0, suggeres: 0 };
 
-  const { data: echeances } = await supabase.from("transactions")
+  const { data: echRows } = await supabase.from("transactions")
     .select("id, bail_id, mois, annee, montant_loyer, montant_charges")
     .in("bail_id", baux.map((b) => b.id))
     .in("statut", ["impayé", "en_attente"]);
+
+  // Le taux du bail voyage avec l'échéance : le moteur compare des montants
+  // bancaires, donc TTC, à un échéancier tenu en HT.
+  const tauxParBail = new Map(
+    baux.map((b) => [
+      b.id as string,
+      b.tva_applicable === false ? 0 : Number(b.taux_tva ?? 20),
+    ]),
+  );
+  const echeances = (echRows ?? []).map((e) => ({
+    ...e,
+    taux_tva: tauxParBail.get(e.bail_id as string) ?? 0,
+  }));
 
   const { data: locataires } = await supabase.from("locataires")
     .select("id, raison_sociale, nom, prenom").eq("societe_id", societeId);
@@ -310,7 +324,7 @@ export async function rapprocherSociete(
   );
 
   const { affectations, suggestions } = rapprocher(
-    (echeances ?? []) as Echeance[],
+    echeances as Echeance[],
     mouvements,
     contextes,
     appris,
