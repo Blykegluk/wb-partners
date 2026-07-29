@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/Auth'
 import { useSociete } from '../contexts/Societe'
@@ -756,15 +756,48 @@ function MembresTab() {
 // banking-connect ouvre un consentement et renvoie l'URL de la banque, sur
 // laquelle on redirige. Au retour, banking-callback persiste session et
 // comptes puis renvoie vers /app/banques?connected=1.
-const ASPSPS = [
-  { name: 'Societe Generale Professionnels', country: 'FR', label: 'Société Générale — Professionnels' },
-  { name: 'Societe Generale Entreprises', country: 'FR', label: 'Société Générale — Entreprises' },
-  { name: 'Caisse d Epargne', country: 'FR', label: 'Caisse d’Épargne' },
-]
+//
+// La liste des banques vient de l'API : Enable Banking exige le nom exact,
+// accents compris, et il y a plus de cent établissements en France — dont une
+// quinzaine de Caisses d'Épargne régionales. Une liste écrite à la main serait
+// fausse ou incomplète.
+function ChoixBanque({ banques, valeur, onChange, chargement, erreur }) {
+  const [filtre, setFiltre] = useState('')
+
+  const visibles = useMemo(() => {
+    const f = filtre.trim().toLowerCase()
+    return f ? banques.filter(b => b.name.toLowerCase().includes(f)) : banques
+  }, [banques, filtre])
+
+  // Après filtrage la banque retenue peut avoir disparu de la liste : le select
+  // afficherait alors le premier libellé tout en gardant l'ancienne valeur.
+  useEffect(() => {
+    if (visibles.length && !visibles.some(b => b.name === valeur)) onChange(visibles[0].name)
+  }, [visibles, valeur, onChange])
+
+  if (chargement) return <p className="text-xs text-gray-400 mb-3">Chargement de la liste des banques...</p>
+  if (erreur) return <p className="text-xs text-red-500 mb-3">{erreur}</p>
+
+  return (
+    <>
+      <Field label="Rechercher" value={filtre} onChange={e => setFiltre(e.target.value)}
+        placeholder="Générale, Épargne Ile De France..." />
+      {visibles.length === 0 ? (
+        <p className="text-xs text-gray-400 mb-3">Aucune banque ne correspond à cette recherche.</p>
+      ) : (
+        <Sel label="Banque" value={valeur} onChange={e => onChange(e.target.value)}
+          options={visibles.map(b => ({ v: b.name, l: b.name }))} />
+      )}
+    </>
+  )
+}
 
 function BanqueTab() {
   const { selected, isAdmin, bankAccounts, bankConnection, reload } = useSociete()
-  const [aspsp, setAspsp] = useState(ASPSPS[0].name)
+  const [banques, setBanques] = useState([])
+  const [chargementBanques, setChargementBanques] = useState(true)
+  const [erreurBanques, setErreurBanques] = useState('')
+  const [aspsp, setAspsp] = useState('')
   const [connecting, setConnecting] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState(null)
@@ -787,19 +820,37 @@ function BanqueTab() {
     return session?.access_token
   }
 
+  // La liste est servie par banking-connect, qui la tient de l'API.
+  useEffect(() => {
+    let annule = false
+    ;(async () => {
+      try {
+        const res = await fetch(`${FUNCTIONS_URL_TOP}/banking-connect`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await token()}` },
+          body: JSON.stringify({ action: 'aspsps' }),
+        })
+        const data = await res.json()
+        if (annule) return
+        if (!res.ok) throw new Error(data.error || 'Liste des banques indisponible')
+        setBanques(data.aspsps || [])
+      } catch (e) {
+        if (!annule) setErreurBanques(e.message)
+      } finally {
+        if (!annule) setChargementBanques(false)
+      }
+    })()
+    return () => { annule = true }
+  }, [])
+
   const connecter = async () => {
     setError('')
     setConnecting(true)
     try {
-      const choix = ASPSPS.find(a => a.name === aspsp)
       const res = await fetch(`${FUNCTIONS_URL_TOP}/banking-connect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await token()}` },
-        body: JSON.stringify({
-          aspsp_name: choix.name,
-          aspsp_country: choix.country,
-          societe_id: selected.id,
-        }),
+        body: JSON.stringify({ aspsp_name: aspsp, societe_id: selected.id }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Connexion impossible')
@@ -900,9 +951,9 @@ function BanqueTab() {
               <p className="text-xs text-gray-400 mb-2">
                 Pour ajouter une autre banque, relancez une connexion.
               </p>
-              <Sel label="Banque" value={aspsp} onChange={e => setAspsp(e.target.value)}
-                options={ASPSPS.map(a => ({ v: a.name, l: a.label }))} />
-              <Btn variant="ghost" onClick={connecter} disabled={connecting}>
+              <ChoixBanque banques={banques} valeur={aspsp} onChange={setAspsp}
+                chargement={chargementBanques} erreur={erreurBanques} />
+              <Btn variant="ghost" onClick={connecter} disabled={connecting || !aspsp}>
                 {connecting ? 'Redirection...' : 'Connecter une autre banque'}
               </Btn>
             </div>
@@ -917,11 +968,11 @@ function BanqueTab() {
             automatiquement les loyers attendus des virements réellement reçus.
           </p>
           <div className="max-w-sm mx-auto text-left">
-            <Sel label="Banque" value={aspsp} onChange={e => setAspsp(e.target.value)}
-              options={ASPSPS.map(a => ({ v: a.name, l: a.label }))} />
+            <ChoixBanque banques={banques} valeur={aspsp} onChange={setAspsp}
+              chargement={chargementBanques} erreur={erreurBanques} />
           </div>
           {isAdmin ? (
-            <Btn onClick={connecter} disabled={connecting} className="justify-center">
+            <Btn onClick={connecter} disabled={connecting || !aspsp} className="justify-center">
               <Landmark size={15} />
               {connecting ? 'Redirection...' : 'Connecter ce compte'}
             </Btn>

@@ -47,11 +47,19 @@ et renseignez cette URL publique dans le Control Panel Enable Banking.
 ## Tester
 
 ```bash
-# Ouvrir un consentement (renvoie l'URL de la banque)
+# Lister les banques disponibles en France
 curl -X POST http://localhost:54321/functions/v1/banking-connect \
   -H "Authorization: Bearer <jeton utilisateur>" \
   -H "Content-Type: application/json" \
-  -d '{"aspsp_name":"Societe Generale Professionnels","aspsp_country":"FR","societe_id":"<uuid>"}'
+  -d '{"action":"aspsps"}'
+
+# Ouvrir un consentement (renvoie l'URL de la banque)
+# Le nom doit être repris tel que l'API le donne, accents compris : sinon
+# /auth répond 422 WRONG_ASPSP_PROVIDED.
+curl -X POST http://localhost:54321/functions/v1/banking-connect \
+  -H "Authorization: Bearer <jeton utilisateur>" \
+  -H "Content-Type: application/json" \
+  -d '{"aspsp_name":"Société Générale Professionnels","societe_id":"<uuid>"}'
 
 # Synchroniser une société
 curl -X POST http://localhost:54321/functions/v1/banking-sync \

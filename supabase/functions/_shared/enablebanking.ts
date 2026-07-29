@@ -40,6 +40,13 @@ export interface EbSessionResponse {
   [k: string]: unknown;
 }
 
+export interface EbAspsp {
+  name: string;
+  country: string;
+  psu_types?: Array<"business" | "personal">;
+  [k: string]: unknown;
+}
+
 export interface EbAuthResponse {
   url: string;
   authorization_id?: string;
@@ -188,6 +195,22 @@ export async function ebJson<T>(path: string, init: RequestInit = {}): Promise<T
 }
 
 // ── Opérations métier ───────────────────────────────────────
+
+/**
+ * Banques disponibles dans un pays.
+ *
+ * Les noms doivent être repris au caractère près, accents compris, sinon /auth
+ * répond 422 WRONG_ASPSP_PROVIDED. C'est la raison pour laquelle la liste est
+ * lue ici plutôt que recopiée dans l'interface : une liste écrite à la main se
+ * désynchronise, et la Caisse d'Épargne n'existe d'ailleurs pas comme entité
+ * unique — elle est déclinée en une quinzaine de caisses régionales.
+ */
+export async function getAspsps(country = "FR"): Promise<EbAspsp[]> {
+  const data = await ebJson<{ aspsps?: EbAspsp[] }>(
+    `/aspsps?country=${encodeURIComponent(country)}`,
+  );
+  return data.aspsps ?? [];
+}
 
 /**
  * Démarre un consentement. Renvoie l'URL vers laquelle rediriger l'utilisateur.
