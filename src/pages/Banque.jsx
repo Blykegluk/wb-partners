@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react'
 import {
-  Landmark, RefreshCw, Check, AlertTriangle, EyeOff, Link2, Undo2, Search,
+  Landmark, RefreshCw, Check, AlertTriangle, EyeOff, Link2, Undo2, Search, Tag,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useSociete } from '../contexts/Societe'
 import { useAuth } from '../contexts/Auth'
 import { fmt, fmtDate, MONTHS } from '../lib/utils'
-import { PageHeader, Card, Btn, Empty, Modal, Kpi, KpiRow } from '../components/UI'
+import { categoriesPour, libelleCategorie } from '../lib/categoriesBancaires'
+import { PageHeader, Card, Btn, Empty, Modal, Kpi, KpiRow, Sel, Field } from '../components/UI'
 // Même module que l'Edge Function : l'empreinte apprise ici doit être
 // rigoureusement identique à celle que le moteur recherchera.
 import { empreinte } from '../../supabase/functions/_shared/rapprochement.ts'
@@ -16,6 +17,7 @@ const FUNCTIONS_URL = import.meta.env.VITE_SUPABASE_URL + '/functions/v1'
 const FILTRES = [
   { k: 'a_qualifier', l: 'À qualifier' },
   { k: 'rapproches', l: 'Rapprochés' },
+  { k: 'classes', l: 'Classés' },
   { k: 'ignores', l: 'Ignorés' },
   { k: 'tous', l: 'Tous' },
 ]
@@ -64,6 +66,7 @@ export default function Banque({ navigate }) {
     let l = bankTransactions
     if (filtre === 'a_qualifier') l = l.filter(t => t.statut_rapprochement === 'a_qualifier' && Number(t.amount) > 0)
     else if (filtre === 'rapproches') l = l.filter(t => t.statut_rapprochement?.startsWith('rapproche'))
+    else if (filtre === 'classes') l = l.filter(t => t.statut_rapprochement === 'qualifie')
     else if (filtre === 'ignores') l = l.filter(t => t.statut_rapprochement === 'ignore')
     if (recherche.trim()) {
       const q = recherche.trim().toLowerCase()
@@ -155,6 +158,25 @@ export default function Banque({ navigate }) {
     reload()
   }
 
+  // Classement : le mouvement est qualifié par sa nature, sans échéance en
+  // face. C'est le cas de tout ce qui n'est pas un loyer — indemnité, apport,
+  // travaux — et que l'on ne veut surtout pas ranger dans « ignoré ».
+  const classer = async (mvt, { categorie, bien_id, note }) => {
+    const { error } = await supabase.from('bank_transactions').update({
+      statut_rapprochement: 'qualifie',
+      categorie,
+      bien_id: bien_id || null,
+      note: note?.trim() || null,
+      transaction_id: null,
+      suggestions: null,
+      rapproche_le: new Date().toISOString(),
+      rapproche_par: user?.id || null,
+    }).eq('id', mvt.id)
+    if (error) { setErreur(error.message); return }
+    setQualifier(null)
+    reload()
+  }
+
   const ignorer = async (mvt) => {
     await supabase.from('bank_transactions')
       .update({ statut_rapprochement: 'ignore', suggestions: null })
@@ -164,7 +186,7 @@ export default function Banque({ navigate }) {
 
   const restaurer = async (mvt) => {
     await supabase.from('bank_transactions')
-      .update({ statut_rapprochement: 'a_qualifier' })
+      .update({ statut_rapprochement: 'a_qualifier', categorie: null, bien_id: null, note: null })
       .eq('id', mvt.id)
     reload()
   }
@@ -361,20 +383,37 @@ export default function Banque({ navigate }) {
                             </span>
                           )}
                         </div>
+                      ) : t.statut_rapprochement === 'qualifie' ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+                            <Tag size={11} />
+                            {libelleCategorie(t.categorie)}
+                          </span>
+                          {t.bien_id && (
+                            <span className="text-xs text-gray-400 truncate max-w-[180px]">
+                              {(() => {
+                                const b = biens.find(x => x.id === t.bien_id)
+                                return b?.reference || b?.ville || ''
+                              })()}
+                            </span>
+                          )}
+                        </div>
                       ) : t.statut_rapprochement === 'ignore' ? (
                         <span className="text-xs text-gray-400">Ignoré</span>
-                      ) : credit ? (
+                      ) : (
                         <button
                           onClick={() => canEdit && setQualifier(t)}
                           disabled={!canEdit}
-                          className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full bg-amber-50 text-amber-700 cursor-pointer hover:bg-amber-100 disabled:cursor-default"
+                          className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full cursor-pointer disabled:cursor-default ${
+                            credit
+                              ? 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+                              : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                          }`}
                         >
                           <AlertTriangle size={11} />
-                          À qualifier
-                          {suggestions.length > 0 && ` · ${suggestions.length} piste${suggestions.length > 1 ? 's' : ''}`}
+                          {credit ? 'À qualifier' : 'À classer'}
+                          {credit && suggestions.length > 0 && ` · ${suggestions.length} piste${suggestions.length > 1 ? 's' : ''}`}
                         </button>
-                      ) : (
-                        <span className="text-xs text-gray-300">Débit</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
@@ -385,17 +424,17 @@ export default function Banque({ navigate }) {
                             className="text-gray-300 hover:text-red-500 cursor-pointer">
                             <Undo2 size={15} />
                           </button>
-                        ) : t.statut_rapprochement === 'ignore' ? (
+                        ) : (t.statut_rapprochement === 'ignore' || t.statut_rapprochement === 'qualifie') ? (
                           <button onClick={() => restaurer(t)}
                             className="text-xs font-semibold text-blue-500 hover:underline cursor-pointer">
                             Restaurer
                           </button>
-                        ) : credit ? (
+                        ) : (
                           <button onClick={() => ignorer(t)} title="Ignorer ce mouvement"
                             className="text-gray-300 hover:text-navy cursor-pointer">
                             <EyeOff size={15} />
                           </button>
-                        ) : null
+                        )
                       )}
                     </td>
                   </tr>
@@ -425,13 +464,75 @@ export default function Banque({ navigate }) {
             </div>
           </div>
 
-          <SuggestionsQualification
+          {Number(qualifier.amount) > 0 && (
+            <>
+              <SuggestionsQualification
+                mouvement={qualifier}
+                libelleEcheance={libelleEcheance}
+                onChoisir={(echId) => rapprocherManuel(qualifier, echId)}
+              />
+              <div className="flex items-center gap-3 my-5">
+                <div className="h-px bg-gray-100 flex-1" />
+                <span className="text-xs text-gray-300 uppercase tracking-wide">ou</span>
+                <div className="h-px bg-gray-100 flex-1" />
+              </div>
+            </>
+          )}
+
+          <ClasserMouvement
             mouvement={qualifier}
-            libelleEcheance={libelleEcheance}
-            onChoisir={(echId) => rapprocherManuel(qualifier, echId)}
+            onClasser={(valeurs) => classer(qualifier, valeurs)}
           />
         </Modal>
       )}
+    </div>
+  )
+}
+
+// ── Classement par nature ───────────────────────────────────
+// Pour tout ce qui ne solde pas une échéance de loyer : indemnité de
+// résiliation, dépôt de garantie, apport en compte courant, travaux, taxe
+// foncière. Le rattachement à un bien est facultatif — une écriture de
+// société, frais bancaires ou apport, n'en concerne aucun.
+function ClasserMouvement({ mouvement, onClasser }) {
+  const { biens } = useSociete()
+  const options = categoriesPour(mouvement.amount)
+  const [categorie, setCategorie] = useState(mouvement.categorie || '')
+  const [bienId, setBienId] = useState(mouvement.bien_id || '')
+  const [note, setNote] = useState(mouvement.note || '')
+  const [envoi, setEnvoi] = useState(false)
+
+  const valider = async () => {
+    setEnvoi(true)
+    await onClasser({ categorie, bien_id: bienId, note })
+    setEnvoi(false)
+  }
+
+  return (
+    <div>
+      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">
+        Classer par nature
+      </h4>
+      <p className="text-sm text-gray-400 mb-3">
+        Le mouvement est enregistré avec sa nature, sans échéance en face.
+      </p>
+
+      <Sel label="Nature" value={categorie} onChange={e => setCategorie(e.target.value)}
+        options={[{ v: '', l: 'Choisir...' }, ...options]} />
+
+      <Sel label="Bien concerné (facultatif)" value={bienId} onChange={e => setBienId(e.target.value)}
+        options={[
+          { v: '', l: 'Aucun — écriture de société' },
+          ...biens.map(b => ({ v: b.id, l: b.reference || `${b.adresse || ''} ${b.ville || ''}`.trim() || 'Bien' })),
+        ]} />
+
+      <Field label="Précision (facultatif)" value={note} onChange={e => setNote(e.target.value)}
+        placeholder="Solde négocié au départ du locataire..." />
+
+      <Btn onClick={valider} disabled={!categorie || envoi} className="justify-center w-full">
+        <Tag size={15} />
+        {envoi ? 'Enregistrement...' : 'Classer ce mouvement'}
+      </Btn>
     </div>
   )
 }
