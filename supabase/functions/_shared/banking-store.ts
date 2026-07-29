@@ -35,6 +35,53 @@ export function adminClient(): SupabaseClient {
 
 // ── Persistance du consentement ─────────────────────────────
 
+/** Compare des IBAN sans se soucier des espaces ni de la casse. */
+function clefIban(iban: string | null | undefined): string {
+  return (iban ?? "").replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+}
+
+/**
+ * Détermine la société de rattachement de chaque compte.
+ *
+ * Une connexion ne rapporte pas les comptes d'une société mais tous ceux
+ * auxquels l'identifiant utilisé donne accès — un accès professionnel expose
+ * couramment les comptes de plusieurs sociétés du groupe. La société choisie à
+ * l'écran n'est donc qu'un défaut, appliqué à ce qu'on ne sait pas rattacher
+ * autrement.
+ *
+ * Deux signaux le précèdent : une affectation déjà enregistrée, qui a pu être
+ * corrigée à la main et ne doit pas être écrasée au renouvellement du
+ * consentement ; et l'IBAN déjà renseigné sur une société, saisi délibérément
+ * et plus fiable que l'écran depuis lequel on a cliqué.
+ */
+async function resoudreSocietes(
+  supabase: SupabaseClient,
+  comptes: EbAccount[],
+  defaut: string | null,
+): Promise<Map<string, string | null>> {
+  const { data: societes } = await supabase
+    .from("societe").select("id, iban").not("iban", "is", null);
+  const parIban = new Map<string, string>();
+  for (const s of societes ?? []) {
+    const clef = clefIban(s.iban as string);
+    if (clef) parIban.set(clef, s.id as string);
+  }
+
+  const { data: existants } = await supabase
+    .from("bank_accounts").select("account_uid, societe_id")
+    .in("account_uid", comptes.map((c) => c.uid));
+  const dejaAffectes = new Map(
+    (existants ?? [])
+      .filter((c) => c.societe_id)
+      .map((c) => [c.account_uid as string, c.societe_id as string]),
+  );
+
+  return new Map(comptes.map((c) => [
+    c.uid,
+    dejaAffectes.get(c.uid) ?? parIban.get(clefIban(ibanDeCompte(c))) ?? defaut,
+  ]));
+}
+
 /**
  * Enregistre la session et TOUS les comptes retournés par POST /sessions.
  *
@@ -58,10 +105,12 @@ export async function persisterSession(
   if (eSession) throw new Error(`Enregistrement de la session : ${eSession.message}`);
 
   const comptes: EbAccount[] = session.accounts ?? [];
+  const rattachements = await resoudreSocietes(supabase, comptes, societeId);
+
   for (const compte of comptes) {
     const { error } = await supabase.from("bank_accounts").upsert({
       session_id: session.session_id,
-      societe_id: societeId,
+      societe_id: rattachements.get(compte.uid) ?? societeId,
       account_uid: compte.uid,
       iban: ibanDeCompte(compte),
       name: compte.name ?? null,

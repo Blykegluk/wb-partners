@@ -792,8 +792,62 @@ function ChoixBanque({ banques, valeur, onChange, chargement, erreur }) {
   )
 }
 
+//
+// Une connexion rapporte tous les comptes accessibles avec l'identifiant
+// utilisé, souvent répartis sur plusieurs sociétés du groupe : le rattachement
+// deviné à la connexion doit rester corrigeable.
+function LigneCompte({ compte, societes, modifiable, onDeplace }) {
+  const [enCours, setEnCours] = useState(false)
+
+  const deplacer = async (societeId) => {
+    if (societeId === compte.societe_id) return
+    setEnCours(true)
+    try {
+      const { error } = await supabase.rpc('affecter_compte_bancaire', {
+        p_account_uid: compte.account_uid,
+        p_societe_id: societeId,
+      })
+      if (error) throw new Error(error.message)
+      await onDeplace()
+    } catch (e) {
+      onDeplace(e.message)
+    }
+    setEnCours(false)
+  }
+
+  return (
+    <div className="bg-gray-50 rounded-lg px-4 py-2.5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-navy truncate">{compte.name || 'Compte'}</p>
+          <p className="text-xs text-gray-400 font-mono">{compte.iban || '—'}</p>
+        </div>
+        <p className="text-sm font-semibold text-navy whitespace-nowrap">
+          {compte.solde != null ? `${Number(compte.solde).toFixed(2)} ${compte.currency || 'EUR'}` : '—'}
+        </p>
+      </div>
+      {modifiable && societes.length > 1 && (
+        <div className="mt-2 pt-2 border-t border-gray-200/70 flex items-center gap-2">
+          <span className="text-xs text-gray-400 shrink-0">Rattaché à</span>
+          <select
+            value={compte.societe_id || ''}
+            disabled={enCours}
+            onChange={e => deplacer(e.target.value)}
+            className="text-xs text-gray-700 bg-white border border-gray-200 rounded px-2 py-1 cursor-pointer"
+          >
+            {societes.map(s => (
+              <option key={s.id} value={s.id}>{s.nom_affiche || s.nom}</option>
+            ))}
+          </select>
+          {enCours && <span className="text-xs text-gray-400">Déplacement...</span>}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function BanqueTab() {
-  const { selected, isAdmin, bankAccounts, bankConnection, reload } = useSociete()
+  const { selected, isAdmin, bankAccounts, bankConnection, reload, societes } = useSociete()
   const [banques, setBanques] = useState([])
   const [chargementBanques, setChargementBanques] = useState(true)
   const [erreurBanques, setErreurBanques] = useState('')
@@ -801,6 +855,7 @@ function BanqueTab() {
   const [connecting, setConnecting] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState(null)
+  const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
   // Retour de banking-callback : ?connected=1 ou ?error=...
@@ -861,6 +916,15 @@ function BanqueTab() {
       setError(e.message)
       setConnecting(false)
     }
+  }
+
+  // Le compte quitte la société affichée : il disparaît de la liste, ce qu'il
+  // faut annoncer pour que ça ne passe pas pour une perte de données.
+  const apresDeplacement = async (messageErreur) => {
+    if (messageErreur) { setError(messageErreur); return }
+    setError('')
+    setMessage('Compte déplacé. Il apparaît désormais sous la société de destination.')
+    await reload()
   }
 
   const synchroniser = async () => {
@@ -928,17 +992,12 @@ function BanqueTab() {
 
           <div className="space-y-2">
             {bankAccounts.map(c => (
-              <div key={c.id} className="flex items-center justify-between gap-3 bg-gray-50 rounded-lg px-4 py-2.5">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-navy truncate">{c.name || 'Compte'}</p>
-                  <p className="text-xs text-gray-400 font-mono">{c.iban || '—'}</p>
-                </div>
-                <p className="text-sm font-semibold text-navy whitespace-nowrap">
-                  {c.solde != null ? `${Number(c.solde).toFixed(2)} ${c.currency || 'EUR'}` : '—'}
-                </p>
-              </div>
+              <LigneCompte key={c.id} compte={c} societes={societes}
+                modifiable={isAdmin} onDeplace={apresDeplacement} />
             ))}
           </div>
+
+          {message && <p className="text-sm text-emerald-700 mt-4">{message}</p>}
 
           {syncResult && (
             <p className="text-sm text-emerald-700 mt-4">
