@@ -40,6 +40,11 @@ jobs:
           cp public-site/index.html _site/index.html
           cp public-site/index.html _site/404.html
           cp public-site/logo.png _site/logo.png 2>/dev/null || true
+          # Pages légales : servies en /privacy et /terms grâce au index.html
+          # de chaque dossier. Enable Banking contrôle ces liens lors de la
+          # validation d'une application en production.
+          cp -r public-site/privacy _site/privacy
+          cp -r public-site/terms _site/terms
           echo "wbpartners.fr" > _site/CNAME
           cp -r dist/app/* _site/app/
           cp _site/app/index.html _site/app/404.html
