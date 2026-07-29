@@ -2,11 +2,15 @@ import { useState, useEffect } from 'react'
 import Finances from './Finances'
 import Transactions from './Transactions'
 import Banque from './Banque'
+import Ecarts from './Ecarts'
 import Relances from './Relances'
 import TVA from './TVA'
 
+// « Écarts » se place entre l'échéancier et la banque parce qu'il les
+// confronte : l'un dit ce qui est dû, l'autre ce qui est entré.
 const TABS = [
   { key: 'echeancier', label: 'Échéancier' },
+  { key: 'ecarts', label: 'Écarts' },
   { key: 'banque', label: 'Banque' },
   { key: 'transactions', label: 'Transactions' },
   { key: 'relances', label: 'Relances' },
@@ -37,6 +41,9 @@ export default function FinancesHub({ navigate, navState, setNavState }) {
 
       <div style={{ display: tab === 'echeancier' ? 'block' : 'none' }}>
         <Finances navigate={navigate} />
+      </div>
+      <div style={{ display: tab === 'ecarts' ? 'block' : 'none' }}>
+        <Ecarts navigate={navigate} />
       </div>
       <div style={{ display: tab === 'banque' ? 'block' : 'none' }}>
         <Banque navigate={navigate} />

@@ -1,3 +1,5 @@
+import { getLoyerPourMois } from './utils'
+
 /**
  * Rendement brut = (loyer mensuel × 12) / prix d'achat
  */
@@ -186,4 +188,113 @@ export const quotePartPersonne = ({
 
   r.patrimoineNet = r.valeur - r.dette
   return r
+}
+
+// ── Écart entre l'échéancier et les encaissements ────────────
+//
+// L'application confondait trois notions :
+//
+//   attendu   ce que les baux prévoient pour la période
+//   déclaré   les échéances marquées payées, à la main ou non
+//   encaissé  les virements effectivement reçus et rattachés
+//
+// Une échéance marquée payée à la main n'est pas un encaissement : c'est une
+// intention. L'écart se mesure donc entre l'attendu et l'encaissé, le déclaré
+// servant à expliquer la différence.
+
+/**
+ * Montant dû par un bail pour un mois donné, nul hors période de bail.
+ * Les bornes reprennent exactement celles de la grille de l'échéancier : les
+ * deux écrans doivent afficher le même dû, sans quoi l'écart serait faux.
+ */
+export const attenduMois = (bail, mois, annee) => {
+  const premierDuMois = new Date(annee, mois, 1)
+  if (bail.date_debut) {
+    const d = new Date(bail.date_debut)
+    if (premierDuMois < new Date(d.getFullYear(), d.getMonth(), 1)) return 0
+  }
+  if (bail.date_fin && premierDuMois > new Date(bail.date_fin)) return 0
+  return getLoyerPourMois(bail, mois, annee) + Number(bail.charges || 0)
+}
+
+/** Baux générant effectivement des flux : actifs, sur un bien déjà acquis. */
+export const bauxProductifs = (baux = [], biens = []) =>
+  baux.filter((b) => {
+    if (!b.actif) return false
+    const bien = biens.find((x) => x.id === b.bien_id)
+    return !bien || estAcquis(bien)
+  })
+
+export const ecartsEncaissement = ({
+  baux = [], biens = [], transactions = [], bankTransactions = [], annee,
+}) => {
+  const actifs = bauxProductifs(baux, biens)
+  const echeanceParId = new Map(transactions.map((t) => [t.id, t]))
+
+  const rapproches = bankTransactions.filter(
+    (t) => t.transaction_id && t.statut_rapprochement?.startsWith('rapproche'),
+  )
+
+  const mois = Array.from({ length: 12 }, (_, m) => ({
+    mois: m,
+    attendu: actifs.reduce((s, b) => s + attenduMois(b, m, annee), 0),
+    declare: 0,
+    encaisse: 0,
+  }))
+
+  for (const t of transactions) {
+    if (t.annee !== annee || t.statut !== 'payé') continue
+    mois[t.mois].declare += Number(t.montant_loyer || 0) + Number(t.montant_charges || 0)
+  }
+
+  for (const mvt of rapproches) {
+    const ech = echeanceParId.get(mvt.transaction_id)
+    if (!ech || ech.annee !== annee) continue
+    mois[ech.mois].encaisse += Number(mvt.amount || 0)
+  }
+
+  const total = mois.reduce((a, m) => ({
+    attendu: a.attendu + m.attendu,
+    declare: a.declare + m.declare,
+    encaisse: a.encaisse + m.encaisse,
+  }), { attendu: 0, declare: 0, encaisse: 0 })
+
+  const idsRapprochees = new Set(rapproches.map((m) => m.transaction_id))
+
+  // Encaissement supposé : l'échéance est soldée sans qu'aucun virement ne
+  // l'atteste. Légitime pour un paiement en espèces ou une compensation, à
+  // vérifier dans tous les autres cas.
+  const declareSansVirement = transactions.filter(
+    (t) => t.annee === annee && t.statut === 'payé' && !idsRapprochees.has(t.id),
+  )
+
+  const impayees = transactions.filter((t) => t.annee === annee && t.statut === 'impayé')
+
+  // Le moteur de rapprochement tolère un écart de montant : un virement
+  // partiel ou un trop-perçu passe donc pour rapproché. Il faut le montrer.
+  const ecartsMontant = rapproches.reduce((acc, mvt) => {
+    const ech = echeanceParId.get(mvt.transaction_id)
+    if (!ech || ech.annee !== annee) return acc
+    const du = Number(ech.montant_loyer || 0) + Number(ech.montant_charges || 0)
+    const recu = Number(mvt.amount || 0)
+    if (Math.abs(recu - du) < 0.01) return acc
+    return [...acc, { mouvement: mvt, echeance: ech, du, recu, delta: recu - du }]
+  }, [])
+
+  // Argent reçu que rien n'explique.
+  const creditsNonRattaches = bankTransactions.filter(
+    (t) => Number(t.amount) > 0
+      && t.statut_rapprochement === 'a_qualifier'
+      && t.booking_date && new Date(t.booking_date).getFullYear() === annee,
+  )
+
+  return {
+    mois,
+    total,
+    ecart: total.encaisse - total.attendu,
+    declareSansVirement,
+    impayees,
+    ecartsMontant,
+    creditsNonRattaches,
+  }
 }

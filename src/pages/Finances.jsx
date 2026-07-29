@@ -3,12 +3,12 @@ import { Calendar, Clock } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useSociete } from '../contexts/Societe'
 import { fmt, fmtDate, MONTHS_SHORT, getLoyerPourMois, today } from '../lib/utils'
-import { estAcquis } from '../lib/calculs'
+import { estAcquis, attenduMois, bauxProductifs } from '../lib/calculs'
 import { Card, Empty, Kpi, KpiRow } from '../components/UI'
 
 const now = new Date()
 
-export default function Finances() {
+export default function Finances({ navigate }) {
   const { baux, biens, locataires, transactions, bankTransactions, selected, reload } = useSociete()
   const [selectedYear, setSelectedYear] = useState(now.getFullYear())
 
@@ -16,11 +16,7 @@ export default function Finances() {
   // Un bien dont l'acte n'est pas signé ne génère aucune échéance : la
   // société ne perçoit ni ne débourse rien tant que l'acquisition n'est pas
   // effective.
-  const bauxActifs = baux.filter(b => {
-    if (!b.actif) return false
-    const bien = biens.find(x => x.id === b.bien_id)
-    return !bien || estAcquis(bien)
-  })
+  const bauxActifs = bauxProductifs(baux, biens)
   const biensEnCours = biens.filter(b => !estAcquis(b))
 
   // Échéances soldées par un virement rapproché : permet de distinguer un
@@ -34,11 +30,22 @@ export default function Finances() {
   const getStatutMois = (bailId, mois, annee) =>
     transactions.find(t => t.bail_id === bailId && t.mois === mois && t.annee === annee)
 
+  // attenduMois borne au bail : sans cela un bail de trois mois comptait pour
+  // douze, et l'attendu annuel était surévalué.
   const totalAttendu = bauxActifs.reduce((sum, b) => {
     let total = 0
-    for (let m = 0; m < 12; m++) total += getLoyerPourMois(b, m, selectedYear) + (b.charges || 0)
+    for (let m = 0; m < 12; m++) total += attenduMois(b, m, selectedYear)
     return sum + total
   }, 0)
+
+  // Montant réellement entré en banque sur des échéances de l'année, par
+  // opposition au « payé » déclaratif ci-dessous.
+  const totalEncaisseBanque = bankTransactions
+    .filter(t => t.transaction_id && t.statut_rapprochement?.startsWith('rapproche'))
+    .reduce((s, t) => {
+      const ech = transactions.find(x => x.id === t.transaction_id)
+      return ech?.annee === selectedYear ? s + Number(t.amount || 0) : s
+    }, 0)
 
   const totalEncaisse = transactions
     .filter(t => t.statut === 'payé' && t.annee === selectedYear)
@@ -83,10 +90,16 @@ export default function Finances() {
       </div>
 
       {/* KPIs */}
-      <KpiRow cols={3} className="mb-8">
+      <KpiRow cols={4} className="mb-8">
         <Kpi label={`Attendu ${selectedYear}`} value={fmt(totalAttendu)} tone="brand" sub="Total loyers + charges" />
-        <Kpi label="Encaissé" value={fmt(totalEncaisse)} tone="positive"
+        {/* Deux colonnes distinctes à dessein : une échéance peut être marquée
+            payée sans qu'aucun virement ne soit arrivé. */}
+        <Kpi label="Déclaré payé" value={fmt(totalEncaisse)} tone="navy"
           sub={`${totalAttendu > 0 ? Math.round(totalEncaisse / totalAttendu * 100) : 0}% du total`} />
+        <Kpi label="Encaissé en banque" value={fmt(totalEncaisseBanque)} tone="positive"
+          sub="Virements effectivement rapprochés"
+          className="cursor-pointer hover:border-blue-200"
+          onClick={() => navigate?.('flux', { tab: 'ecarts' })} />
         <Kpi label="Impayés" value={fmt(totalImpaye)} tone="negative" sub="À recouvrer" />
       </KpiRow>
 
