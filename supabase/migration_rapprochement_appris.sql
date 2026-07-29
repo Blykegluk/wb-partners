@@ -38,12 +38,15 @@ create policy "Editors can delete rapprochement_appris"
 -- bank-sync). Ce cron est un filet : il rattrape un webhook perdu, une
 -- fonction indisponible, ou une connexion rétablie après incident.
 --
--- pg_cron + pg_net plutôt qu'une GitHub Action : l'appel reste interne à
--- Supabase, ce qui évite d'exposer une clé de service dans le dépôt.
+-- Le cron ne présente PAS la clé de service (accès total à la base) mais un
+-- jeton dédié, stocké au vault, qui ne sait que déclencher une
+-- synchronisation. La clé de service reste dans l environnement des Edge
+-- Functions. La fonction bank-sync-cron vérifie ce jeton puis appelle
+-- bank-sync pour chaque société connectée.
 --
--- PRÉREQUIS : les secrets `project_url` et `service_role_key` doivent être
--- présents dans le vault Supabase. Sans eux la fonction ne fait rien et
--- l'émet en notice — elle n'échoue pas.
+-- PRÉREQUIS : le secret `cron_token` doit exister au vault ET comme secret
+-- Edge Function `CRON_TOKEN`, avec la même valeur. Sans lui la fonction ne
+-- fait rien et l émet en notice — elle n échoue pas.
 
 create extension if not exists pg_cron with schema extensions;
 create extension if not exists pg_net with schema extensions;
@@ -55,27 +58,27 @@ security definer
 set search_path = public, extensions
 as $$
 declare
-  c record;
-  url text;
-  cle text;
+  jeton text;
 begin
-  select decrypted_secret into url from vault.decrypted_secrets where name = 'project_url';
-  select decrypted_secret into cle from vault.decrypted_secrets where name = 'service_role_key';
-  if url is null or cle is null then
-    raise notice 'Secrets project_url / service_role_key absents du vault : sync ignorée';
+  select decrypted_secret into jeton
+  from vault.decrypted_secrets where name = 'cron_token';
+
+  if jeton is null then
+    raise notice 'Secret cron_token absent du vault : synchronisation ignorée';
     return;
   end if;
 
-  for c in select societe_id from bank_connections where status = 'connected' loop
-    perform net.http_post(
-      url := url || '/functions/v1/bank-sync',
-      headers := jsonb_build_object(
-        'Content-Type', 'application/json',
-        'Authorization', 'Bearer ' || cle
-      ),
-      body := jsonb_build_object('societe_id', c.societe_id)
-    );
-  end loop;
+  -- bank-sync-cron répond en 202 immédiatement et poursuit en arrière-plan :
+  -- pg_net abandonne au bout de 5 s alors qu une synchronisation demande une
+  -- quinzaine de secondes par société.
+  perform net.http_post(
+    url := 'https://zokdctiqmbfnoahhebys.supabase.co/functions/v1/bank-sync-cron',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'x-cron-token', jeton
+    ),
+    body := '{}'::jsonb
+  );
 end;
 $$;
 
