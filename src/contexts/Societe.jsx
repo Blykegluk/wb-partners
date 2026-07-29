@@ -81,7 +81,7 @@ export function SocieteProvider({ children }) {
     if (!hasLoadedData.current) setLoadingData(true)
     const sid = selected.id
 
-    const [b, l, ba, d, m, rev, evt, ac, act, bact, pers, bank, bkAcc, bkTx] = await Promise.all([
+    const [b, l, ba, d, m, rev, evt, ac, act, bact, pers, bkAcc, bkTx] = await Promise.all([
       supabase.from('biens').select('*').eq('societe_id', sid).order('created_at'),
       supabase.from('locataires').select('*').eq('societe_id', sid).order('created_at'),
       supabase.from('baux').select('*').eq('societe_id', sid).order('created_at'),
@@ -94,12 +94,14 @@ export function SocieteProvider({ children }) {
       supabase.from('bien_actionnaires').select('*').eq('societe_id', sid).order('pourcentage', { ascending: false }),
       // Pas de filtre société : l'annuaire est partagé, la RLS se charge du périmètre.
       supabase.from('personnes').select('*').order('nom'),
-      supabase.from('bank_connections').select('*').eq('societe_id', sid).maybeSingle(),
-      supabase.from('bank_accounts').select('*').eq('societe_id', sid).order('nom'),
+      // Enable Banking. bank_sessions n'est volontairement pas lisible depuis
+      // le navigateur (elle ne contient que des jetons de consentement) :
+      // l'état de la connexion se lit sur les comptes.
+      supabase.from('bank_accounts').select('*').eq('societe_id', sid).order('name'),
       // 500 derniers mouvements : suffisant pour l'écran Banque, borné pour
       // ne pas alourdir le chargement de l'application.
       supabase.from('bank_transactions').select('*').eq('societe_id', sid)
-        .eq('supprime', false).order('date', { ascending: false }).limit(500),
+        .order('booking_date', { ascending: false }).limit(500),
     ])
 
     setBiens(b.data || [])
@@ -113,9 +115,22 @@ export function SocieteProvider({ children }) {
     setActionnaires(act.data || [])
     setBienActionnaires(bact.data || [])
     setPersonnes(pers.data || [])
-    setBankConnection(bank.data || null)
-    setBankAccounts(bkAcc.data || [])
+    const comptes = bkAcc.data || []
+    setBankAccounts(comptes)
     setBankTransactions(bkTx.data || [])
+
+    // État de la connexion déduit des comptes : un compte présent implique un
+    // consentement abouti. La date de synchronisation la plus récente et le
+    // statut de session le plus dégradé font foi pour l'ensemble.
+    setBankConnection(comptes.length === 0 ? null : {
+      status: comptes.some(c => c.session_status === 'expired') ? 'expired' : 'connected',
+      institution_name: comptes[0]?.name || null,
+      last_sync: comptes
+        .map(c => c.derniere_sync)
+        .filter(Boolean)
+        .sort()
+        .at(-1) || null,
+    })
 
     // Transactions via baux ids
     const bauxIds = (ba.data || []).map(x => x.id)

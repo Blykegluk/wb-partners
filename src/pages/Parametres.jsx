@@ -752,194 +752,189 @@ function MembresTab() {
 }
 
 // ── Banque tab ──────────────────────────────────────────
+// Flux Enable Banking : l'utilisateur choisit sa banque, l'Edge Function
+// banking-connect ouvre un consentement et renvoie l'URL de la banque, sur
+// laquelle on redirige. Au retour, banking-callback persiste session et
+// comptes puis renvoie vers /app/banques?connected=1.
+const ASPSPS = [
+  { name: 'Societe Generale Professionnels', country: 'FR', label: 'Société Générale — Professionnels' },
+  { name: 'Societe Generale Entreprises', country: 'FR', label: 'Société Générale — Entreprises' },
+  { name: 'Caisse d Epargne', country: 'FR', label: 'Caisse d’Épargne' },
+]
+
 function BanqueTab() {
-  const { user } = useAuth()
-  const { selected, isAdmin } = useSociete()
-  const [conn, setConn] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const { selected, isAdmin, bankAccounts, bankConnection, reload } = useSociete()
+  const [aspsp, setAspsp] = useState(ASPSPS[0].name)
+  const [connecting, setConnecting] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState(null)
   const [error, setError] = useState('')
 
+  // Retour de banking-callback : ?connected=1 ou ?error=...
   useEffect(() => {
-    if (selected) {
-      supabase.from('bank_connections').select('*').eq('societe_id', selected.id).single()
-        .then(({ data }) => { setConn(data); setLoading(false) })
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('connected')) {
+      reload()
+      window.history.replaceState({}, '', window.location.pathname)
+    } else if (params.get('error')) {
+      setError(`La banque a refusé la connexion : ${params.get('error')}`)
+      window.history.replaceState({}, '', window.location.pathname)
     }
-  }, [selected])
+  }, [reload])
 
-  const getToken = async () => {
+  const token = async () => {
     const { data: { session } } = await supabase.auth.getSession()
     return session?.access_token
   }
 
-  const connectBank = async () => {
+  const connecter = async () => {
     setError('')
-    setLoading(true)
+    setConnecting(true)
     try {
-      const token = await getToken()
-      const res = await fetch(`${FUNCTIONS_URL_TOP}/bank-link`, {
+      const choix = ASPSPS.find(a => a.name === aspsp)
+      const res = await fetch(`${FUNCTIONS_URL_TOP}/banking-connect`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await token()}` },
         body: JSON.stringify({
+          aspsp_name: choix.name,
+          aspsp_country: choix.country,
           societe_id: selected.id,
-          callback_url: window.location.origin + window.location.pathname,
-          user_email: user?.email || '',
         }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      // Redirect to Bridge Connect widget (user selects bank there)
+      if (!res.ok) throw new Error(data.error || 'Connexion impossible')
+      if (!data.url) throw new Error('La banque n’a pas renvoyé d’URL d’autorisation')
+      // La suite du parcours se déroule chez la banque.
       window.location.href = data.url
     } catch (e) {
       setError(e.message)
-      setLoading(false)
+      setConnecting(false)
     }
   }
 
-  const checkCallback = async () => {
-    setLoading(true)
-    setError('')
-    try {
-      const token = await getToken()
-      const res = await fetch(`${FUNCTIONS_URL_TOP}/bank-callback`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ societe_id: selected.id }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      if (data.status === 'connected') {
-        setConn(prev => ({ ...prev, ...data, status: 'connected' }))
-      } else {
-        setError(data.message || 'Connexion en attente.')
-      }
-    } catch (e) { setError(e.message) }
-    setLoading(false)
-  }
-
-  const syncTransactions = async () => {
+  const synchroniser = async () => {
     setSyncing(true)
     setSyncResult(null)
     setError('')
     try {
-      const token = await getToken()
-      const res = await fetch(`${FUNCTIONS_URL_TOP}/bank-sync`, {
+      const res = await fetch(`${FUNCTIONS_URL_TOP}/banking-sync`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${await token()}` },
         body: JSON.stringify({ societe_id: selected.id }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
+      if (!res.ok) throw new Error(data.error || 'Synchronisation en échec')
       setSyncResult(data)
-      setConn(prev => ({ ...prev, last_sync: new Date().toISOString() }))
+      reload()
     } catch (e) { setError(e.message) }
     setSyncing(false)
   }
 
-  const disconnect = async () => {
-    if (!confirm('Déconnecter le compte bancaire ?')) return
-    await supabase.from('bank_connections').delete().eq('societe_id', selected.id)
-    setConn(null)
-    setSyncResult(null)
-  }
+  const expiree = bankConnection?.status === 'expired'
+  const connecte = bankAccounts.length > 0
 
-  if (loading && !conn) return <Card className="p-8 text-center"><p className="text-gray-400 text-sm">Chargement...</p></Card>
+  return (
+    <div>
+      {error && (
+        <Card className="p-4 mb-4 border-red-200 bg-red-50/40">
+          <p className="text-sm text-red-600 flex items-center gap-2">
+            <AlertTriangle size={15} /> {error}
+          </p>
+        </Card>
+      )}
 
-  // Connected state
-  if (conn?.status === 'connected') {
-    return (
-      <div>
-        <Card className="p-6 mb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center">
-                <Landmark size={24} className="text-emerald-600" />
-              </div>
-              <div>
-                <p className="font-bold text-navy">{conn.institution_name || 'Banque connectée'}</p>
-                <p className="text-xs text-gray-400">
-                  Compte connecté
-                  {conn.last_sync && <> · Dernière sync : {new Date(conn.last_sync).toLocaleDateString('fr-FR')} {new Date(conn.last_sync).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</>}
-                </p>
-              </div>
+      {connecte ? (
+        <Card className="p-6">
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <h3 className="text-sm font-bold text-navy flex items-center gap-2">
+                <Landmark size={16} />
+                {bankAccounts.length} compte{bankAccounts.length > 1 ? 's' : ''} connecté{bankAccounts.length > 1 ? 's' : ''}
+              </h3>
+              <p className="text-xs text-gray-400 mt-1">
+                {bankConnection?.last_sync
+                  ? `Dernière synchronisation le ${fmtDate(bankConnection.last_sync)}`
+                  : 'Jamais synchronisé'}
+              </p>
             </div>
-            <div className="flex items-center gap-2">
-              <Btn onClick={syncTransactions} disabled={syncing}>
-                <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
+            {isAdmin && (
+              <Btn onClick={synchroniser} disabled={syncing}>
+                <RefreshCw size={15} className={syncing ? 'animate-spin' : ''} />
                 {syncing ? 'Synchronisation...' : 'Synchroniser'}
               </Btn>
-              {isAdmin && (
-                <Btn variant="ghost" onClick={disconnect}><Unlink size={14} /> Déconnecter</Btn>
-              )}
-            </div>
-          </div>
-        </Card>
-
-        {syncResult && (
-          <Card className="p-6 border-emerald-200">
-            <h4 className="text-sm font-bold text-navy mb-3">Résultat de la synchronisation</h4>
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div className="bg-blue-50 rounded-lg p-3">
-                <p className="text-2xl font-bold text-blue-600">{syncResult.bank_transactions}</p>
-                <p className="text-xs text-gray-400">Transactions bancaires</p>
-              </div>
-              <div className="bg-emerald-50 rounded-lg p-3">
-                <p className="text-2xl font-bold text-emerald-600">{syncResult.matched}</p>
-                <p className="text-xs text-gray-400">Loyers matchés</p>
-              </div>
-              <div className="bg-amber-50 rounded-lg p-3">
-                <p className="text-2xl font-bold text-amber-600">{(syncResult.total_pending || 0) - syncResult.matched}</p>
-                <p className="text-xs text-gray-400">En attente</p>
-              </div>
-            </div>
-            {syncResult.details?.length > 0 && (
-              <div className="mt-4 space-y-1">
-                {syncResult.details.map((d, i) => (
-                  <div key={i} className="flex justify-between items-center py-1.5 px-3 bg-emerald-50 rounded text-sm">
-                    <span className="text-emerald-700 font-medium">{d.amount}€ — {d.date}</span>
-                    <span className="text-emerald-500 text-xs">Ref: {d.bank_ref}</span>
-                  </div>
-                ))}
-              </div>
             )}
-          </Card>
-        )}
+          </div>
 
-        {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
-      </div>
-    )
-  }
+          {expiree && (
+            <div className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2.5 mb-4">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              <span>
+                Le consentement bancaire a expiré — la DSP2 le limite à 90 jours.
+                Reconnectez le compte pour reprendre la synchronisation.
+              </span>
+            </div>
+          )}
 
-  // Pending state (waiting for bank auth callback)
-  if (conn?.status === 'pending') {
-    return (
-      <Card className="p-8 text-center">
-        <Landmark size={40} className="text-amber-400 mx-auto mb-4" />
-        <p className="font-semibold text-navy mb-2">Autorisation en attente</p>
-        <p className="text-sm text-gray-400 mb-4">Vous avez initié une connexion bancaire. Si vous avez autorisé l'accès, cliquez ci-dessous.</p>
-        <Btn onClick={checkCallback}>Vérifier la connexion</Btn>
-        {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
-      </Card>
-    )
-  }
+          <div className="space-y-2">
+            {bankAccounts.map(c => (
+              <div key={c.id} className="flex items-center justify-between gap-3 bg-gray-50 rounded-lg px-4 py-2.5">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-navy truncate">{c.name || 'Compte'}</p>
+                  <p className="text-xs text-gray-400 font-mono">{c.iban || '—'}</p>
+                </div>
+                <p className="text-sm font-semibold text-navy whitespace-nowrap">
+                  {c.solde != null ? `${Number(c.solde).toFixed(2)} ${c.currency || 'EUR'}` : '—'}
+                </p>
+              </div>
+            ))}
+          </div>
 
-  // Not connected
-  return (
-    <Card className="p-8">
-      <div className="text-center mb-6">
-        <Landmark size={40} className="text-gray-300 mx-auto mb-4" />
-        <p className="font-semibold text-navy mb-1">Connecter un compte bancaire</p>
-        <p className="text-sm text-gray-400 max-w-md mx-auto">Vérifiez automatiquement si les loyers sont perçus en connectant le compte bancaire de la société. Vous choisirez votre banque à l'étape suivante.</p>
-      </div>
+          {syncResult && (
+            <p className="text-sm text-emerald-700 mt-4">
+              {syncResult.mouvements} mouvement{syncResult.mouvements > 1 ? 's' : ''} récupéré{syncResult.mouvements > 1 ? 's' : ''}, {syncResult.rapproches} rapprochement{syncResult.rapproches > 1 ? 's' : ''} automatique{syncResult.rapproches > 1 ? 's' : ''}.
+            </p>
+          )}
 
-      <div className="max-w-md mx-auto text-center">
-        {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
-        <Btn onClick={connectBank} disabled={loading} className="justify-center">
-          <Landmark size={15} /> {loading ? 'Connexion...' : 'Connecter ma banque'}
-        </Btn>
-        <p className="text-xs text-gray-300 mt-4">Connexion sécurisée via Bridge (Open Banking / DSP2). Vos identifiants bancaires ne sont jamais stockés sur nos serveurs.</p>
-      </div>
-    </Card>
+          {isAdmin && (
+            <div className="mt-5 pt-4 border-t border-gray-100">
+              <p className="text-xs text-gray-400 mb-2">
+                Pour ajouter une autre banque, relancez une connexion.
+              </p>
+              <Sel label="Banque" value={aspsp} onChange={e => setAspsp(e.target.value)}
+                options={ASPSPS.map(a => ({ v: a.name, l: a.label }))} />
+              <Btn variant="ghost" onClick={connecter} disabled={connecting}>
+                {connecting ? 'Redirection...' : 'Connecter une autre banque'}
+              </Btn>
+            </div>
+          )}
+        </Card>
+      ) : (
+        <Card className="p-8 text-center">
+          <Landmark size={40} className="text-gray-300 mx-auto mb-4" />
+          <p className="font-semibold text-navy mb-1">Aucun compte bancaire connecté</p>
+          <p className="text-sm text-gray-400 mb-5 max-w-md mx-auto">
+            Connectez le compte de {selected?.nom_affiche || selected?.nom} pour rapprocher
+            automatiquement les loyers attendus des virements réellement reçus.
+          </p>
+          <div className="max-w-sm mx-auto text-left">
+            <Sel label="Banque" value={aspsp} onChange={e => setAspsp(e.target.value)}
+              options={ASPSPS.map(a => ({ v: a.name, l: a.label }))} />
+          </div>
+          {isAdmin ? (
+            <Btn onClick={connecter} disabled={connecting} className="justify-center">
+              <Landmark size={15} />
+              {connecting ? 'Redirection...' : 'Connecter ce compte'}
+            </Btn>
+          ) : (
+            <p className="text-xs text-gray-400">Seul un administrateur peut connecter un compte.</p>
+          )}
+          <p className="text-xs text-gray-300 mt-4 max-w-md mx-auto">
+            Accès en lecture seule, via Enable Banking (agrégateur agréé DSP2).
+            Le consentement est valable 90 jours et révocable à tout moment
+            depuis votre banque.
+          </p>
+        </Card>
+      )}
+    </div>
   )
 }

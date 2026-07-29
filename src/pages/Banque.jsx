@@ -48,26 +48,26 @@ export default function Banque({ navigate }) {
   }
 
   // ── KPI ────────────────────────────────────────────────
-  const comptesSuivis = bankAccounts.filter(c => c.suivi !== false && c.actif !== false)
+  const comptesSuivis = bankAccounts.filter(c => c.suivi !== false)
   // Le solde n'additionne que l'euro : mélanger les devises n'aurait aucun sens.
   const soldeEur = comptesSuivis
-    .filter(c => (c.devise || 'EUR') === 'EUR')
+    .filter(c => (c.currency || 'EUR') === 'EUR')
     .reduce((s, c) => s + Number(c.solde || 0), 0)
-  const autresDevises = comptesSuivis.filter(c => (c.devise || 'EUR') !== 'EUR')
+  const autresDevises = comptesSuivis.filter(c => (c.currency || 'EUR') !== 'EUR')
 
-  const credits = bankTransactions.filter(t => Number(t.montant) > 0)
+  const credits = bankTransactions.filter(t => Number(t.amount) > 0)
   const nbRapproches = credits.filter(t => t.statut_rapprochement?.startsWith('rapproche')).length
   const nbAQualifier = credits.filter(t => t.statut_rapprochement === 'a_qualifier').length
 
   // ── Liste filtrée ──────────────────────────────────────
   const liste = useMemo(() => {
     let l = bankTransactions
-    if (filtre === 'a_qualifier') l = l.filter(t => t.statut_rapprochement === 'a_qualifier' && Number(t.montant) > 0)
+    if (filtre === 'a_qualifier') l = l.filter(t => t.statut_rapprochement === 'a_qualifier' && Number(t.amount) > 0)
     else if (filtre === 'rapproches') l = l.filter(t => t.statut_rapprochement?.startsWith('rapproche'))
     else if (filtre === 'ignores') l = l.filter(t => t.statut_rapprochement === 'ignore')
     if (recherche.trim()) {
       const q = recherche.trim().toLowerCase()
-      l = l.filter(t => (t.libelle || '').toLowerCase().includes(q) || String(t.montant).includes(q))
+      l = l.filter(t => (t.remittance_information || '').toLowerCase().includes(q) || String(t.amount).includes(q))
     }
     return l
   }, [bankTransactions, filtre, recherche])
@@ -77,7 +77,7 @@ export default function Banque({ navigate }) {
     setSyncing(true); setErreur(''); setResultat(null)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch(`${FUNCTIONS_URL}/bank-sync`, {
+      const res = await fetch(`${FUNCTIONS_URL}/banking-sync`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -107,14 +107,14 @@ export default function Banque({ navigate }) {
 
     const { error: e2 } = await supabase.from('transactions').update({
       statut: 'payé',
-      date_paiement: mvt.date,
+      date_paiement: mvt.booking_date,
     }).eq('id', echeanceId)
     if (e2) { setErreur(e2.message); return }
 
     // Apprentissage — best effort : une erreur ici ne doit pas invalider le
     // rapprochement, qui est déjà enregistré.
     const ech = transactions.find(t => t.id === echeanceId)
-    const emp = empreinte(mvt.libelle)
+    const emp = empreinte(mvt.remittance_information)
     if (ech?.bail_id && emp) {
       const { data: existant } = await supabase.from('rapprochement_appris')
         .select('id, occurrences').eq('societe_id', selected.id).eq('empreinte', emp).maybeSingle()
@@ -217,7 +217,7 @@ export default function Banque({ navigate }) {
           value={fmt(soldeEur)}
           sub={
             autresDevises.length > 0
-              ? `+ ${autresDevises.map(c => `${Number(c.solde || 0).toFixed(2)} ${c.devise}`).join(', ')}`
+              ? `+ ${autresDevises.map(c => `${Number(c.solde || 0).toFixed(2)} ${c.currency}`).join(', ')}`
               : `${comptesSuivis.length} compte${comptesSuivis.length > 1 ? 's' : ''} suivi${comptesSuivis.length > 1 ? 's' : ''}`
           }
         />
@@ -267,9 +267,9 @@ export default function Banque({ navigate }) {
                     suivi ? 'bg-gray-50 border-gray-100' : 'bg-white border-dashed border-gray-200 opacity-60'
                   }`}>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-navy truncate">{c.nom || 'Compte'}</p>
+                    <p className="text-sm font-semibold text-navy truncate">{c.name || 'Compte'}</p>
                     <p className="text-xs text-gray-400">
-                      {c.type || '—'} · {Number(c.solde || 0).toFixed(2)} {c.devise || 'EUR'}
+                      {c.product || '—'} · {Number(c.solde || 0).toFixed(2)} {c.currency || 'EUR'}
                     </p>
                   </div>
                   {canEdit && (
@@ -283,7 +283,7 @@ export default function Banque({ navigate }) {
               )
             })}
           </div>
-          {bankAccounts.some(c => (c.devise || 'EUR') !== 'EUR') && (
+          {bankAccounts.some(c => (c.currency || 'EUR') !== 'EUR') && (
             <p className="text-xs text-gray-400 mt-3">
               Les comptes en devise étrangère sont exclus du rapprochement des loyers.
             </p>
@@ -331,22 +331,22 @@ export default function Banque({ navigate }) {
             </thead>
             <tbody>
               {liste.map(t => {
-                const credit = Number(t.montant) > 0
+                const credit = Number(t.amount) > 0
                 const rapproche = t.statut_rapprochement?.startsWith('rapproche')
                 const suggestions = Array.isArray(t.suggestions) ? t.suggestions : []
                 return (
                   <tr key={t.id} className="border-t border-gray-50 hover:bg-gray-50/50">
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{fmtDate(t.date)}</td>
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{fmtDate(t.booking_date)}</td>
                     <td className="px-4 py-3">
-                      <p className="text-navy font-mono text-xs">{t.libelle || '—'}</p>
-                      {t.devise !== 'EUR' && (
-                        <span className="text-[10px] font-bold uppercase text-amber-600">{t.devise}</span>
+                      <p className="text-navy font-mono text-xs">{t.remittance_information || '—'}</p>
+                      {t.currency !== 'EUR' && (
+                        <span className="text-[10px] font-bold uppercase text-amber-600">{t.currency}</span>
                       )}
                     </td>
                     <td className={`px-4 py-3 text-right font-semibold whitespace-nowrap ${
                       credit ? 'text-emerald-600' : 'text-navy'
                     }`}>
-                      {credit ? '+' : ''}{Number(t.montant).toFixed(2)} {t.devise === 'EUR' ? '€' : t.devise}
+                      {credit ? '+' : ''}{Number(t.amount).toFixed(2)} {t.currency === 'EUR' ? '€' : t.currency}
                     </td>
                     <td className="px-4 py-3">
                       {rapproche ? (
@@ -416,11 +416,11 @@ export default function Banque({ navigate }) {
           <div className="bg-gray-50 rounded-lg px-4 py-3 mb-4">
             <div className="flex justify-between items-start gap-4">
               <div className="min-w-0">
-                <p className="font-mono text-xs text-navy">{qualifier.libelle || '—'}</p>
-                <p className="text-xs text-gray-400 mt-1">{fmtDate(qualifier.date)}</p>
+                <p className="font-mono text-xs text-navy">{qualifier.remittance_information || '—'}</p>
+                <p className="text-xs text-gray-400 mt-1">{fmtDate(qualifier.booking_date)}</p>
               </div>
               <p className="text-lg font-bold text-emerald-600 whitespace-nowrap">
-                +{Number(qualifier.montant).toFixed(2)} €
+                +{Number(qualifier.amount).toFixed(2)} €
               </p>
             </div>
           </div>
