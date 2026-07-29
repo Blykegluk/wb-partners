@@ -5,3 +5,7 @@ dist
 .DS_Store
 supabase/.temp/
 .claude/worktrees/
+
+# Clés et secrets
+*.pem
+supabase/.env.local

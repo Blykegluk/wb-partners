@@ -1,0 +1,12 @@
+project_id = "zokdctiqmbfnoahhebys"
+
+# Retour de la banque après consentement : c'est le navigateur de
+# l'utilisateur qui appelle cette fonction, sans en-tête Authorization.
+# Sans cette ligne, Supabase répond 401 avant d'exécuter le code et le
+# parcours de connexion casse silencieusement.
+#
+# ATTENTION : ce fichier ne s'applique qu'aux déploiements via la CLI
+# (supabase functions deploy). En cas de déploiement par un autre moyen,
+# désactiver « Verify JWT » sur la fonction depuis le dashboard.
+[functions.banking-callback]
+verify_jwt = false
