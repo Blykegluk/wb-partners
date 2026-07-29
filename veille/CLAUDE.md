@@ -88,10 +88,23 @@ type, applique cette échelle :
    Tu passes au suivant. Ce n'est jamais un motif d'arrêt.
 2. **Tous les portails d'une recherche refusent** → tu bascules sur les autres
    recherches et tu notes la limite dans `runs.erreurs`. Le run continue.
-3. **Panne réelle** — à ne retenir QUE si les trois conditions sont réunies :
-   `WebSearch` échoue aussi, **et** au moins deux domaines de contrôle sans
-   rapport avec l'immobilier échouent (teste `example.com` et `wikipedia.org`),
-   **et** tu journalises le message d'erreur exact de chacun dans `runs.erreurs`.
+3. **Panne réelle** — le test décisif est le suivant, et lui seul : ouvre par
+   WebFetch **deux domaines de contrôle sans rapport avec l'immobilier**
+   (`example.com`, `wikipedia.org`) **et** l'API de géocodage
+   `api-adresse.data.gouv.fr`. Si ces trois-là échouent, la sortie réseau est
+   réellement coupée. Journalise le message d'erreur exact de chacun dans
+   `runs.erreurs`.
+
+   **`WebSearch` peut parfaitement fonctionner pendant que `WebFetch` est
+   coupé** : les deux outils n'empruntent pas le même chemin réseau. Ne conclus
+   donc jamais « le réseau va bien » du seul fait que la recherche répond — et
+   inversement, un WebSearch opérationnel n'interdit pas de déclarer la panne.
+   C'est exactement ce qui s'est produit les 29/07 à 06h17 et 08h29.
+
+   Dans ce cas précis : aucune insertion possible (la règle d'or l'interdit),
+   mais journalise le run avec le détail technique, et signale-le dans ta
+   réponse finale — l'environnement d'exécution planifié peut être privé de
+   réseau alors qu'une session interactive en dispose.
 
 **Un run partiel vaut toujours mieux qu'un run abandonné.** Dès qu'une seule
 annonce a pu être ouverte et vérifiée, insère-la et journalise le run avec ses
