@@ -55,24 +55,75 @@ quotidien complet en le suivant à la lettre. **Supabase est l'unique source de 
 
 **Scoring R3 (/100)** : potentiel de CA de la zone 30 · intensité concurrentielle sur le format recommandé 20 · économie (loyer/CA ou coût d'occupation) 20 · configuration (surface de vente, réserve, livraison, ERP, extraction/froid) 15 · accessibilité & flux 10 · disponibilité/timing 5.
 
-## SOURCES & RÈGLES
+## SOURCES
 
-- Sources : BureauxLocaux, Geolocaux, SeLoger Bureaux & Commerces, Bien'ici, Figaro Immobilier, Leboncoin pro, CessionPME, Place des Commerces, Les Annonces du Commerce, Point de Vente, murscommerciaux.com, Espaces Atypiques, agences (Arthur Loyd, Knight Frank, CBRE, JLL, Perfia, Huchet-Demorge, ICC Invest, Century 21 Horeca), immobilier.notaires.fr.
+Classement établi par test réel (29/07/2026). **Un portail bloqué n'est pas un
+incident : c'est l'état normal d'une bonne moitié du marché.** Ne consigne dans
+`runs.erreurs` que ce qui change par rapport à ce classement.
+
+**Portails ouverts — commence toujours par eux**
+BureauxLocaux · Geolocaux · Point de Vente · Place des Commerces · Bien'ici
+(pauvre en contenu direct, passe par les fiches) · Les Annonces du Commerce ·
+murscommerciaux.com · Espaces Atypiques · sites d'agences (Arthur Loyd, Knight
+Frank, CBRE, JLL, Perfia, Huchet-Demorge, ICC Invest, Century 21 Horeca).
+
+**Portails habituellement bloqués — n'y consacre pas de budget**
+SeLoger · Leboncoin · Figaro Immobilier · CessionPME · PAP · Logic-Immo ·
+MSimond · Nuroa · Zimo. Deux refus distincts, tous deux normaux : `403` (anti-bot
+du site) et `Claude Code is unable to fetch from …` (refus de la passerelle).
+Si WebSearch fait remonter une annonce intéressante hébergée sur l'un d'eux,
+cherche la **même annonce sur un portail ouvert ou sur le site de l'agence** —
+c'est fréquent, les mandats sont multi-diffusés. Sans page ouvrable, pas
+d'insertion (voir règle d'or) : mentionne-la en piste à creuser dans le rapport.
+
 - Varier les requêtes (ville × type × budget) par rapport aux runs précédents (lire `runs.requetes`) ; consigner les requêtes du jour dans `runs.requetes`.
+
+## DIAGNOSTIC RÉSEAU — NE PAS CONFONDRE BLOCAGE ET PANNE
+
+Un run a déjà été abandonné à tort pour « panne d'infrastructure » alors que
+seuls des portails immobiliers refusaient l'accès. Avant toute conclusion de ce
+type, applique cette échelle :
+
+1. **Un domaine refuse** (403, refus passerelle, captcha, SSL, timeout) → normal.
+   Tu passes au suivant. Ce n'est jamais un motif d'arrêt.
+2. **Tous les portails d'une recherche refusent** → tu bascules sur les autres
+   recherches et tu notes la limite dans `runs.erreurs`. Le run continue.
+3. **Panne réelle** — à ne retenir QUE si les trois conditions sont réunies :
+   `WebSearch` échoue aussi, **et** au moins deux domaines de contrôle sans
+   rapport avec l'immobilier échouent (teste `example.com` et `wikipedia.org`),
+   **et** tu journalises le message d'erreur exact de chacun dans `runs.erreurs`.
+
+**Un run partiel vaut toujours mieux qu'un run abandonné.** Dès qu'une seule
+annonce a pu être ouverte et vérifiée, insère-la et journalise le run avec ses
+limites, plutôt que de tout jeter.
+
+## RÈGLES
+
 - **Fraîcheur** : prioriser le publié/modifié récent. Re-vérifier les `active` de plus de 14 jours ; annonce disparue → `statut='expiree'` (jamais supprimée, jamais re-proposée).
 - **Anti-hallucination — règle d'or** : chaque ligne insérée = une annonce réelle dont le lien a été **ouvert (WebFetch réussi) pendant le run**. Jamais d'annonce de mémoire. Donnée absente = "à vérifier". `prix` (ou `loyer_annuel`), `surface_totale` et `lien` obligatoires, sinon pas d'insertion. Contre-vérifier chaque lien avant insertion.
 - **Pistes hors critères (exception encadrée)** : un dossier EXCEPTIONNEL qui coche toutes les cases d'une recherche sauf UNE règle bloquante (ex. prix non affiché « nous consulter ») peut être inséré avec `hors_critere=true` et `motif_hors_critere` (règle non satisfaite + pourquoi le dossier mérite le suivi + action à mener). Maximum 1-2 par run, uniquement si vraiment remarquable (ex. PC purgé pour résidence hôtelière). Le lien doit quand même avoir été ouvert et vérifié ; `score` peut rester NULL si inévaluable. Ces pistes apparaissent dans une sous-section dédiée du dashboard, hors compteurs.
 
 ## DÉROULÉ DU RUN
 
-1. **Idempotence** : si une ligne `runs` existe déjà pour aujourd'hui, compléter sans dupliquer ou s'arrêter en le signalant.
+1. **Réserver le run AVANT de travailler.** Le 28/07/2026, deux exécutions
+   lancées à 4 minutes d'intervalle ont toutes deux constaté « aucun run
+   aujourd'hui » et travaillé en double : vérifier au début puis écrire à la fin
+   laisse une fenêtre de plusieurs minutes. Insère donc la ligne `runs` du jour
+   **immédiatement**, compteurs à 0 et `erreurs='RUN EN COURS'`, puis mets-la à
+   jour en fin de parcours (étape 6). Si une ligne existe déjà pour aujourd'hui :
+   `RUN EN COURS` de moins d'une heure → une autre exécution travaille, arrête-toi
+   en le signalant ; run terminé → complète sans dupliquer.
+1bis. **Rattrapage.** Regarde la date du dernier run terminé. S'il remonte à plus
+   de deux jours (les trous de 5 à 10 jours sont fréquents), élargis la fenêtre de
+   fraîcheur d'autant : sur dix jours d'absence, une annonce publiée il y a huit
+   jours est une nouveauté pour la base, pas une annonce périmée.
 2. Lire `opportunites` (clés, statuts). Dédoublonnage par `cle_unique` (adresse normalisée minuscule sans accents + surface arrondie à 5 m² + prix arrondi à 10 k€ ; fallback titre+surface+prix+source). Upsert : clé existante → mettre à jour `verifie_le` et le prix s'il a changé (ancien prix consigné en commentaire système, `auteur` NULL, ex. "Prix modifié : 590 k → 550 k").
-3. Exécuter les 3 recherches (méthode recommandée : 3 agents en parallèle avec les règles anti-hallucination dans leur prompt, puis contre-vérification de chaque lien).
+3. Exécuter les 3 recherches (méthode recommandée : 3 agents en parallèle, puis contre-vérification de chaque lien). **Recopie dans le prompt de chaque agent la règle d'or anti-hallucination ET l'échelle de diagnostic réseau ci-dessus**, avec la liste des portails ouverts et bloqués : le 29/07/2026, les trois agents ont conclu chacun de leur côté à une panne d'infrastructure sur de simples refus de portails, et le run entier a été abandonné. Un agent rapporte ce qu'il a pu ouvrir et ce qui l'a refusé — il ne décrète pas l'état du réseau.
 4. Scorer chaque nouveauté (/100) : `score_detail` jsonb par critère + `justification_score` (1-2 phrases) + `points_forts` / `points_vigilance`.
 4bis. **Géocoder** chaque nouveauté pour la vue carte : appeler `https://api-adresse.data.gouv.fr/search/?q=<adresse>&postcode=<CP>&limit=1`, stocker `latitude`/`longitude` (coordinates = [lng, lat]). Si l'adresse exacte n'est pas communiquée, géocoder au niveau quartier/ville et mettre `geo_approx=true`. Si rien d'exploitable, laisser lat/lng NULL.
 5. Insérer les nouveautés.
 5bis. **CONTRÔLE D'EXPIRATION — OBLIGATOIRE À CHAQUE RUN** : re-vérifier les opportunités `statut='active'` dont `verifie_le` remonte à plus de 14 jours (au minimum). Ouvrir le `lien` (WebFetch) de chacune. **N'expirer (`statut='expiree'`) QUE sur disparition CONFIRMÉE** (404, « annonce expirée / plus disponible / vendu / retiré », redirection vers une liste/accueil sans le bien). Un site qui **bloque** (403, captcha, SSL, timeout) ou un cas ambigu = **on garde `active`** (ne jamais expirer sur simple échec de fetch). Annonces vivantes → `verifie_le=now()` (et prix mis à jour si changé, commentaire système auteur NULL). Ne jamais toucher un `statut` posé à la main (a_visiter, offre_deposee, en_nego, signee, abandonnee). Compter dans `runs.expirees`.
-6. Insérer la ligne `runs` (date_run, requetes jsonb par recherche, annonces_analysees, nouvelles, expirees, erreurs).
+6. Mettre à jour la ligne `runs` réservée à l'étape 1 (requetes jsonb par recherche, annonces_analysees, nouvelles, expirees, erreurs, rapport) — et remplacer `RUN EN COURS`. Journalise le run **même s'il n'a rien donné** : un run vide documenté vaut mieux qu'un trou dans l'historique.
 7. Ne JAMAIS modifier/supprimer les commentaires des associés, ni écraser un `statut` posé à la main (le pipeline ne touche `statut` que pour `active`→`expiree`).
 8. Réponse finale : résumé en français — nouveautés par recherche avec scores, top du jour, expirées, erreurs, pistes hors base (ex. annonces sans prix affiché à creuser par téléphone).
 
