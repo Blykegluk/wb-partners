@@ -7,7 +7,8 @@ quotidien complet en le suivant à la lettre. **Supabase est l'unique source de 
 
 - **Supabase** : projet `zokdctiqmbfnoahhebys` (« WB Partners », eu-west-1) — écritures via
   le connecteur/MCP Supabase (`execute_sql`). Tables : `opportunites`, `commentaires`,
-  `runs` (schéma complet : `supabase/migration_veille.sql` de ce repo).
+  `runs` (schéma complet : `supabase/migration_veille.sql` de ce repo). Le relais
+  qui sert à ouvrir les pages web est décrit dans `supabase/migration_veille_relais.sql`.
 - **Dashboard** : https://wbpartners.fr/app/ page « Pipeline » — lit la base en direct,
   aucun déploiement nécessaire pour les données.
 - **Ce repo est en LECTURE SEULE pour toi** : ne commite rien, ne pushe jamais (un push
@@ -57,9 +58,14 @@ quotidien complet en le suivant à la lettre. **Supabase est l'unique source de 
 
 ## SOURCES
 
-Classement établi par test réel (29/07/2026). **Un portail bloqué n'est pas un
-incident : c'est l'état normal d'une bonne moitié du marché.** Ne consigne dans
-`runs.erreurs` que ce qui change par rapport à ce classement.
+Classement établi par test réel (29/07/2026), re-testé à travers le relais
+Supabase le 30/07/2026. **Un portail bloqué n'est pas un incident : c'est l'état
+normal d'une bonne moitié du marché.** Ne consigne dans `runs.erreurs` que ce
+qui change par rapport à ce classement.
+
+Mesures du 30/07/2026 via le relais, page d'accueil : BureauxLocaux 200,
+Geolocaux 200, Point de Vente 200, murscommerciaux.com 200, Les Annonces du
+Commerce en timeout TLS (à retenter, pas à radier), SeLoger 403.
 
 **Portails ouverts — commence toujours par eux**
 BureauxLocaux · Geolocaux · Point de Vente · Place des Commerces · Bien'ici
@@ -69,8 +75,8 @@ Frank, CBRE, JLL, Perfia, Huchet-Demorge, ICC Invest, Century 21 Horeca).
 
 **Portails habituellement bloqués — n'y consacre pas de budget**
 SeLoger · Leboncoin · Figaro Immobilier · CessionPME · PAP · Logic-Immo ·
-MSimond · Nuroa · Zimo. Deux refus distincts, tous deux normaux : `403` (anti-bot
-du site) et `Claude Code is unable to fetch from …` (refus de la passerelle).
+MSimond · Nuroa · Zimo. Le refus se lit dans `status_code` (403 anti-bot, ou une
+page « activez JavaScript ») : c'est normal, tu passes au suivant.
 Si WebSearch fait remonter une annonce intéressante hébergée sur l'un d'eux,
 cherche la **même annonce sur un portail ouvert ou sur le site de l'agence** —
 c'est fréquent, les mandats sont multi-diffusés. Sans page ouvrable, pas
@@ -78,42 +84,61 @@ d'insertion (voir règle d'or) : mentionne-la en piste à creuser dans le rappor
 
 - Varier les requêtes (ville × type × budget) par rapport aux runs précédents (lire `runs.requetes`) ; consigner les requêtes du jour dans `runs.requetes`.
 
-## DIAGNOSTIC RÉSEAU — NE PAS CONFONDRE BLOCAGE ET PANNE
+## OUVRIR UNE PAGE — PASSER PAR SUPABASE, PAS PAR WebFetch
 
-Un run a déjà été abandonné à tort pour « panne d'infrastructure » alors que
-seuls des portails immobiliers refusaient l'accès. Avant toute conclusion de ce
-type, applique cette échelle :
+**`WebFetch` ne fonctionne pas dans l'environnement planifié.** Ce n'est pas
+une panne passagère : le conteneur cloud n'a aucun accès sortant, et `WebFetch`
+y renvoie `403` sur *tous* les domaines — y compris `example.com` et
+`api-adresse.data.gouv.fr`. C'est ce qui a vidé les runs des 29 et 30/07/2026.
+N'essaie pas de diagnostiquer ce point : c'est établi, et l'échelle de
+diagnostic qui figurait ici ne servait qu'à le redécouvrir chaque matin.
 
-1. **Un domaine refuse** (403, refus passerelle, captcha, SSL, timeout) → normal.
-   Tu passes au suivant. Ce n'est jamais un motif d'arrêt.
-2. **Tous les portails d'une recherche refusent** → tu bascules sur les autres
-   recherches et tu notes la limite dans `runs.erreurs`. Le run continue.
-3. **Panne réelle** — le test décisif est le suivant, et lui seul : ouvre par
-   WebFetch **deux domaines de contrôle sans rapport avec l'immobilier**
-   (`example.com`, `wikipedia.org`) **et** l'API de géocodage
-   `api-adresse.data.gouv.fr`. Si ces trois-là échouent, la sortie réseau est
-   réellement coupée. Journalise le message d'erreur exact de chacun dans
-   `runs.erreurs`.
+Supabase, lui, sort sur Internet normalement. Les pages se récupèrent donc
+**par la base**, en deux appels `execute_sql` distincts :
 
-   **`WebSearch` peut parfaitement fonctionner pendant que `WebFetch` est
-   coupé** : les deux outils n'empruntent pas le même chemin réseau. Ne conclus
-   donc jamais « le réseau va bien » du seul fait que la recherche répond — et
-   inversement, un WebSearch opérationnel n'interdit pas de déclarer la panne.
-   C'est exactement ce qui s'est produit les 29/07 à 06h17 et 08h29.
+```sql
+-- 1) mise en file (un seul appel pour toutes les URL d'un lot)
+select * from veille_fetch_start(array[
+  'https://www.bureauxlocaux.com/…',
+  'https://www.geolocaux.com/…'
+]);
 
-   Dans ce cas précis : aucune insertion possible (la règle d'or l'interdit),
-   mais journalise le run avec le détail technique, et signale-le dans ta
-   réponse finale — l'environnement d'exécution planifié peut être privé de
-   réseau alors qu'une session interactive en dispose.
+-- 2) lecture, dans un appel SÉPARÉ (obligatoire : pg_net n'émet la requête
+--    qu'après le COMMIT du premier). Compter 1 à 2 s par page.
+select id, url, etat, status_code, taille, texte
+from veille_fetch_result(array[1,2]::bigint[], 20000);
+```
 
-**Un run partiel vaut toujours mieux qu'un run abandonné.** Dès qu'une seule
-annonce a pu être ouverte et vérifiée, insère-la et journalise le run avec ses
-limites, plutôt que de tout jeter.
+- `etat = 'ok'` → la page est lue, `texte` contient le HTML nettoyé.
+- `etat = 'en_attente'` → refais l'appel (2), rien d'autre.
+- `etat = 'erreur'` → DNS/TLS/timeout, avec le message exact dans `erreur`.
+- `status_code` 403/404 n'est pas une erreur de transport : **c'est le portail
+  qui refuse**, exactement comme en local. Tu passes au suivant.
+
+Le troisième argument de `veille_fetch_result` borne la taille du texte rendu
+(20 000 caractères par défaut) : sur une page de résultats, monte-le ; sur un
+lot de dix fiches, descends-le pour ne pas saturer ta lecture.
+
+N'ajoute pas d'en-têtes HTTP sans raison : Geolocaux renvoie « 400 Invalid
+Header » dès qu'un en-tête personnalisé est présent, même un simple
+User-Agent, alors qu'il répond 200 sans rien.
+
+**Géocodage (étape 4bis)** : même chemin, avec `veille_geocode_result` qui rend
+directement `latitude` / `longitude` / `label`.
+
+**Ce que ça ne change pas** : un portail bloqué reste l'état normal d'une bonne
+moitié du marché, et **un run partiel vaut toujours mieux qu'un run abandonné**.
+Dès qu'une seule annonce a pu être ouverte et vérifiée, insère-la et journalise
+le run avec ses limites, plutôt que de tout jeter.
+
+**Si le relais lui-même tombe** (les appels `execute_sql` échouent), alors la
+base est inaccessible et il n'y a effectivement plus rien à faire : journalise
+si tu le peux, signale-le dans ta réponse finale, et arrête-toi.
 
 ## RÈGLES
 
 - **Fraîcheur** : prioriser le publié/modifié récent. Re-vérifier les `active` de plus de 14 jours ; annonce disparue → `statut='expiree'` (jamais supprimée, jamais re-proposée).
-- **Anti-hallucination — règle d'or** : chaque ligne insérée = une annonce réelle dont le lien a été **ouvert (WebFetch réussi) pendant le run**. Jamais d'annonce de mémoire. Donnée absente = "à vérifier". `prix` (ou `loyer_annuel`), `surface_totale` et `lien` obligatoires, sinon pas d'insertion. Contre-vérifier chaque lien avant insertion.
+- **Anti-hallucination — règle d'or** : chaque ligne insérée = une annonce réelle dont le lien a été **ouvert pendant le run par le relais Supabase** (`etat='ok'` et `status_code=200`, avec du texte exploitable en retour). Jamais d'annonce de mémoire. Donnée absente = "à vérifier". `prix` (ou `loyer_annuel`), `surface_totale` et `lien` obligatoires, sinon pas d'insertion. Contre-vérifier chaque lien avant insertion.
 - **Pistes hors critères (exception encadrée)** : un dossier EXCEPTIONNEL qui coche toutes les cases d'une recherche sauf UNE règle bloquante (ex. prix non affiché « nous consulter ») peut être inséré avec `hors_critere=true` et `motif_hors_critere` (règle non satisfaite + pourquoi le dossier mérite le suivi + action à mener). Maximum 1-2 par run, uniquement si vraiment remarquable (ex. PC purgé pour résidence hôtelière). Le lien doit quand même avoir été ouvert et vérifié ; `score` peut rester NULL si inévaluable. Ces pistes apparaissent dans une sous-section dédiée du dashboard, hors compteurs.
 
 ## DÉROULÉ DU RUN
@@ -131,9 +156,11 @@ limites, plutôt que de tout jeter.
    fraîcheur d'autant : sur dix jours d'absence, une annonce publiée il y a huit
    jours est une nouveauté pour la base, pas une annonce périmée.
 2. Lire `opportunites` (clés, statuts). Dédoublonnage par `cle_unique` (adresse normalisée minuscule sans accents + surface arrondie à 5 m² + prix arrondi à 10 k€ ; fallback titre+surface+prix+source). Upsert : clé existante → mettre à jour `verifie_le` et le prix s'il a changé (ancien prix consigné en commentaire système, `auteur` NULL, ex. "Prix modifié : 590 k → 550 k").
-3. Exécuter les 3 recherches (méthode recommandée : 3 agents en parallèle, puis contre-vérification de chaque lien). **Recopie dans le prompt de chaque agent la règle d'or anti-hallucination ET l'échelle de diagnostic réseau ci-dessus**, avec la liste des portails ouverts et bloqués : le 29/07/2026, les trois agents ont conclu chacun de leur côté à une panne d'infrastructure sur de simples refus de portails, et le run entier a été abandonné. Un agent rapporte ce qu'il a pu ouvrir et ce qui l'a refusé — il ne décrète pas l'état du réseau.
+3. Exécuter les 3 recherches (méthode recommandée : 3 agents en parallèle, puis contre-vérification de chaque lien). **Recopie dans le prompt de chaque agent la règle d'or anti-hallucination ET le mode d'emploi du relais Supabase ci-dessus**, avec la liste des portails ouverts et bloqués : le 29/07/2026, les trois agents ont conclu chacun de leur côté à une panne d'infrastructure sur de simples refus de portails, et le run entier a été abandonné. Un agent rapporte ce qu'il a pu ouvrir et ce qui l'a refusé — il ne décrète pas l'état du réseau, et il n'utilise jamais `WebFetch`, qui échouera.
+
+   **Si un agent n'a pas accès au connecteur Supabase**, il ne peut pas ouvrir de page : qu'il te renvoie alors la liste des URL à ouvrir plutôt que de conclure quoi que ce soit, et fais les appels `veille_fetch_start` / `veille_fetch_result` toi-même avant de lui transmettre le texte. `WebSearch` reste disponible pour *trouver* les annonces — c'est seulement leur ouverture qui passe par le relais.
 4. Scorer chaque nouveauté (/100) : `score_detail` jsonb par critère + `justification_score` (1-2 phrases) + `points_forts` / `points_vigilance`.
-4bis. **Géocoder** chaque nouveauté pour la vue carte : appeler `https://api-adresse.data.gouv.fr/search/?q=<adresse>&postcode=<CP>&limit=1`, stocker `latitude`/`longitude` (coordinates = [lng, lat]). Si l'adresse exacte n'est pas communiquée, géocoder au niveau quartier/ville et mettre `geo_approx=true`. Si rien d'exploitable, laisser lat/lng NULL.
+4bis. **Géocoder** chaque nouveauté pour la vue carte : mettre en file les URL `https://api-adresse.data.gouv.fr/search/?q=<adresse>&postcode=<CP>&limit=1` avec `veille_fetch_start`, puis lire `veille_geocode_result` qui rend directement `latitude`/`longitude`. Si l'adresse exacte n'est pas communiquée, géocoder au niveau quartier/ville et mettre `geo_approx=true`. Si rien d'exploitable, laisser lat/lng NULL.
 5. Insérer les nouveautés.
 5bis. **CONTRÔLE D'EXPIRATION — OBLIGATOIRE À CHAQUE RUN** : re-vérifier les opportunités `statut='active'` dont `verifie_le` remonte à plus de 14 jours (au minimum). Ouvrir le `lien` (WebFetch) de chacune. **N'expirer (`statut='expiree'`) QUE sur disparition CONFIRMÉE** (404, « annonce expirée / plus disponible / vendu / retiré », redirection vers une liste/accueil sans le bien). Un site qui **bloque** (403, captcha, SSL, timeout) ou un cas ambigu = **on garde `active`** (ne jamais expirer sur simple échec de fetch). Annonces vivantes → `verifie_le=now()` (et prix mis à jour si changé, commentaire système auteur NULL). Ne jamais toucher un `statut` posé à la main (a_visiter, offre_deposee, en_nego, signee, abandonnee). Compter dans `runs.expirees`.
 6. Mettre à jour la ligne `runs` réservée à l'étape 1 (requetes jsonb par recherche, annonces_analysees, nouvelles, expirees, erreurs, rapport) — et remplacer `RUN EN COURS`. Journalise le run **même s'il n'a rien donné** : un run vide documenté vaut mieux qu'un trou dans l'historique.
