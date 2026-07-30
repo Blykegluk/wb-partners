@@ -31,6 +31,8 @@ export function SocieteProvider({ children }) {
   const [bankConnection, setBankConnection] = useState(null)
   const [bankAccounts, setBankAccounts] = useState([])
   const [bankTransactions, setBankTransactions] = useState([])
+  const [courriers, setCourriers] = useState([])
+  const [envoisConfig, setEnvoisConfig] = useState(null)
   const [loadingData, setLoadingData] = useState(false)
   const hasLoadedData = useRef(false)
 
@@ -81,7 +83,7 @@ export function SocieteProvider({ children }) {
     if (!hasLoadedData.current) setLoadingData(true)
     const sid = selected.id
 
-    const [b, l, ba, d, m, rev, evt, ac, act, bact, pers, bkAcc, bkTx] = await Promise.all([
+    const [b, l, ba, d, m, rev, evt, ac, act, bact, pers, bkAcc, bkTx, crr, envCfg] = await Promise.all([
       supabase.from('biens').select('*').eq('societe_id', sid).order('created_at'),
       supabase.from('locataires').select('*').eq('societe_id', sid).order('created_at'),
       supabase.from('baux').select('*').eq('societe_id', sid).order('created_at'),
@@ -102,6 +104,11 @@ export function SocieteProvider({ children }) {
       // ne pas alourdir le chargement de l'application.
       supabase.from('bank_transactions').select('*').eq('societe_id', sid)
         .order('booking_date', { ascending: false }).limit(500),
+      // Historique des courriers (quittances, relances…) : alimente la
+      // colonne « dernier courrier » du suivi des loyers.
+      supabase.from('courriers_envoyes').select('*').eq('societe_id', sid)
+        .order('envoye_le', { ascending: false }).limit(500),
+      supabase.from('envois_config').select('*').eq('societe_id', sid).maybeSingle(),
     ])
 
     setBiens(b.data || [])
@@ -118,6 +125,8 @@ export function SocieteProvider({ children }) {
     const comptes = bkAcc.data || []
     setBankAccounts(comptes)
     setBankTransactions(bkTx.data || [])
+    setCourriers(crr.data || [])
+    setEnvoisConfig(envCfg.data || null)
 
     // État de la connexion déduit des comptes : un compte présent implique un
     // consentement abouti. La date de synchronisation la plus récente et le
@@ -161,6 +170,7 @@ export function SocieteProvider({ children }) {
       selected, selectSociete, role, canEdit, isAdmin,
       biens, locataires, baux, transactions, documents, membres, revisions, evenements, appelsCharges, actionnaires, bienActionnaires, personnes,
       bankConnection, bankAccounts, bankTransactions,
+      courriers, envoisConfig,
       loadingData, reload,
     }}>
       {children}

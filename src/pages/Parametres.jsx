@@ -13,6 +13,7 @@ const TABS = [
   { key: 'actionnariat', label: 'Actionnariat' },
   { key: 'membres', label: 'Membres' },
   { key: 'banque', label: 'Banque' },
+  { key: 'envois', label: 'Envois' },
 ]
 
 export default function Parametres({ navState, setNavState }) {
@@ -53,7 +54,151 @@ export default function Parametres({ navState, setNavState }) {
       <div style={{ display: tab === 'banque' ? 'block' : 'none' }}>
         <BanqueTab />
       </div>
+      <div style={{ display: tab === 'envois' ? 'block' : 'none' }}>
+        <EnvoisTab />
+      </div>
     </div>
+  )
+}
+
+// ── Envois tab ──────────────────────────────────────────
+// Paramétrage des envois automatiques : quittances, avis d'échéance et
+// paliers de relance. Les emails partent de contact@wbpartners.fr via la
+// fonction auto-documents, déclenchée chaque matin par le cron de la base.
+// Sans ligne envois_config, la société n'envoie rien : opt-in explicite.
+function EnvoisTab() {
+  const { selected, baux, envoisConfig, isAdmin, reload } = useSociete()
+  const [f, setF] = useState({
+    quittance_auto: false, avis_actif: false, avis_jour: 1,
+    relance_apres_jours: 5, mise_en_demeure_apres_jours: 15, commandement_apres_jours: 30,
+  })
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    if (envoisConfig) {
+      setF({
+        quittance_auto: envoisConfig.quittance_auto,
+        avis_actif: envoisConfig.avis_jour != null,
+        avis_jour: envoisConfig.avis_jour ?? 1,
+        relance_apres_jours: envoisConfig.relance_apres_jours,
+        mise_en_demeure_apres_jours: envoisConfig.mise_en_demeure_apres_jours,
+        commandement_apres_jours: envoisConfig.commandement_apres_jours,
+      })
+    }
+  }, [envoisConfig])
+
+  const u = (k, v) => setF(p => ({ ...p, [k]: v }))
+
+  const save = async () => {
+    const { error } = await supabase.from('envois_config').upsert({
+      societe_id: selected.id,
+      quittance_auto: f.quittance_auto,
+      avis_jour: f.avis_actif ? Number(f.avis_jour) : null,
+      relance_apres_jours: Number(f.relance_apres_jours),
+      mise_en_demeure_apres_jours: Number(f.mise_en_demeure_apres_jours),
+      commandement_apres_jours: Number(f.commandement_apres_jours),
+      updated_at: new Date().toISOString(),
+    })
+    if (error) { alert(`Enregistrement impossible : ${error.message}`) ; return }
+    reload()
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+
+  const bauxAvecAuto = baux.filter(b => b.actif && (b.auto_avis || b.auto_relance))
+
+  return (
+    <Card className="p-6">
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="text-sm font-bold text-navy">Envois automatiques</h3>
+        {isAdmin && (
+          <Btn onClick={save}>
+            {saved ? <><CheckCircle size={15} /> Enregistré</> : 'Enregistrer'}
+          </Btn>
+        )}
+      </div>
+      <p className="text-xs text-gray-400 mb-6">
+        Les documents partent par email depuis <strong className="text-gray-500">contact@wbpartners.fr</strong>,
+        chaque matin vers 8h30. Chaque envoi est tracé dans le suivi des loyers.
+        {!envoisConfig && ' Tant que rien n’est enregistré ici, aucun envoi automatique n’a lieu.'}
+      </p>
+
+      <h4 className="text-xs font-bold uppercase text-gray-400 mb-3">Quittances</h4>
+      <label className="flex items-center gap-2 mb-1 cursor-pointer text-sm text-gray-700">
+        <input type="checkbox" className="w-4 h-4 rounded border-gray-300 accent-navy"
+          checked={f.quittance_auto} disabled={!isAdmin}
+          onChange={e => u('quittance_auto', e.target.checked)} />
+        Envoyer la quittance dès qu'un loyer est rapproché d'un virement
+      </label>
+      <p className="text-xs text-gray-400 mb-6 ml-6">
+        La quittance n'est jamais envoyée sur un simple « payé » coché à la main :
+        il faut un virement constaté en banque.
+      </p>
+
+      <h4 className="text-xs font-bold uppercase text-gray-400 mb-3">Avis d'échéance</h4>
+      <label className="flex items-center gap-2 mb-2 cursor-pointer text-sm text-gray-700">
+        <input type="checkbox" className="w-4 h-4 rounded border-gray-300 accent-navy"
+          checked={f.avis_actif} disabled={!isAdmin}
+          onChange={e => u('avis_actif', e.target.checked)} />
+        Envoyer l'avis d'échéance du mois en cours
+      </label>
+      {f.avis_actif && (
+        <div className="ml-6 mb-2 w-56">
+          <Sel label="Jour d'envoi" value={f.avis_jour} disabled={!isAdmin}
+            onChange={e => u('avis_jour', e.target.value)}
+            options={Array.from({ length: 28 }, (_, i) => ({ v: i + 1, l: `Le ${i + 1} du mois` }))} />
+        </div>
+      )}
+      <p className="text-xs text-gray-400 mb-6 ml-6">
+        Seuls les baux dont la case « Envoyer avis d'échéance automatiquement »
+        est cochée (fiche du bail, page Patrimoine) sont concernés.
+      </p>
+
+      <h4 className="text-xs font-bold uppercase text-gray-400 mb-3">Paliers de relance</h4>
+      <p className="text-xs text-gray-400 mb-3">
+        Délais en jours de retard depuis le 1er du mois dû. Chaque document n'est
+        envoyé qu'une fois par échéance, aux baux dont la case « Envoyer relances
+        automatiquement » est cochée.
+      </p>
+      <Grid2>
+        <Field label="Relance amiable après (jours)" type="number" min="1"
+          value={f.relance_apres_jours} disabled={!isAdmin}
+          onChange={e => u('relance_apres_jours', e.target.value)} />
+        <Field label="Mise en demeure après (jours)" type="number" min="1"
+          value={f.mise_en_demeure_apres_jours} disabled={!isAdmin}
+          onChange={e => u('mise_en_demeure_apres_jours', e.target.value)} />
+      </Grid2>
+      <div className="w-1/2 pr-2">
+        <Field label="Commandement proposé après (jours)" type="number" min="1"
+          value={f.commandement_apres_jours} disabled={!isAdmin}
+          onChange={e => u('commandement_apres_jours', e.target.value)} />
+      </div>
+      <p className="text-xs text-gray-400 mb-6">
+        Le commandement de payer n'est <strong>jamais envoyé par email</strong> : il n'a de
+        valeur que signifié par commissaire de justice. Passé ce délai, l'application
+        le propose simplement en PDF dans le suivi des loyers.
+      </p>
+
+      <h4 className="text-xs font-bold uppercase text-gray-400 mb-3">Baux concernés</h4>
+      {bauxAvecAuto.length === 0 ? (
+        <p className="text-xs text-gray-400">
+          Aucun bail actif n'a d'envoi automatique activé. Les cases se cochent
+          sur la fiche de chaque bail, page Patrimoine.
+        </p>
+      ) : (
+        <div className="space-y-1.5">
+          {bauxAvecAuto.map(b => (
+            <div key={b.id} className="flex items-center gap-2 text-sm text-gray-600">
+              <Shield size={13} className="text-gray-300" />
+              Bail du {fmtDate(b.date_debut)}
+              <span className="text-xs text-gray-400">
+                {[b.auto_avis && 'avis', b.auto_relance && 'relances'].filter(Boolean).join(' + ')}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
   )
 }
 

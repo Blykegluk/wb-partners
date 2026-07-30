@@ -323,3 +323,107 @@ export const ecartsEncaissement = ({
     creditsNonRattaches,
   }
 }
+
+/**
+ * Suivi des loyers : la vie de chaque échéance sur une ligne.
+ *
+ * Pour chaque bail productif et chaque mois de l'année : l'attendu TTC, ce
+ * qui est réellement entré en banque, la façon dont on le sait (rapproché
+ * automatiquement, à la main, ou simplement déclaré), l'écart, et le dernier
+ * courrier parti. C'est la vue qui réunit ce que l'Échéancier, les Écarts et
+ * les Relances montraient chacun de leur côté.
+ */
+export const suiviLoyers = ({
+  baux = [], biens = [], transactions = [], bankTransactions = [], courriers = [], annee,
+}) => {
+  const actifs = bauxProductifs(baux, biens)
+  const now = new Date()
+
+  const rapprochesParEcheance = new Map()
+  for (const mvt of bankTransactions) {
+    if (!mvt.transaction_id || !mvt.statut_rapprochement?.startsWith('rapproche')) continue
+    const liste = rapprochesParEcheance.get(mvt.transaction_id) || []
+    liste.push(mvt)
+    rapprochesParEcheance.set(mvt.transaction_id, liste)
+  }
+
+  // Dernier courrier par échéance et par période de bail (les avis
+  // d'échéance ne référencent pas d'échéance, seulement bail + période).
+  const courrierPour = (bailId, echId, mois) => {
+    return courriers.find(c =>
+      c.statut === 'envoye'
+      && ((echId && c.transaction_id === echId)
+        || (c.bail_id === bailId && c.mois === mois && c.annee === annee))
+    ) || null
+  }
+
+  const parBail = actifs.map(bail => {
+    const coef = coefTva(bail)
+    const lignes = []
+
+    for (let mois = 0; mois < 12; mois++) {
+      const attendu = attenduMois(bail, mois, annee) * coef
+      const ech = transactions.find(t => t.bail_id === bail.id && t.mois === mois && t.annee === annee) || null
+      const mouvements = ech ? (rapprochesParEcheance.get(ech.id) || []) : []
+      const recu = mouvements.reduce((s, m) => s + Number(m.amount || 0), 0)
+      const futur = new Date(annee, mois, 1) > new Date(now.getFullYear(), now.getMonth(), 1)
+
+      // Comment sait-on que c'est payé ?
+      let qualification = 'aucun'
+      if (mouvements.length > 0) {
+        qualification = mouvements.some(m => m.statut_rapprochement === 'rapproche_auto')
+          ? 'rapproche_auto' : 'rapproche_manuel'
+      } else if (ech?.statut === 'payé') {
+        qualification = 'declare'
+      }
+
+      const ecart = recu - attendu
+      let verdict
+      if (attendu === 0) verdict = 'horsBail'
+      else if (futur) verdict = 'futur'
+      else if (recu === 0) verdict = 'flag'
+      else if (Math.abs(ecart) < 0.02) verdict = 'ok'
+      else if (ecart < 0) verdict = 'watch'
+      else verdict = 'ok'
+
+      lignes.push({
+        mois, attendu, ech, mouvements, recu, ecart, futur, qualification, verdict,
+        motifEcart: mouvements.find(m => m.motif_ecart)?.motif_ecart || null,
+        courrier: attendu > 0 ? courrierPour(bail.id, ech?.id, mois) : null,
+      })
+    }
+
+    const duesADate = lignes.filter(l => l.attendu > 0 && !l.futur)
+    return {
+      bail,
+      lignes,
+      totaux: {
+        attendu: lignes.reduce((s, l) => s + l.attendu, 0),
+        recu: lignes.reduce((s, l) => s + l.recu, 0),
+        // L'écart total ne compte que le passé : un loyer de décembre non
+        // encore dû n'est pas un manque à encaisser.
+        ecart: duesADate.reduce((s, l) => s + l.ecart, 0),
+        moisSansVirement: duesADate.filter(l => l.recu === 0).length,
+      },
+    }
+  })
+
+  const total = parBail.reduce((a, b) => ({
+    attendu: a.attendu + b.totaux.attendu,
+    recu: a.recu + b.totaux.recu,
+    ecart: a.ecart + b.totaux.ecart,
+    moisSansVirement: a.moisSansVirement + b.totaux.moisSansVirement,
+  }), { attendu: 0, recu: 0, ecart: 0, moisSansVirement: 0 })
+
+  // Argent entré sans échéance en face : crédits non rattachés ou qualifiés
+  // hors loyer, sur l'année affichée.
+  const horsEcheance = bankTransactions.filter(t =>
+    Number(t.amount) > 0
+    && !t.transaction_id
+    && t.booking_date && new Date(t.booking_date).getFullYear() === annee,
+  )
+
+  const courriersAnnee = courriers.filter(c => c.annee === annee || (!c.annee && new Date(c.envoye_le).getFullYear() === annee))
+
+  return { parBail, total, horsEcheance, courriersAnnee }
+}
