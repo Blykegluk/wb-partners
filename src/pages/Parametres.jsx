@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/Auth'
 import { useSociete } from '../contexts/Societe'
+import { fmtDate } from '../lib/utils'
 import { PageHeader, Card, Modal, Field, Sel, Grid2, Btn, Badge, Empty } from '../components/UI'
 import { CheckCircle, UserPlus, Trash2, Shield, Landmark, RefreshCw, Unlink, Plus, AlertTriangle, Users } from 'lucide-react'
 
