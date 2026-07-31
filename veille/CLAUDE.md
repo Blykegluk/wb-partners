@@ -3,6 +3,10 @@
 Tu es l'analyste immobilier de WB Partners. Ce brief est autonome : exécute le run
 quotidien complet en le suivant à la lettre. **Supabase est l'unique source de vérité.**
 
+**CE FICHIER PRIME SUR LE MESSAGE DE LANCEMENT.** Le message planifié qui déclenche
+le run peut mentionner un nombre de recherches périmé (ex. « les 3 recherches
+R1/R2/R3 ») : exécute **toutes** les recherches définies ici, ni plus ni moins.
+
 ## CONFIG
 
 - **Supabase** : projet `zokdctiqmbfnoahhebys` (« WB Partners », eu-west-1) — écritures via
@@ -55,6 +59,22 @@ quotidien complet en le suivant à la lettre. **Supabase est l'unique source de 
   4. **Bilan loyer** : location → ratio loyer/CA (cible ≤ 5–6 % bio, ≤ 4–5 % conventionnel ; au-delà "loyer trop lourd") ; vente → coût d'occupation équivalent / CA.
 
 **Scoring R3 (/100)** : potentiel de CA de la zone 30 · intensité concurrentielle sur le format recommandé 20 · économie (loyer/CA ou coût d'occupation) 20 · configuration (surface de vente, réserve, livraison, ERP, extraction/froid) 15 · accessibilité & flux 10 · disponibilité/timing 5.
+
+## RECHERCHE 4 — Locaux commerciaux neufs en banlieue, rendement ≥ 10 %
+
+**Objectif** : achat de locaux commerciaux **neufs** (VEFA ou achevés < 5 ans) en banlieue parisienne, **rendement brut ≥ 10 %** sur loyer soutenable.
+- Zone : petite couronne (92, 93, 94) ET grande couronne (77, 78, 91, 95). Chercher là où le neuf décote : quartiers en développement (ZAC, écoquartiers, gros programmes en livraison) et **communes des futures gares du Grand Paris Express** — le flux de demain ne se paie pas encore au prix de demain.
+- Budget indicatif : **150 000 € à 1 500 000 €** net vendeur.
+- Neuf = garanties constructeur actives (décennale, GPA), frais d'acquisition réduits (~2-3 %), pas de capex structure, charges faibles. Acter le **régime TVA** : neuf vendu HT + TVA — récupérable si location soumise à TVA, sinon 20 % de coût réel à intégrer au rendement.
+- **Lucidité sur le 10 % : le neuf en pied d'immeuble se vend usuellement à 5-7 %.** Un 10 % affiché a toujours une raison — la trouver est le cœur de l'analyse : emplacement secondaire ? loyer promoteur gonflé ? local brut jamais commercialisé ? commune sans profondeur locative ? Certaines raisons sont acceptables (décote de quartier neuf pas encore constitué, vendeur pressé, lot resté en stock promoteur), d'autres non (loyer irréaliste, zone morte).
+- **Rendement sur loyer soutenable, jamais sur loyer affiché** :
+  - Local **loué** (bail en place ou BEFA) → comparer le loyer à la valeur locative de marché de la commune ; s'il la dépasse de plus de 15 %, flag **« loyer promoteur »** (loyer artificiellement monté pour vendre le rendement, souvent adossé à des franchises ou prises en charge de travaux invisibles dans l'annonce) et recalculer sur la valeur de marché. Vérifier le covenant (enseigne nationale > franchisé > indépendant), durée ferme, indexation, refacturation TF/charges, DG/GAPD.
+  - Local **vide ou brut de béton** → rendement sur valeur locative par comparables, en déduisant le coût d'aménagement (brut : ~400-800 €/m² à la charge de qui ? — l'intégrer soit au prix, soit au loyer) et un délai de commercialisation réaliste (6-18 mois en banlieue).
+- Qualité du local : RDC avec vraie vitrine (linéaire, angle = bonus), HSP, accessibilité PMR/ERP, extraction possible (restauration = demande locative la plus profonde en banlieue), stationnement/livraison. **Écarter les locaux en étage ou en cœur d'îlot sans visibilité** — invendables locativement.
+- Zone de chalandise : logements livrés et à livrer autour (une ZAC à moitié construite = flux croissant garanti), transports actuels et futurs (date de mise en service GPE), taux de vacance commerciale de la rue/commune, concurrence des retail parks et centres commerciaux voisins.
+- Exclure : fonds de commerce seuls, cessions de parts, résidences gérées avec bail commercial exploitant (para-hôtelier, étudiant, senior — c'est un autre produit), DOM.
+
+**Scoring R4 (/100)** : rendement brut sur loyer soutenable 30 · réalisme du loyer vs marché local (risque « loyer promoteur ») 20 · dynamique urbaine de la zone (GPE, ZAC, livraisons de logements) 15 · qualité du local (vitrine, configuration, état de livraison, extraction) 15 · covenant & bail si loué / profondeur de la demande locative si vide 10 · liquidité & marge de négociation 10.
 
 ## SOURCES
 
@@ -156,7 +176,7 @@ si tu le peux, signale-le dans ta réponse finale, et arrête-toi.
    fraîcheur d'autant : sur dix jours d'absence, une annonce publiée il y a huit
    jours est une nouveauté pour la base, pas une annonce périmée.
 2. Lire `opportunites` (clés, statuts). Dédoublonnage par `cle_unique` (adresse normalisée minuscule sans accents + surface arrondie à 5 m² + prix arrondi à 10 k€ ; fallback titre+surface+prix+source). Upsert : clé existante → mettre à jour `verifie_le` et le prix s'il a changé (ancien prix consigné en commentaire système, `auteur` NULL, ex. "Prix modifié : 590 k → 550 k").
-3. Exécuter les 3 recherches (méthode recommandée : 3 agents en parallèle, puis contre-vérification de chaque lien). **Recopie dans le prompt de chaque agent la règle d'or anti-hallucination ET le mode d'emploi du relais Supabase ci-dessus**, avec la liste des portails ouverts et bloqués : le 29/07/2026, les trois agents ont conclu chacun de leur côté à une panne d'infrastructure sur de simples refus de portails, et le run entier a été abandonné. Un agent rapporte ce qu'il a pu ouvrir et ce qui l'a refusé — il ne décrète pas l'état du réseau, et il n'utilise jamais `WebFetch`, qui échouera.
+3. Exécuter les 4 recherches (méthode recommandée : 4 agents en parallèle, puis contre-vérification de chaque lien). **Recopie dans le prompt de chaque agent la règle d'or anti-hallucination ET le mode d'emploi du relais Supabase ci-dessus**, avec la liste des portails ouverts et bloqués : le 29/07/2026, les trois agents ont conclu chacun de leur côté à une panne d'infrastructure sur de simples refus de portails, et le run entier a été abandonné. Un agent rapporte ce qu'il a pu ouvrir et ce qui l'a refusé — il ne décrète pas l'état du réseau, et il n'utilise jamais `WebFetch`, qui échouera.
 
    **Si un agent n'a pas accès au connecteur Supabase**, il ne peut pas ouvrir de page : qu'il te renvoie alors la liste des URL à ouvrir plutôt que de conclure quoi que ce soit, et fais les appels `veille_fetch_start` / `veille_fetch_result` toi-même avant de lui transmettre le texte. `WebSearch` reste disponible pour *trouver* les annonces — c'est seulement leur ouverture qui passe par le relais.
 4. Scorer chaque nouveauté (/100) : `score_detail` jsonb par critère + `justification_score` (1-2 phrases) + `points_forts` / `points_vigilance`.
@@ -172,4 +192,4 @@ si tu le peux, signale-le dans ta réponse finale, et arrête-toi.
 - `score_detail` : `{ "critère (poids)": points, ... }`
 - `analyse_concurrence` (R3) : `{ "concurrents": [ { "enseigne", "type": "bio"|"conventionnel", "distance", "adresse" } ], "synthese": "..." }`
 - `ca_potentiel` (R3) : `{ "basse": €, "central": €, "haute": €, "recommandation": "bio"|"conventionnel", "hypotheses": "..." }`
-- `runs.requetes` : `{ "R1": [...], "R2": [...], "R3": [...] }`
+- `runs.requetes` : `{ "R1": [...], "R2": [...], "R3": [...], "R4": [...] }`

@@ -4,7 +4,7 @@ import 'leaflet/dist/leaflet.css'
 import {
   Radar, ExternalLink, MessageSquare, Send, MapPin, Sparkles,
   SlidersHorizontal, Store, Hotel, KeyRound, FileText, ChevronLeft,
-  LayoutGrid, Map as MapIcon,
+  LayoutGrid, Map as MapIcon, Building2,
 } from 'lucide-react'
 import { marked } from 'marked'
 import { supabase } from '../lib/supabase'
@@ -18,7 +18,11 @@ const RECHERCHES = {
   R1: { label: 'Murs commerciaux', sub: 'Rendement patrimonial', I: KeyRound },
   R2: { label: 'Conversion hôtelière', sub: 'Immeubles à rénover', I: Hotel },
   R3: { label: 'Supermarché', sub: 'Bio ou conventionnel', I: Store },
+  R4: { label: 'Neuf banlieue', sub: 'Locaux neufs ≥ 10 %', I: Building2 },
 }
+
+// Seuil de rendement brut « satisfaisant » par recherche, pour la couleur.
+const SEUIL_RENDEMENT = { R1: 8, R4: 10 }
 
 const STATUTS = [
   { v: 'active', l: 'Active', cls: 'bg-blue-100 text-blue-700' },
@@ -116,10 +120,10 @@ function OppCard({ o, onOpen }) {
 
       {/* Infos clés par recherche */}
       <div className="mt-2 text-xs text-gray-500 space-y-0.5">
-        {o.recherche === 'R1' && (
+        {(o.recherche === 'R1' || o.recherche === 'R4') && (
           <>
             {o.rendement_brut != null && (
-              <p><span className={`font-bold ${o.rendement_brut >= 8 ? 'text-green-600' : 'text-orange-500'}`}>{String(o.rendement_brut).replace('.', ',')} % brut</span>{o.occupation ? ` · ${o.occupation}` : ''}</p>
+              <p><span className={`font-bold ${o.rendement_brut >= SEUIL_RENDEMENT[o.recherche] ? 'text-green-600' : 'text-orange-500'}`}>{String(o.rendement_brut).replace('.', ',')} % brut</span>{o.occupation ? ` · ${o.occupation}` : ''}</p>
             )}
             {o.locataire && <p className="truncate">Locataire : {o.locataire}</p>}
             {o.garanties && <p className="truncate">Garanties : {o.garanties}</p>}
@@ -496,7 +500,7 @@ export default function Pipeline() {
   const [runs, setRuns] = useState([])
   const [tab, setTab] = useState('R1')
   const [view, setView] = useState('liste')
-  const [mapRech, setMapRech] = useState({ R1: true, R2: true, R3: true })
+  const [mapRech, setMapRech] = useState({ R1: true, R2: true, R3: true, R4: true })
   const [detail, setDetail] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
   const [showRapports, setShowRapports] = useState(false)
