@@ -127,6 +127,7 @@ export const agregatsBiens = (biens = [], bienActionnaires = [], baux = [], ref 
     loyerMensuelBrut: 0, loyerMensuelNet: 0,
     cashflowBrut: 0, cashflowNet: 0,
     partielle: false,      // au moins un bien n'est pas détenu à 100 %
+    detteEstimee: false,   // au moins un prêt sans termes : capital d'origine affiché
     // Biens sous compromis, pas encore signés : suivis à part, exclus des
     // agrégats ci-dessus.
     nbEnCours: 0,
@@ -137,14 +138,18 @@ export const agregatsBiens = (biens = [], bienActionnaires = [], baux = [], ref 
     const part = partSociete(b.id, bienActionnaires)
     if (part < 0.9999) acc.partielle = true
     const prix = b.prix_achat || 0
-    const dette = b.montant_emprunt || 0
 
     if (!estAcquis(b, ref)) {
       acc.nbEnCours += 1
       acc.valeurEnCours += prix * part
-      acc.engagementEnCours += dette * part
+      acc.engagementEnCours += (b.montant_emprunt || 0) * part
       return
     }
+
+    // Dette = capital restant dû, pas capital d'origine.
+    const pret = encoursPret(b, ref)
+    const dette = pret.montant
+    if (pret.estime) acc.detteEstimee = true
 
     const loyer = loyerMensuelBien(b, baux)
     const cf = cashflowMensuel(b, baux)
@@ -190,7 +195,7 @@ export const quotePartPersonne = ({
   // découler tant que l'acte n'est pas signé.
   biens.filter(b => estAcquis(b, ref)).forEach(b => {
     const prix = b.prix_achat || 0
-    const dette = b.montant_emprunt || 0
+    const dette = encoursPret(b, ref).montant
     const loyer = loyerMensuelBien(b, baux)
     const cf = cashflowMensuel(b, baux)
 
@@ -641,4 +646,63 @@ export const tvaReelle = ({ bankAccounts = [], bankTransactions = [], transactio
     tvaDeclareeNonComptee,
     ecartsRapprochement: mois.reduce((s, m) => s + m.ecartRapprochement, 0),
   }
+}
+
+// ── Emprunts : encours réel et intérêts ─────────────────────────
+//
+// « Dette » affichait le capital emprunté d'origine, jamais amorti : le
+// patrimoine net était sous-évalué de tout le capital déjà remboursé. Le
+// tableau d'amortissement se calcule depuis les termes du prêt de la fiche
+// bien (montant, taux, durée, différé) — sans taux renseigné, on retombe
+// sur le capital initial en le disant (estime: true).
+
+/** Nombre de mensualités déjà versées à la date de référence. */
+const mensualitesVersees = (bien, ref = new Date()) => {
+  if (!bien.date_acquisition) return 0
+  const debut = new Date(bien.date_acquisition)
+  // Le différé (decalage_pret, en mois) repousse la première mensualité.
+  debut.setMonth(debut.getMonth() + Number(bien.decalage_pret || 0))
+  const n = (ref.getFullYear() - debut.getFullYear()) * 12 + (ref.getMonth() - debut.getMonth())
+  return Math.max(0, Math.min(n, Number(bien.duree_credit || 0)))
+}
+
+/**
+ * Capital restant dû du prêt d'un bien à une date. Renvoie
+ * { montant, estime } — estime=true quand les termes manquent (taux ou
+ * durée absents) et que le chiffre est le capital d'origine, pas un encours.
+ */
+export const encoursPret = (bien, ref = new Date()) => {
+  const K = Number(bien.montant_emprunt || 0)
+  if (K <= 0) return { montant: 0, estime: false }
+  const taux = Number(bien.taux_interet)
+  const duree = Number(bien.duree_credit)
+  if (!taux || !duree || !bien.date_acquisition) return { montant: K, estime: true }
+  const r = taux / 100 / 12
+  const M = K * r / (1 - Math.pow(1 + r, -duree))
+  const n = mensualitesVersees(bien, ref)
+  const crd = K * Math.pow(1 + r, n) - M * (Math.pow(1 + r, n) - 1) / r
+  return { montant: Math.max(0, crd), estime: false }
+}
+
+/** Intérêts d'emprunt payés sur une année civile (somme des parts d'intérêt
+ *  des mensualités de l'année). 0 si les termes du prêt manquent. */
+export const interetsAnnee = (bien, annee) => {
+  const K = Number(bien.montant_emprunt || 0)
+  const taux = Number(bien.taux_interet)
+  const duree = Number(bien.duree_credit)
+  if (K <= 0 || !taux || !duree || !bien.date_acquisition) return 0
+  const r = taux / 100 / 12
+  const M = K * r / (1 - Math.pow(1 + r, -duree))
+  const debut = new Date(bien.date_acquisition)
+  debut.setMonth(debut.getMonth() + Number(bien.decalage_pret || 0))
+  let total = 0
+  let crd = K
+  for (let n = 0; n < duree; n++) {
+    const date = new Date(debut.getFullYear(), debut.getMonth() + n, 1)
+    const interet = crd * r
+    if (date.getFullYear() === annee) total += interet
+    if (date.getFullYear() > annee) break
+    crd -= M - interet
+  }
+  return total
 }

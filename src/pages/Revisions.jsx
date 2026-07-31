@@ -55,9 +55,25 @@ export default function Revisions() {
 
     const ai = parseFloat(ancienIndice)
     const ni = parseFloat(nouvelIndice)
-    const nouveauLoyer = bail.loyer_ht * (ni / ai)
+    const coef = ni / ai
+    const arrondi = (v) => Math.round(v * coef * 100) / 100
 
-    // Insert revision record
+    // La révision s'applique au loyer réellement en vigueur : sur un bail
+    // progressif, réviser loyer_ht seul ne changeait rien pendant les trois
+    // premières années (les paliers an1/an2/an3 continuaient de s'appliquer).
+    // On révise donc le loyer final ET les paliers non encore soldés.
+    const maj = { loyer_ht: arrondi(bail.loyer_ht) }
+    for (const k of ['loyer_an1', 'loyer_an2', 'loyer_an3']) {
+      if (bail[k] != null) maj[k] = arrondi(Number(bail[k]))
+    }
+    // L'anniversaire avance d'un an : le bail sort de « à réviser » et
+    // reviendra tout seul l'année prochaine.
+    if (bail.date_revision_anniversaire) {
+      const d = new Date(bail.date_revision_anniversaire)
+      d.setFullYear(d.getFullYear() + 1)
+      maj.date_revision_anniversaire = d.toISOString().slice(0, 10)
+    }
+
     await supabase.from('revisions_loyer').insert({
       societe_id: selected.id,
       bail_id: bail.id,
@@ -66,12 +82,11 @@ export default function Revisions() {
       ancien_indice: ai,
       nouvel_indice: ni,
       ancien_loyer: bail.loyer_ht,
-      nouveau_loyer: Math.round(nouveauLoyer * 100) / 100,
+      nouveau_loyer: maj.loyer_ht,
       appliquee: true,
     })
 
-    // Update bail loyer_ht
-    await supabase.from('baux').update({ loyer_ht: Math.round(nouveauLoyer * 100) / 100 }).eq('id', bail.id)
+    await supabase.from('baux').update(maj).eq('id', bail.id)
 
     setSaving(false)
     setOpen(null)
@@ -166,7 +181,9 @@ export default function Revisions() {
                     <td className="px-4 py-3 text-sm">{r.nouvel_indice}</td>
                     <td className="px-4 py-3 text-sm">{fmt(r.ancien_loyer)}</td>
                     <td className="px-4 py-3 text-sm font-semibold">{fmt(r.nouveau_loyer)}</td>
-                    <td className="px-4 py-3 text-sm text-green-600">+{variation}%</td>
+                    <td className={`px-4 py-3 text-sm font-semibold ${Number(variation) >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                      {Number(variation) >= 0 ? '+' : ''}{variation}%
+                    </td>
                   </tr>
                 )
               })}

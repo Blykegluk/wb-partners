@@ -67,18 +67,16 @@ export default function FichePatrimoniale() {
           loyers, cashflow et patrimoine net — avec quote-part calculée pour chaque actionnaire.
         </p>
 
-        <div className="grid grid-cols-3 gap-3 mb-6 text-left">
+        {/* Des chiffres réels — les anciennes tuiles affichaient les mots
+            « multi » et « PDF » dans des gabarits de KPI. */}
+        <div className="grid grid-cols-2 gap-3 mb-6 text-left">
           <div className="bg-gray-50 rounded-lg p-3 text-center">
             <p className="text-2xl font-bold text-navy">{societes.length}</p>
-            <p className="text-xs text-gray-400 uppercase font-semibold mt-1">Sociétés</p>
+            <p className="text-xs text-gray-400 uppercase font-semibold mt-1">Société{societes.length > 1 ? 's' : ''} accessibles</p>
           </div>
           <div className="bg-gray-50 rounded-lg p-3 text-center">
-            <p className="text-2xl font-bold text-navy">multi</p>
-            <p className="text-xs text-gray-400 uppercase font-semibold mt-1">Biens consolidés</p>
-          </div>
-          <div className="bg-gray-50 rounded-lg p-3 text-center">
-            <p className="text-2xl font-bold text-navy">PDF</p>
-            <p className="text-xs text-gray-400 uppercase font-semibold mt-1">À jour ce jour</p>
+            <p className="text-2xl font-bold text-navy">{new Date().toLocaleDateString('fr-FR')}</p>
+            <p className="text-xs text-gray-400 uppercase font-semibold mt-1">Données à date de génération</p>
           </div>
         </div>
 

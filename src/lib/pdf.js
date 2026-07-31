@@ -274,7 +274,12 @@ export const pdfPortfolio = (soc, biens, baux, transactions, locataires) => {
   const totalLoyer = biens.reduce((s, b) => s + loyerMensuelBien(b, baux), 0) * 12
   const totalCashflow = biens.reduce((s, b) => s + cashflowMensuel(b, baux), 0)
   const bauxActifs = baux.filter(b => b.actif)
-  const tauxOcc = biens.length ? Math.round(bauxActifs.length / biens.length * 100) : 0
+  const acquisIds = biens.filter(b => estAcquis(b)).map(b => b.id)
+  const louesIds = new Set(bauxActifs.filter(ba => {
+    if (ba.date_fin && new Date(ba.date_fin) < new Date()) return false
+    return acquisIds.includes(ba.bien_id)
+  }).map(ba => ba.bien_id))
+  const tauxOcc = acquisIds.length ? Math.round(louesIds.size / acquisIds.length * 100) : 0
 
   const biensRows = biens.map(b => {
     const bail = baux.find(ba => ba.bien_id === b.id && ba.actif)
@@ -377,8 +382,10 @@ export const pdfFichePatrimoniale = ({ userName, userEmail, societes }) => {
   let totalCashflow = 0
   let totalDette = 0
   let detentionPartielle = false
+  let detteEstimee = false
   societes.forEach(({ biens, bienActionnaires, baux }) => {
     const agg = agregatsBiens(biens, bienActionnaires || [], baux || [])
+    if (agg.detteEstimee) detteEstimee = true
     totalBiens += biens.length
     totalPatrimoine += agg.valeurNette
     totalLoyer += agg.loyerMensuelNet * 12
@@ -387,6 +394,9 @@ export const pdfFichePatrimoniale = ({ userName, userEmail, societes }) => {
     if (agg.partielle) detentionPartielle = true
   })
   const patrimoineNet = totalPatrimoine - totalDette
+  const noteDette = detteEstimee
+    ? `<p style="font-size:9px;color:#94a3b8;margin-top:4px">* Au moins un prêt sans taux ou durée renseignés : son capital d'origine est retenu faute de pouvoir calculer le restant dû.</p>`
+    : ''
 
   // Quote-part consolidée de l'utilisateur, société par société.
   const maQuotePart = moi
@@ -481,7 +491,12 @@ export const pdfFichePatrimoniale = ({ userName, userEmail, societes }) => {
     const socCashflow = agg.cashflowNet
     const socNet = socPatrimoine - socDette
     const bauxActifs = (baux || []).filter(b => b.actif)
-    const tauxOcc = biens.length ? Math.round(bauxActifs.length / biens.length * 100) : 0
+    const acquisIds = biens.filter(b => estAcquis(b)).map(b => b.id)
+    const louesIds = new Set(bauxActifs.filter(ba => {
+      if (ba.date_fin && new Date(ba.date_fin) < new Date()) return false
+      return acquisIds.includes(ba.bien_id)
+    }).map(ba => ba.bien_id))
+    const tauxOcc = acquisIds.length ? Math.round(louesIds.size / acquisIds.length * 100) : 0
 
     const nomPersonne = (id, fallback) => pers.find(p => p.id === id)?.nom || fallback || '—'
 
@@ -498,7 +513,7 @@ export const pdfFichePatrimoniale = ({ userName, userEmail, societes }) => {
           <th style="text-align:right">Quote-part nette</th>
         </tr></thead>
         <tbody>
-          ${actionnaires.map(a => {
+          ${(() => { let cumulNet = 0; return actionnaires.map(a => {
             const p = pers.find(x => x.id === a.personne_id)
             const qp = quotePartPersonne({
               personneId: a.personne_id,
@@ -517,14 +532,14 @@ export const pdfFichePatrimoniale = ({ userName, userEmail, societes }) => {
               <td style="text-align:right;font-weight:700">${Number(a.pourcentage).toFixed(2)}%</td>
               <td style="text-align:right;color:#64748b">${fmt(qp.valeurIndirecte)}</td>
               <td style="text-align:right;color:#64748b">${qp.valeurDirecte > 0 ? fmt(qp.valeurDirecte) : '—'}</td>
-              <td style="text-align:right;font-weight:600;color:#1a2d4e">${fmt(qp.patrimoineNet)}</td>
+              <td style="text-align:right;font-weight:600;color:#1a2d4e">${(cumulNet += qp.patrimoineNet, fmt(qp.patrimoineNet))}</td>
             </tr>`
-          }).join('')}
+          }).join('') + `
           <tr class="tot"><td colspan="2"><strong>Total</strong></td>
             <td style="text-align:right"><strong style="color:${Math.abs(totalPct - 100) < 0.01 ? '#22c55e' : '#ef4444'}">${totalPct.toFixed(2)}%</strong></td>
             <td colspan="2"></td>
-            <td style="text-align:right"><strong>${fmt(socNet * totalPct / 100)}</strong></td>
-          </tr>
+            <td style="text-align:right"><strong>${fmt(cumulNet)}</strong></td>
+          </tr>` })()}
         </tbody>
       </table>
     ` : '<p style="font-style:italic;color:#94a3b8;font-size:11px;margin-bottom:24px">Aucun actionnaire enregistré pour cette société.</p>'
@@ -638,7 +653,7 @@ export const pdfFichePatrimoniale = ({ userName, userEmail, societes }) => {
         <div class="soc-summary">
           <div><div class="lbl">Biens acquis</div><div class="val">${biens.length - agg.nbEnCours}</div></div>
           <div><div class="lbl">Valeur d'acquisition</div><div class="val">${fmt(socPatrimoine)}</div></div>
-          <div><div class="lbl">Encours emprunt</div><div class="val">${fmt(socDette)}</div></div>
+          <div><div class="lbl">Encours emprunt${agg.detteEstimee ? ' *' : ''}</div><div class="val">${fmt(socDette)}</div></div>
           <div><div class="lbl">Patrimoine net</div><div class="val" style="color:#1a2d4e">${fmt(socNet)}</div></div>
           <div><div class="lbl">Loyer annuel</div><div class="val">${fmt(socLoyer)}</div></div>
           <div><div class="lbl">Taux d'occupation</div><div class="val">${tauxOcc}%</div></div>
@@ -695,13 +710,14 @@ export const pdfFichePatrimoniale = ({ userName, userEmail, societes }) => {
     <h3 class="section-title">Synthèse globale</h3>
     <div class="global-summary">
       <div class="item"><div class="val">${fmt(totalPatrimoine)}</div><div class="lbl">Valeur d'acquisition</div></div>
-      <div class="item"><div class="val">${fmt(totalDette)}</div><div class="lbl">Encours emprunt</div></div>
+      <div class="item"><div class="val">${fmt(totalDette)}</div><div class="lbl">Encours emprunt${detteEstimee ? ' *' : ''}</div></div>
       <div class="item accent"><div class="val">${fmt(patrimoineNet)}</div><div class="lbl">Patrimoine net</div></div>
       <div class="item"><div class="val">${fmt(totalLoyer)}</div><div class="lbl">Loyers annuels</div></div>
       <div class="item"><div class="val" style="${totalCashflow >= 0 ? 'color:#22c55e' : 'color:#ef4444'}">${fmt(totalCashflow)}</div><div class="lbl">Cashflow mensuel</div></div>
       <div class="item"><div class="val">${totalBiens}</div><div class="lbl">Biens totaux</div></div>
     </div>
     ${detentionPartielle ? `<p style="font-size:10px;color:#94a3b8;font-style:italic;margin:-24px 0 24px">Certains biens ne sont pas détenus à 100 % : tous les montants ci-dessus sont ramenés à la quote-part réellement détenue par chaque société.</p>` : ''}
+    ${noteDette}
 
     ${sommaireHtml}
 

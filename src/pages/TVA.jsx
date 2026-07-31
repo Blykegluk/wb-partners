@@ -156,10 +156,12 @@ function TvaDeclarative({ baux, biens, transactions, annee, setAnnee, navigate }
         tvaCollectee += ((t.montant_loyer || 0) + (t.montant_charges || 0)) * (coef - 1)
       }
 
-      const chargesDeductiblesHT = bauxActifs.reduce((s, ba) => {
-        const bien = biens.find(b => b.id === ba.bien_id)
-        return s + (bien?.charges_refacturables || 0) / 12
-      }, 0)
+      // Un bien par bien, pas par bail : deux baux sur le même bien ne
+      // doublent pas ses charges.
+      const biensLoues = [...new Set(bauxActifs.map(ba => ba.bien_id))]
+        .map(id => biens.find(b => b.id === id)).filter(Boolean)
+      const chargesDeductiblesHT = biensLoues.reduce((s, bien) =>
+        s + (bien.charges_refacturables || 0) / 12, 0)
       const tvaDeductible = chargesDeductiblesHT * 0.2
 
       const solde = tvaCollectee - tvaDeductible

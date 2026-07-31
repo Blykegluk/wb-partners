@@ -562,7 +562,7 @@ export default function Pipeline() {
 
   return (
     <div>
-      <PageHeader title="Pipeline" sub="Veille immobilière quotidienne" />
+      <PageHeader title="Veille immobilière" sub="Le pipeline d'acquisition, alimenté chaque matin" />
 
       {/* Bandeau de synthèse */}
       <Card className="p-4 mb-6">
