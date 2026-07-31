@@ -4,7 +4,7 @@ import 'leaflet/dist/leaflet.css'
 import {
   Radar, ExternalLink, MessageSquare, Send, MapPin, Sparkles,
   SlidersHorizontal, Store, Hotel, KeyRound, FileText, ChevronLeft,
-  LayoutGrid, Map as MapIcon, Building2,
+  LayoutGrid, Map as MapIcon, Building2, Table2, ArrowUpDown, ArrowUp, ArrowDown,
 } from 'lucide-react'
 import { marked } from 'marked'
 import { supabase } from '../lib/supabase'
@@ -40,6 +40,29 @@ const statutCfg = (v) => STATUTS.find(s => s.v === v) || { l: v, cls: 'bg-gray-1
 const isNouveau = (o) => o.detecte_le && (Date.now() - new Date(o.detecte_le).getTime()) < 48 * 3600 * 1000
 
 const fmtNum = (n) => n == null ? '—' : new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(n)
+
+// Dernier commentaire d'un associé (les commentaires système — changements
+// de prix consignés par la veille — ont un auteur NULL et restent discrets).
+const nomAuteur = (c) => c.profiles?.full_name || c.profiles?.email?.split('@')[0] || 'Associé'
+const dernierCommentaire = (liste = []) => liste.find(c => c.auteur) || null
+
+// Encart commentaire : la parole des associés doit se voir au premier
+// coup d'œil, dans la liste comme sur la carte.
+function EncartCommentaire({ commentaires, compact = false }) {
+  const dernier = dernierCommentaire(commentaires)
+  if (!dernier) return null
+  const nb = commentaires.filter(c => c.auteur).length
+  return (
+    <div className={`bg-blue-50/80 border-l-2 border-blue-400 rounded-r px-2.5 py-1.5 ${compact ? 'mt-1.5' : 'mt-2.5'}`}>
+      <p className="m-0 text-[11px] font-semibold text-blue-800 flex items-center gap-1">
+        <MessageSquare size={10} className="shrink-0" />
+        {nomAuteur(dernier)} · {fmtDate(dernier.cree_le)}
+        {nb > 1 && <span className="font-normal text-blue-500">· {nb} commentaires</span>}
+      </p>
+      <p className={`m-0 mt-0.5 text-xs text-gray-700 ${compact ? 'line-clamp-2' : 'line-clamp-3'}`}>{dernier.contenu}</p>
+    </div>
+  )
+}
 
 const scoreColor = (score) =>
   score == null ? '#94a3b8' : score >= 70 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444'
@@ -79,7 +102,7 @@ function Row({ label, children }) {
 
 // ── Carte opportunité ────────────────────────────────────────
 
-function OppCard({ o, onOpen }) {
+function OppCard({ o, onOpen, commentaires = [] }) {
   const s = statutCfg(o.statut)
   return (
     <Card className="p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => onOpen(o)}>
@@ -140,6 +163,8 @@ function OppCard({ o, onOpen }) {
         {o.points_forts && <p className="text-green-600 truncate">+ {o.points_forts}</p>}
       </div>
 
+      <EncartCommentaire commentaires={commentaires} />
+
       {o.hors_critere && o.motif_hors_critere && (
         <p className="mt-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-100 rounded px-2 py-1.5">
           {o.motif_hors_critere}
@@ -156,6 +181,134 @@ function OppCard({ o, onOpen }) {
           Annonce <ExternalLink size={11} />
         </a>
       </div>
+    </Card>
+  )
+}
+
+
+// ── Vue Détails : tableau triable ────────────────────────────
+//
+// Toutes les informations lisibles d'un coup, tri par clic sur les
+// en-têtes comme dans un tableur. Le clic sur une ligne ouvre la fiche.
+
+const COLONNES_DETAILS = [
+  { k: 'score', l: 'Score', num: true, get: o => o.score },
+  { k: 'statut', l: 'Statut', get: o => statutCfg(o.statut).l },
+  { k: 'adresse', l: 'Adresse', get: o => o.adresse || '' },
+  { k: 'ville', l: 'Ville', get: o => o.ville || '' },
+  { k: 'montant', l: 'Prix / Loyer', num: true, get: o => o.prix ?? o.loyer_annuel },
+  { k: 'prix_m2', l: '€/m²', num: true, get: o => o.prix_m2 },
+  { k: 'surface', l: 'Surface', num: true, get: o => o.surface_totale },
+  { k: 'rendement', l: 'Rdt brut', num: true, get: o => o.rendement_brut },
+  { k: 'forts', l: 'Points forts', get: o => o.points_forts || '' },
+  { k: 'vigilance', l: 'Points de vigilance', get: o => o.points_vigilance || '' },
+  { k: 'commentaire', l: 'Dernier commentaire', get: (o, cm) => dernierCommentaire(cm)?.contenu || '' },
+  { k: 'detecte', l: 'Détecté le', num: true, get: o => o.detecte_le ? new Date(o.detecte_le).getTime() : null, aff: o => fmtDate(o.detecte_le) },
+]
+
+function VueDetails({ opps, commentairesParOpp, onOpen }) {
+  const [tri, setTri] = useState({ k: 'score', desc: true })
+
+  const cliquer = (k) => setTri(t => t.k === k ? { k, desc: !t.desc } : { k, desc: true })
+
+  const lignes = useMemo(() => {
+    const col = COLONNES_DETAILS.find(c => c.k === tri.k)
+    const val = (o) => col.get(o, commentairesParOpp.get(o.id) || [])
+    return [...opps].sort((a, b) => {
+      const va = val(a), vb = val(b)
+      // Les vides toujours en bas, quel que soit le sens du tri.
+      if (va == null || va === '') return 1
+      if (vb == null || vb === '') return -1
+      const cmp = col.num ? va - vb : String(va).localeCompare(String(vb), 'fr')
+      return tri.desc ? -cmp : cmp
+    })
+  }, [opps, tri, commentairesParOpp])
+
+  if (opps.length === 0) {
+    return <Empty icon={<Table2 size={40} />} text="Aucune opportunité ne correspond aux filtres." />
+  }
+
+  return (
+    <Card className="overflow-x-auto">
+      <table className="w-full border-collapse" style={{ minWidth: 1450 }}>
+        <thead>
+          <tr className="bg-gray-50 text-left">
+            {COLONNES_DETAILS.map(c => (
+              <th key={c.k} onClick={() => cliquer(c.k)}
+                className={`px-3 py-3 text-[11px] font-bold uppercase tracking-wide cursor-pointer select-none whitespace-nowrap hover:text-navy ${tri.k === c.k ? 'text-navy' : 'text-gray-400'}`}>
+                <span className="inline-flex items-center gap-1">
+                  {c.l}
+                  {tri.k === c.k
+                    ? (tri.desc ? <ArrowDown size={11} /> : <ArrowUp size={11} />)
+                    : <ArrowUpDown size={11} className="opacity-30" />}
+                </span>
+              </th>
+            ))}
+            <th className="px-3 py-3" />
+          </tr>
+        </thead>
+        <tbody>
+          {lignes.map(o => {
+            const cm = commentairesParOpp.get(o.id) || []
+            const dernier = dernierCommentaire(cm)
+            const st = statutCfg(o.statut)
+            const seuil = SEUIL_RENDEMENT[o.recherche]
+            return (
+              <tr key={o.id} onClick={() => onOpen(o)}
+                className="border-t border-gray-50 hover:bg-blue-50/40 cursor-pointer align-top">
+                <td className="px-3 py-2.5">
+                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-full text-white text-xs font-bold"
+                    style={{ background: scoreColor(o.score) }}>{o.score ?? '—'}</span>
+                </td>
+                <td className="px-3 py-2.5 whitespace-nowrap">
+                  <span className={`${st.cls} px-1.5 py-0.5 rounded text-[10px] font-semibold`}>{st.l}</span>
+                  {o.hors_critere && <span className="block mt-1 text-[9px] font-bold text-amber-600">HORS CRITÈRES</span>}
+                </td>
+                <td className="px-3 py-2.5 text-sm font-semibold text-navy" style={{ minWidth: 170 }}>
+                  {o.adresse || 'Adresse à confirmer'}
+                  <span className="block text-[10px] font-normal text-gray-400">{o.recherche} · {RECHERCHES[o.recherche]?.label}</span>
+                </td>
+                <td className="px-3 py-2.5 text-sm text-gray-600 whitespace-nowrap">{o.code_postal} {o.ville}</td>
+                <td className="px-3 py-2.5 text-sm font-bold text-navy text-right whitespace-nowrap">
+                  {o.type_offre === 'location'
+                    ? (o.loyer_annuel ? `${fmtNum(o.loyer_annuel)} €/an` : '—')
+                    : (o.prix ? `${fmtNum(o.prix)} €` : '—')}
+                </td>
+                <td className="px-3 py-2.5 text-sm text-right text-gray-600 whitespace-nowrap">{o.prix_m2 ? fmtNum(o.prix_m2) : '—'}</td>
+                <td className="px-3 py-2.5 text-sm text-right text-gray-600 whitespace-nowrap">{o.surface_totale ? `${fmtNum(o.surface_totale)} m²` : '—'}</td>
+                <td className="px-3 py-2.5 text-sm text-right font-semibold whitespace-nowrap">
+                  {o.rendement_brut != null
+                    ? <span className={seuil && o.rendement_brut >= seuil ? 'text-green-600' : 'text-orange-500'}>{String(o.rendement_brut).replace('.', ',')} %</span>
+                    : '—'}
+                </td>
+                <td className="px-3 py-2.5 text-xs text-green-700" style={{ minWidth: 200, maxWidth: 280 }}>
+                  <span className="line-clamp-3" title={o.points_forts || ''}>{o.points_forts || '—'}</span>
+                </td>
+                <td className="px-3 py-2.5 text-xs text-amber-700" style={{ minWidth: 200, maxWidth: 280 }}>
+                  <span className="line-clamp-3" title={o.points_vigilance || ''}>{o.points_vigilance || '—'}</span>
+                </td>
+                <td className="px-3 py-2.5 text-xs" style={{ minWidth: 180, maxWidth: 260 }}>
+                  {dernier ? (
+                    <span className="block bg-blue-50/80 border-l-2 border-blue-400 rounded-r px-2 py-1">
+                      <span className="font-semibold text-blue-800">{nomAuteur(dernier)}</span>
+                      <span className="block text-gray-700 line-clamp-2" title={dernier.contenu}>{dernier.contenu}</span>
+                    </span>
+                  ) : <span className="text-gray-300">—</span>}
+                </td>
+                <td className="px-3 py-2.5 text-xs text-gray-400 whitespace-nowrap">{fmtDate(o.detecte_le)}</td>
+                <td className="px-3 py-2.5">
+                  {o.lien && (
+                    <a href={o.lien} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+                      className="text-blue-500 hover:text-blue-700" title="Ouvrir l'annonce">
+                      <ExternalLink size={14} />
+                    </a>
+                  )}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </Card>
   )
 }
@@ -409,7 +562,7 @@ function RapportsModal({ runs, onClose }) {
 
 // ── Vue carte ────────────────────────────────────────────────
 
-function MapView({ opps, onOpen }) {
+function MapView({ opps, onOpen, commentairesParOpp }) {
   const geo = opps.filter(o => o.latitude && o.longitude)
   const sansGeo = opps.length - geo.length
 
@@ -460,6 +613,7 @@ function MapView({ opps, onOpen }) {
                         {o.surface_totale ? ` · ${fmtNum(o.surface_totale)} m²` : ''}
                       </p>
                       {o.geo_approx && <p className="text-amber-600 mt-1">Localisation approximative (adresse non communiquée)</p>}
+                      <EncartCommentaire commentaires={commentairesParOpp?.get(o.id) || []} compact />
                       <button
                         onClick={() => onOpen(o)}
                         className="mt-2 bg-navy text-white px-2.5 py-1 rounded font-semibold cursor-pointer"
@@ -498,6 +652,7 @@ function MapView({ opps, onOpen }) {
 export default function Pipeline() {
   const [opps, setOpps] = useState(null)
   const [runs, setRuns] = useState([])
+  const [commentaires, setCommentaires] = useState([])
   const [tab, setTab] = useState('R1')
   const [view, setView] = useState('liste')
   const [mapRech, setMapRech] = useState({ R1: true, R2: true, R3: true, R4: true })
@@ -512,18 +667,33 @@ export default function Pipeline() {
   const [fTri, setFTri] = useState('score')
 
   const load = async () => {
-    const [o, r] = await Promise.all([
+    const [o, r, c] = await Promise.all([
       supabase.from('opportunites').select('*'),
       supabase.from('runs').select('*').order('date_run', { ascending: false }).limit(60),
+      // Tous les commentaires d'un coup : ils s'affichent désormais sur les
+      // cartes de la liste, la carte géographique et la vue Détails.
+      supabase.from('commentaires')
+        .select('opportunite_id, contenu, cree_le, auteur, profiles:auteur(full_name, email)')
+        .order('cree_le', { ascending: false }),
     ])
     setOpps(o.data || [])
     setRuns(r.data || [])
+    setCommentaires(c.data || [])
   }
 
   useEffect(() => { load() }, [])
 
   const onStatutChange = (id, statut) =>
     setOpps(prev => prev.map(o => o.id === id ? { ...o, statut } : o))
+
+  const commentairesParOpp = useMemo(() => {
+    const m = new Map()
+    for (const c of commentaires) {
+      if (!m.has(c.opportunite_id)) m.set(c.opportunite_id, [])
+      m.get(c.opportunite_id).push(c)
+    }
+    return m
+  }, [commentaires])
 
   const villes = useMemo(() =>
     [...new Set((opps || []).map(o => o.ville).filter(Boolean))].sort(), [opps])
@@ -601,6 +771,12 @@ export default function Pipeline() {
             }`}>
             <MapIcon size={14} /><span className="hidden sm:inline">Carte</span>
           </button>
+          <button onClick={() => setView('details')}
+            className={`px-3 py-1.5 rounded-md text-sm font-semibold cursor-pointer inline-flex items-center gap-1.5 transition-colors ${
+              view === 'details' ? 'bg-navy text-white' : 'text-gray-500 hover:text-gray-700'
+            }`}>
+            <Table2 size={14} /><span className="hidden sm:inline">Détails</span>
+          </button>
         </div>
         <button onClick={() => setShowRapports(true)}
           className="ml-auto px-3 py-2 rounded-lg text-sm cursor-pointer inline-flex items-center gap-1.5 bg-white text-gray-400 border border-gray-200 hover:bg-gray-50">
@@ -614,8 +790,8 @@ export default function Pipeline() {
         </button>
       </div>
 
-      {/* Sélecteur de recherche : onglets (liste) ou cases superposables (carte) */}
-      {view === 'liste' ? (
+      {/* Sélecteur de recherche : onglets (liste, détails) ou cases superposables (carte) */}
+      {view !== 'carte' ? (
         <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
           {Object.entries(RECHERCHES).map(([k, { label, I }]) => (
             <button key={k} onClick={() => setTab(k)}
@@ -660,7 +836,15 @@ export default function Pipeline() {
       )}
 
       {view === 'carte' ? (
-        <MapView opps={mapOpps} onOpen={setDetail} />
+        <MapView opps={mapOpps} onOpen={setDetail} commentairesParOpp={commentairesParOpp} />
+      ) : view === 'details' ? (
+        <>
+          <p className="text-gray-400 text-xs mb-3">
+            {RECHERCHES[tab].sub} — {filtered.length + horsCriteres.length} opportunité{filtered.length + horsCriteres.length > 1 ? 's' : ''} ·
+            cliquez sur un en-tête pour trier, sur une ligne pour ouvrir la fiche
+          </p>
+          <VueDetails opps={[...filtered, ...horsCriteres]} commentairesParOpp={commentairesParOpp} onOpen={setDetail} />
+        </>
       ) : (
         <>
           {/* Sous-titre de section */}
@@ -673,7 +857,7 @@ export default function Pipeline() {
             <Empty icon={<Radar size={40} />} text="Aucune opportunité ne correspond aux filtres." />
           ) : (
             <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-              {filtered.map(o => <OppCard key={o.id} o={o} onOpen={setDetail} />)}
+              {filtered.map(o => <OppCard key={o.id} o={o} onOpen={setDetail} commentaires={commentairesParOpp.get(o.id) || []} />)}
             </div>
           )}
 
@@ -685,7 +869,7 @@ export default function Pipeline() {
                 Dossiers exceptionnels suivis malgré une règle non satisfaite — le motif est indiqué sur chaque carte.
               </p>
               <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                {horsCriteres.map(o => <OppCard key={o.id} o={o} onOpen={setDetail} />)}
+                {horsCriteres.map(o => <OppCard key={o.id} o={o} onOpen={setDetail} commentaires={commentairesParOpp.get(o.id) || []} />)}
               </div>
             </div>
           )}
