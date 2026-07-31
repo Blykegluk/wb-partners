@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Building2, Plus, Trash2, Upload, MapPin, FileText, Users, FolderOpen, Receipt, ArrowRight, Link, Euro, ChevronLeft, ChevronDown, Download, ExternalLink, Map, List, Printer, Zap, Clock, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useSociete } from '../contexts/Societe'
+import { useAuth } from '../contexts/Auth'
 import { fmt, fmtDate, googleMapsUrl, DOC_TYPES } from '../lib/utils'
 import { rendementBrut, rendementNet, cashflowMensuel, estAcquis } from '../lib/calculs'
 import { pdfAvisEcheance, pdfFacture, pdfQuittance, pdfRelance, pdfMiseEnDemeure, pdfCommandement } from '../lib/pdf'
@@ -44,6 +45,7 @@ const TABS = [
 
 export default function Patrimoine({ navigate, navState, setNavState }) {
   const { biens, baux, locataires, documents, transactions, appelsCharges, selected, canEdit, reload } = useSociete()
+  const { user } = useAuth()
 
   const [detailId, setDetailId] = useState(null)
   const [tab, setTab] = useState('infos')
@@ -842,19 +844,30 @@ export default function Patrimoine({ navigate, navState, setNavState }) {
             <Field label="Date d'émission" type="date" value={genDate} onChange={e => setGenDate(e.target.value)} />
             <div className="flex justify-end gap-3 mt-4">
               <Btn variant="ghost" onClick={() => setGenModal(null)}>Annuler</Btn>
-              <Btn onClick={() => {
+              <Btn onClick={async () => {
                 const { type, bail, bien, loc } = genModal
+                let paidTx = null
                 if (type === 'avis_echeance') pdfAvisEcheance(bail, bien, loc, selected, genMois, genAnnee)
                 else if (type === 'facture') pdfFacture(bail, bien, loc, selected, genMois, genAnnee)
                 else if (type === 'quittance') {
-                  const paidTx = transactions.find(t => t.bail_id === bail.id && t.statut === 'payé' && t.annee === genAnnee && t.mois === genMois)
+                  paidTx = transactions.find(t => t.bail_id === bail.id && t.statut === 'payé' && t.annee === genAnnee && t.mois === genMois)
                   if (paidTx) pdfQuittance(bail, bien, loc, selected, paidTx)
                   else { alert(`Aucun loyer payé pour ${['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'][genMois]} ${genAnnee}.`); return }
                 }
                 else if (type === 'relance') pdfRelance(bail, bien, loc, selected, transactions)
                 else if (type === 'mise_en_demeure') pdfMiseEnDemeure(bail, bien, loc, selected, transactions)
                 else if (type === 'commandement') pdfCommandement(bail, bien, loc, selected, transactions)
+                // Chaque document généré laisse une trace : c'est ce journal
+                // qui alimente « dernier courrier » du Suivi des loyers —
+                // SuiviLoyers journalisait déjà, Patrimoine générait en douce.
+                await supabase.from('courriers_envoyes').insert({
+                  societe_id: selected.id, bail_id: bail.id,
+                  transaction_id: paidTx?.id || null,
+                  type, mois: genMois, annee: genAnnee, canal: 'manuel', statut: 'envoye',
+                  sujet: `${type.replaceAll('_', ' ')} — PDF généré`, envoye_par: user?.id || null,
+                })
                 setGenModal(null)
+                reload()
               }}>
                 <Printer size={14} /> Générer
               </Btn>
