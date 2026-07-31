@@ -34,11 +34,30 @@ export default function Tresorerie({ navigate }) {
       loyers: Math.round(m.loyers),
       autresRecettes: Math.round(m.autresRecettes),
       ...Object.fromEntries(POSTES_SORTIES.map((p) => [p.k, Math.round(m.sorties[p.k])])),
-      solde: m.solde == null ? null : Math.round(m.solde),
     }))
     const totalEntrees = reel.mois.reduce((s, m) => s + m.entrees, 0)
     const totalSorties = reel.mois.reduce((s, m) => s + m.totalSorties, 0)
     const nonQualifiees = reel.mois.reduce((s, m) => s + m.sorties.autres, 0)
+
+    // La trésorerie est un instantané : chaque point du graphe de solde est
+    // daté précisément — les 1ers du mois couverts par l'historique, puis
+    // aujourd'hui si l'année affichée est en cours.
+    const now = new Date()
+    const snapshots = []
+    for (let m = 0; m < 12; m++) {
+      const iso = `${year}-${String(m + 1).padStart(2, '0')}-01`
+      if (reel.debut && iso >= reel.debut && new Date(year, m, 1) <= now) {
+        snapshots.push({
+          date: `01/${String(m + 1).padStart(2, '0')}/${year}`,
+          solde: Math.round(reel.soldeALaDate(iso)),
+        })
+      }
+    }
+    if (year === now.getFullYear()) {
+      const dd = String(now.getDate()).padStart(2, '0')
+      const mm = String(now.getMonth() + 1).padStart(2, '0')
+      snapshots.push({ date: `${dd}/${mm}/${year}`, solde: Math.round(reel.soldeActuel) })
+    }
 
     return (
       <div>
@@ -89,15 +108,15 @@ export default function Tresorerie({ navigate }) {
         </Card>
 
         <Card className="p-5">
-          <h3 className="text-sm font-bold text-navy mb-4">Solde bancaire réel en fin de mois</h3>
+          <h3 className="text-sm font-bold text-navy mb-4">Solde bancaire réel, à date exacte</h3>
           <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={data}>
+            <LineChart data={snapshots} margin={{ left: 8, right: 32 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-              <XAxis dataKey="mois" tick={{ fontSize: 12 }} />
+              <XAxis dataKey="date" tick={{ fontSize: 11 }} interval={0} />
               <YAxis tick={{ fontSize: 12 }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} domain={['auto', 'auto']} />
-              <Tooltip formatter={(v) => fmt(v)} />
+              <Tooltip formatter={(v) => [fmt(v), 'Solde']} labelFormatter={(d) => `Au ${d}`} />
               <Line type="monotone" dataKey="solde" name="Solde réel" stroke="#1a2d4e"
-                strokeWidth={2.5} dot={{ fill: '#1a2d4e', r: 4 }} connectNulls={false} />
+                strokeWidth={2.5} dot={{ fill: '#1a2d4e', r: 4 }} />
             </LineChart>
           </ResponsiveContainer>
         </Card>

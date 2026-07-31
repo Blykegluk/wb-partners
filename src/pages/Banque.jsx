@@ -7,7 +7,7 @@ import { useSociete } from '../contexts/Societe'
 import { useAuth } from '../contexts/Auth'
 import { fmt, fmtDate, MONTHS } from '../lib/utils'
 import { categoriesPour, libelleCategorie } from '../lib/categoriesBancaires'
-import { coefTva } from '../lib/calculs'
+import { coefTva, comptesSuivisEur } from '../lib/calculs'
 import { PageHeader, Card, Btn, Empty, Modal, Kpi, KpiRow, Sel, Field } from '../components/UI'
 // Même module que l'Edge Function : l'empreinte apprise ici doit être
 // rigoureusement identique à celle que le moteur recherchera.
@@ -52,11 +52,12 @@ export default function Banque({ navigate }) {
 
   // ── KPI ────────────────────────────────────────────────
   const comptesSuivis = bankAccounts.filter(c => c.suivi !== false)
-  // Le solde n'additionne que l'euro : mélanger les devises n'aurait aucun sens.
-  const soldeEur = comptesSuivis
-    .filter(c => (c.currency || 'EUR') === 'EUR')
-    .reduce((s, c) => s + Number(c.solde || 0), 0)
-  const autresDevises = comptesSuivis.filter(c => (c.currency || 'EUR') !== 'EUR')
+  // Le solde n'additionne que l'euro : mélanger les devises n'aurait aucun
+  // sens. Le filtre partagé tolère 'XXX' (devise non renseignée par la
+  // banque), qui n'est pas une devise étrangère.
+  const eur = comptesSuivisEur(bankAccounts)
+  const soldeEur = eur.reduce((s, c) => s + Number(c.solde || 0), 0)
+  const autresDevises = comptesSuivis.filter(c => !eur.includes(c))
 
   const credits = bankTransactions.filter(t => Number(t.amount) > 0)
   const nbRapproches = credits.filter(t => t.statut_rapprochement?.startsWith('rapproche')).length

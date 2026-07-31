@@ -49,7 +49,7 @@ const bankTransactions = [
 ]
 const bankAccounts = [{
   id: 'acc-1', societe_id: 'soc-1', account_uid: UID, name: 'Caisse d’Épargne',
-  currency: 'EUR', solde: 78432.17, suivi: true, derniere_sync: '2026-07-31',
+  currency: 'XXX', solde: 166185.63, suivi: true, derniere_sync: '2026-07-31',
 }]
 const courriers = [{
   id: 'c1', societe_id: 'soc-1', bail_id: 'bail-1', transaction_id: 't0', type: 'mise_en_demeure',

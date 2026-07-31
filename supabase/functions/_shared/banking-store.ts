@@ -114,7 +114,11 @@ export async function persisterSession(
       account_uid: compte.uid,
       iban: ibanDeCompte(compte),
       name: compte.name ?? null,
-      currency: compte.currency ?? null,
+      // Certaines banques déclarent 'XXX' (ISO 4217 « devise non renseignée »)
+      // au niveau du compte alors que tous les mouvements sont en EUR. On ne
+      // stocke pas ce non-renseignement : l'application traiterait le compte
+      // comme une devise étrangère et l'écarterait des soldes.
+      currency: compte.currency === "XXX" ? null : compte.currency ?? null,
       product: compte.product ?? null,
       session_status: "active",
       raw: compte,

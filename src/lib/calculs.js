@@ -438,8 +438,11 @@ export const suiviLoyers = ({
 // 6 mois avant la connexion) : avant `debut`, il n'existe pas de vérité
 // bancaire, et les courbes doivent s'interrompre plutôt qu'inventer.
 
-const comptesSuivisEur = (bankAccounts = []) =>
-  bankAccounts.filter((c) => c.suivi !== false && (c.currency || 'EUR') === 'EUR')
+// 'XXX' est le code ISO 4217 « devise non renseignée » : certaines banques
+// le déclarent au niveau du compte alors que les mouvements sont en EUR.
+// L'écarter ferait passer un compte français pour une devise étrangère.
+export const comptesSuivisEur = (bankAccounts = []) =>
+  bankAccounts.filter((c) => c.suivi !== false && ['EUR', 'XXX'].includes(c.currency || 'EUR'))
 
 /** Premier jour du mois suivant, en ISO local (pas de décalage UTC). */
 const debutMoisSuivant = (annee, mois) => {
@@ -461,15 +464,19 @@ export const tresorerieReelle = ({ bankAccounts = [], bankTransactions = [] }) =
   const mvts = bankTransactions.filter((t) => uids.has(t.account_uid) && t.booking_date)
   const debut = mvts.reduce((min, t) => (min === null || t.booking_date < min ? t.booking_date : min), null)
 
-  const soldeFinMois = (annee, mois) => {
-    const seuil = debutMoisSuivant(annee, mois)
+  // Solde au matin d'une date : le solde actuel moins tout ce qui a bougé
+  // depuis. La trésorerie est un instantané, pas une moyenne — chaque point
+  // rendu doit porter sa date exacte.
+  const soldeALaDate = (dateIso) => {
     const posterieurs = mvts
-      .filter((t) => t.booking_date >= seuil)
+      .filter((t) => t.booking_date >= dateIso)
       .reduce((s, t) => s + Number(t.amount || 0), 0)
     return soldeActuel - posterieurs
   }
 
-  return { soldeActuel, debut, mvts, soldeFinMois }
+  const soldeFinMois = (annee, mois) => soldeALaDate(debutMoisSuivant(annee, mois))
+
+  return { soldeActuel, debut, mvts, soldeALaDate, soldeFinMois }
 }
 
 /** Postes de sorties pour la ventilation des flux réels. */
@@ -490,7 +497,7 @@ export const POSTES_SORTIES = [
 export const fluxReelsParMois = ({ bankAccounts = [], bankTransactions = [], annee }) => {
   const reel = tresorerieReelle({ bankAccounts, bankTransactions })
   if (!reel) return null
-  const { mvts, debut, soldeActuel, soldeFinMois } = reel
+  const { mvts, debut, soldeActuel, soldeALaDate, soldeFinMois } = reel
   const now = new Date()
   const posteDe = (categorie) =>
     POSTES_SORTIES.find((p) => p.cats?.includes(categorie))?.k || 'autres'
@@ -528,7 +535,7 @@ export const fluxReelsParMois = ({ bankAccounts = [], bankTransactions = [], ann
     }
   })
 
-  return { mois, debut, soldeActuel }
+  return { mois, debut, soldeActuel, soldeALaDate }
 }
 
 /**

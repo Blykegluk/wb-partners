@@ -132,16 +132,24 @@ export default function Apercu({ navigate }) {
   )
   const treso = useMemo(() => {
     if (reel) {
-      return Array.from({ length: 12 }, (_, m) => {
-        const horsFenetre = reel.debut
-          ? new Date(currentYear, m + 1, 1) <= new Date(reel.debut)
-          : true
-        const futur = new Date(currentYear, m, 1) > now
-        return {
-          mois: MONTHS_SHORT[m],
-          solde: horsFenetre || futur ? null : Math.round(reel.soldeFinMois(currentYear, m)),
+      // La trésorerie est un instantané : chaque point est le solde exact au
+      // matin d'une date — les 1ers du mois couverts par l'historique
+      // bancaire, puis aujourd'hui.
+      const points = []
+      for (let m = 0; m < 12; m++) {
+        const iso = `${currentYear}-${String(m + 1).padStart(2, '0')}-01`
+        if (reel.debut && iso >= reel.debut && new Date(currentYear, m, 1) <= now) {
+          points.push({
+            mois: `01/${String(m + 1).padStart(2, '0')}`,
+            date: `01/${String(m + 1).padStart(2, '0')}/${currentYear}`,
+            solde: Math.round(reel.soldeALaDate(iso)),
+          })
         }
-      })
+      }
+      const dd = String(now.getDate()).padStart(2, '0')
+      const mm = String(now.getMonth() + 1).padStart(2, '0')
+      points.push({ mois: `${dd}/${mm}`, date: `${dd}/${mm}/${currentYear}`, solde: Math.round(reel.soldeActuel) })
+      return points
     }
     const monthly = Array.from({ length: 12 }, (_, m) => {
       const entrees = transactions
@@ -350,17 +358,19 @@ export default function Apercu({ navigate }) {
             </div>
             <div style={{ width: '100%', height: 150 }}>
               <ResponsiveContainer>
-                <LineChart data={treso} margin={{ top: 5, right: 8, bottom: 0, left: 0 }}>
+                <LineChart data={treso} margin={{ top: 5, right: 24, bottom: 0, left: 16 }}>
                   <XAxis
                     dataKey="mois"
                     tick={{ fontSize: 11, fill: FAINT }}
                     axisLine={false}
                     tickLine={false}
-                    interval={1}
+                    interval={reel ? 0 : 1}
                   />
                   <YAxis hide domain={['auto', 'auto']} />
                   <Tooltip
-                    formatter={v => fmt(v)}
+                    formatter={v => [fmt(v), 'Solde']}
+                    labelFormatter={(label, payload) =>
+                      payload?.[0]?.payload?.date ? `Au ${payload[0].payload.date}` : label}
                     contentStyle={{
                       borderRadius: 8,
                       border: `1px solid ${BORDER}`,
@@ -372,10 +382,10 @@ export default function Apercu({ navigate }) {
                     dataKey="solde"
                     stroke={BRAND}
                     strokeWidth={2.5}
-                    dot={false}
+                    dot={reel ? { fill: BRAND, r: 3 } : false}
                     connectNulls={false}
                   />
-                  {treso[currentMonth]?.solde != null && (
+                  {!reel && treso[currentMonth]?.solde != null && (
                     <ReferenceDot x={MONTHS_SHORT[currentMonth]} y={treso[currentMonth].solde} r={4} fill={BRAND} stroke="none" />
                   )}
                 </LineChart>
