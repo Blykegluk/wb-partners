@@ -8,7 +8,8 @@ import { suiviLoyers } from '../lib/calculs'
 import {
   pdfAvisEcheance, pdfFacture, pdfQuittance, pdfRelance, pdfMiseEnDemeure, pdfCommandement,
 } from '../lib/pdf'
-import { Card, Empty, Kpi, KpiRow } from '../components/UI'
+import { Card, Empty, Kpi, KpiRow, Modal } from '../components/UI'
+import { libelleCategorie } from '../lib/categoriesBancaires'
 
 const FUNCTIONS_URL = import.meta.env.VITE_SUPABASE_URL + '/functions/v1'
 
@@ -36,6 +37,7 @@ export default function SuiviLoyers({ navigate }) {
   const [annee, setAnnee] = useState(now.getFullYear())
   const [busy, setBusy] = useState(null) // `${bailId}-${mois}` pendant un envoi
   const [menuOuvert, setMenuOuvert] = useState(null)
+  const [rattacher, setRattacher] = useState(null) // { bail, ligne } pendant un rattachement
 
   const annees = [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1]
   const banqueConnectee = bankAccounts.length > 0
@@ -121,6 +123,39 @@ export default function SuiviLoyers({ navigate }) {
     )
     if (motif === null) return
     await supabase.from('bank_transactions').update({ motif_ecart: motif || null }).eq('id', mvt.id)
+    reload()
+  }
+
+  // Crédits sans échéance en face, rattachables depuis une ligne du tableau :
+  // tout ce qui est entré sans être ni rapproché ni ignoré, quelle que soit
+  // l'année (un loyer de janvier peut arriver fin décembre).
+  const creditsARattacher = useMemo(
+    () => bankTransactions
+      .filter(t => Number(t.amount) > 0 && !t.transaction_id && t.statut_rapprochement !== 'ignore')
+      .sort((a, b) => (b.booking_date || '').localeCompare(a.booking_date || '')),
+    [bankTransactions],
+  )
+
+  // Lie un virement reçu à l'échéance d'une ligne — le geste inverse de
+  // l'écran Banque : on part du mois dû, on choisit l'argent qui le règle.
+  const rattacherVirement = async (mvt) => {
+    const { bail, ligne } = rattacher
+    const ech = await echeanceDuMois(bail, ligne, 'payé')
+    if (!ech) return
+    const { error } = await supabase.from('bank_transactions').update({
+      statut_rapprochement: 'rapproche_manuel',
+      transaction_id: ech.id,
+      categorie: null,
+      suggestions: null,
+      motif_ecart: null,
+      rapproche_le: new Date().toISOString(),
+      rapproche_par: user?.id || null,
+    }).eq('id', mvt.id)
+    if (error) { alert(`Rattachement impossible : ${error.message}`); return }
+    await supabase.from('transactions')
+      .update({ statut: 'payé', date_paiement: mvt.booking_date })
+      .eq('id', ech.id)
+    setRattacher(null)
     reload()
   }
 
@@ -253,7 +288,9 @@ export default function SuiviLoyers({ navigate }) {
                     onEmail={type => envoyerEmail(bail, ligne, type)}
                     onPdf={type => genererPdf(bail, ligne, type)}
                     onEcart={() => expliquerEcart(ligne)}
-                    onPaye={() => marquerPaye(bail, ligne)} />
+                    onPaye={() => marquerPaye(bail, ligne)}
+                    nbCandidats={creditsARattacher.length}
+                    onRattacher={() => setRattacher({ bail, ligne })} />
                 ))}
               </tbody>
               <tfoot>
@@ -294,7 +331,7 @@ export default function SuiviLoyers({ navigate }) {
                   <span className="text-sm text-gray-600 truncate">
                     <strong className="text-navy">{fmtDate(t.booking_date)}</strong>
                     {' · '}{(t.remittance_information || t.counterparty_name || '—').slice(0, 60)}
-                    {t.categorie ? <span className="text-xs text-gray-400"> · {t.categorie.replaceAll('_', ' ')}</span> : ''}
+                    {t.categorie ? <span className="text-xs text-gray-400"> · {libelleCategorie(t.categorie)}</span> : ''}
                   </span>
                   <span className="text-sm font-semibold text-navy whitespace-nowrap">{fmt(Number(t.amount))}</span>
                 </div>
@@ -337,6 +374,43 @@ export default function SuiviLoyers({ navigate }) {
           )}
         </Card>
       </div>
+
+      {rattacher && (
+        <Modal
+          title={`Rattacher un virement — ${MONTHS[rattacher.ligne.mois]} ${annee}`}
+          onClose={() => setRattacher(null)}
+          width="max-w-2xl"
+        >
+          <p className="text-sm text-gray-500 mb-1">
+            {nomBail(rattacher.bail)} — dû <strong className="text-navy">{fmt(rattacher.ligne.attendu)}</strong> TTC.
+          </p>
+          <p className="text-xs text-gray-400 mb-4">
+            Choisissez le virement qui règle ce mois. Si le montant diffère,
+            la ligne passera en « écart à expliquer ».
+          </p>
+          <div className="space-y-1.5 max-h-80 overflow-y-auto">
+            {creditsARattacher.map(t => {
+              const proche = rattacher.ligne.attendu > 0
+                && Math.abs(Number(t.amount) - rattacher.ligne.attendu) / rattacher.ligne.attendu <= 0.05
+              return (
+                <button key={t.id} onClick={() => rattacherVirement(t)}
+                  className="w-full flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 bg-gray-50 hover:bg-blue-50/60 border border-transparent hover:border-blue-200 cursor-pointer text-left transition-colors">
+                  <span className="text-sm text-gray-600 truncate">
+                    <strong className="text-navy">{fmtDate(t.booking_date)}</strong>
+                    {' · '}{(t.remittance_information || t.counterparty_name || '—').slice(0, 55)}
+                    {t.categorie && (
+                      <span className="text-xs text-gray-400"> · {libelleCategorie(t.categorie)}</span>
+                    )}
+                  </span>
+                  <span className={`text-sm font-semibold whitespace-nowrap ${proche ? 'text-emerald-600' : 'text-navy'}`}>
+                    {fmt(Number(t.amount))}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
@@ -349,7 +423,7 @@ const VERDICT_DOT = {
 
 function LigneMois({
   bail, ligne, annee, canEdit, busy, menuOuvert, onMenu,
-  relanceJ, medJ, onEmail, onPdf, onEcart, onPaye,
+  relanceJ, medJ, onEmail, onPdf, onEcart, onPaye, nbCandidats, onRattacher,
 }) {
   const retardJours = Math.floor((now - new Date(annee, ligne.mois, 1)) / 86400000)
   const palier = retardJours >= medJ ? 'mise_en_demeure' : 'relance'
@@ -428,6 +502,11 @@ function LigneMois({
             {!ligne.futur && ligne.verdict === 'ok' && ligne.ech && (
               <BoutonAction disabled={busy} onClick={() => onEmail('quittance')} tone="quiet">
                 <Send size={11} className="mr-1" />{busy ? 'Envoi…' : 'Quittance'}
+              </BoutonAction>
+            )}
+            {!ligne.futur && ligne.recu === 0 && nbCandidats > 0 && (
+              <BoutonAction disabled={busy} onClick={onRattacher} tone="quiet">
+                Rattacher un virement
               </BoutonAction>
             )}
             {!ligne.futur && ligne.verdict === 'flag' && ligne.qualification === 'aucun' && (

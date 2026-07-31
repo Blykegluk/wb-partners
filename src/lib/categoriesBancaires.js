@@ -4,9 +4,13 @@
 //
 // Le sens du montant détermine la liste proposée : un crédit ne peut pas être
 // une taxe foncière, un débit ne peut pas être un dépôt de garantie reçu.
+//
+// Aucune catégorie « loyer » ici, et c'est voulu : un loyer correspond
+// toujours à une échéance — même payé avec un écart, qui se justifie au
+// rapprochement. Classer un loyer par nature le ferait disparaître du
+// suivi des encaissements.
 
 export const RECETTES = [
-  { v: 'loyer_hors_echeance', l: 'Loyer (hors échéance suivie)' },
   { v: 'charges_refacturees', l: 'Refacturation de charges' },
   { v: 'depot_garantie_recu', l: 'Dépôt de garantie reçu' },
   { v: 'indemnite_resiliation', l: 'Indemnité de résiliation de bail' },

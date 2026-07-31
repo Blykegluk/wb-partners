@@ -507,12 +507,32 @@ export default function Banque({ navigate }) {
 // foncière. Le rattachement à un bien est facultatif — une écriture de
 // société, frais bancaires ou apport, n'en concerne aucun.
 function ClasserMouvement({ mouvement, onClasser }) {
-  const { biens } = useSociete()
+  const { biens, baux, locataires } = useSociete()
   const options = categoriesPour(mouvement.amount)
   const [categorie, setCategorie] = useState(mouvement.categorie || '')
   const [bienId, setBienId] = useState(mouvement.bien_id || '')
   const [note, setNote] = useState(mouvement.note || '')
   const [envoi, setEnvoi] = useState(false)
+
+  // Un crédit dont le montant avoisine le loyer TTC d'un bail est très
+  // probablement un loyer — et un loyer se rapproche d'une échéance, même
+  // avec un écart. C'est en classant des loyers « par nature » qu'ils
+  // disparaissent du suivi des encaissements.
+  const ressembleAUnLoyer = useMemo(() => {
+    const recu = Number(mouvement.amount || 0)
+    if (recu <= 0) return null
+    for (const bail of baux.filter(b => b.actif)) {
+      const ttc = (Number(bail.loyer_ht || 0) + Number(bail.charges || 0)) * coefTva(bail)
+      if (ttc > 0 && Math.abs(recu - ttc) / ttc <= 0.2) {
+        const loc = locataires.find(l => l.id === bail.locataire_id)
+        return {
+          nom: loc?.raison_sociale || `${loc?.prenom || ''} ${loc?.nom || ''}`.trim() || 'un locataire',
+          ttc,
+        }
+      }
+    }
+    return null
+  }, [mouvement, baux, locataires])
 
   const valider = async () => {
     setEnvoi(true)
@@ -528,6 +548,19 @@ function ClasserMouvement({ mouvement, onClasser }) {
       <p className="text-sm text-gray-400 mb-3">
         Le mouvement est enregistré avec sa nature, sans échéance en face.
       </p>
+
+      {ressembleAUnLoyer && (
+        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 mb-3">
+          <AlertTriangle size={14} className="text-amber-500 mt-0.5 shrink-0" />
+          <p className="text-xs text-amber-700">
+            Ce montant est proche du loyer de <strong>{ressembleAUnLoyer.nom}</strong>{' '}
+            ({fmt(ressembleAUnLoyer.ttc)} TTC/mois). S'il s'agit d'un loyer,
+            rapprochez-le de son échéance ci-dessus — l'écart éventuel se
+            justifie à cette étape. Un loyer classé par nature disparaît du
+            suivi des encaissements.
+          </p>
+        </div>
+      )}
 
       <Sel label="Nature" value={categorie} onChange={e => setCategorie(e.target.value)}
         options={[{ v: '', l: 'Choisir...' }, ...options]} />
