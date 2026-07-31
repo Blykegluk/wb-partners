@@ -1,12 +1,13 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import {
   AlertTriangle, RefreshCw, Sparkles, Check, CircleDashed, ArrowUpRight,
 } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceDot } from 'recharts'
 import { useAuth } from '../contexts/Auth'
 import { useSociete } from '../contexts/Societe'
-import { fmt, MONTHS_SHORT, getLoyerActuel } from '../lib/utils'
-import { agregatsBiens, partSociete, estAcquis, tresorerieReelle } from '../lib/calculs'
+import { supabase } from '../lib/supabase'
+import { fmt, fmtPct, MONTHS_SHORT, getLoyerActuel } from '../lib/utils'
+import { agregatsBiens, partSociete, estAcquis, tresorerieReelle, coefTva, attenduMois } from '../lib/calculs'
 
 const NAVY = '#16294a'
 const BRAND = '#3f6ad8'
@@ -58,14 +59,14 @@ function KpiCard({ label, value, hint, hintColor, tone, onClick }) {
 // ── Component ─────────────────────────────────────────────────
 export default function Apercu({ navigate }) {
   const { user } = useAuth()
-  const { biens, locataires, baux, transactions, bienActionnaires, bankConnection, bankAccounts, bankTransactions } = useSociete()
+  const { biens, locataires, baux, transactions, bienActionnaires, bankConnection, bankAccounts, bankTransactions, courriers } = useSociete()
 
   const bauxActifs = baux.filter(b => b.actif)
 
   // ── KPIs ────────────────────────────────────────────────────
   // Pondérés par la quote-part réellement détenue par la société : un bien
   // détenu à 50 % ne pèse que pour moitié dans le patrimoine et le cashflow.
-  const agg = agregatsBiens(biens, bienActionnaires)
+  const agg = agregatsBiens(biens, bienActionnaires, baux)
   const valeurPatrimoine = agg.valeurNette
   const cashflowMensualise = agg.cashflowNet
   // Un bail rattaché à un bien non encore acquis ne produit aucun loyer.
@@ -73,10 +74,16 @@ export default function Apercu({ navigate }) {
     const bien = biens.find(x => x.id === b.bien_id)
     if (bien && !estAcquis(bien)) return s
     const part = partSociete(b.bien_id, bienActionnaires)
-    return s + (getLoyerActuel(b) || b.loyer_ht || 0) * part
+    // getLoyerActuel est borné par les dates du bail : un bail terminé ou
+    // pas encore commencé compte 0, sans fallback.
+    return s + getLoyerActuel(b) * part
   }, 0)
+  // Impayés en TTC, comme partout ailleurs dans le suivi.
   const impayes = transactions.filter(t => t.statut === 'impayé')
-  const totalImpayes = impayes.reduce((s, t) => s + (t.montant_loyer || 0) + (t.montant_charges || 0), 0)
+  const totalImpayes = impayes.reduce((s, t) => {
+    const coef = coefTva(baux.find(b => b.id === t.bail_id))
+    return s + ((t.montant_loyer || 0) + (t.montant_charges || 0)) * coef
+  }, 0)
 
   // ── À traiter ──────────────────────────────────────────────
   const now = new Date()
@@ -168,15 +175,62 @@ export default function Apercu({ navigate }) {
     return monthly
   }, [reel, transactions, biens, bienActionnaires, currentYear])
 
-  // ── Traité cette nuit (simulé depuis données réelles) ──────
-  const rapprochesJuillet = transactions.filter(t => t.mois === currentMonth && t.annee === currentYear && t.statut === 'payé').length
+  // ── Traité cette nuit : l'activité réelle des dernières 24 h ──
+  // Rapprochements automatiques du moteur bancaire et courriers partis
+  // tout seuls — pas un compteur déclaratif déguisé.
+  const depuisHier = new Date(now.getTime() - 24 * 3600 * 1000).toISOString()
+  const rapprochesAuto = bankTransactions.filter(t =>
+    t.statut_rapprochement === 'rapproche_auto' && t.rapproche_le && t.rapproche_le >= depuisHier).length
+  const courriersAuto = (courriers || []).filter(c =>
+    c.canal === 'email' && !c.envoye_par && c.statut === 'envoye' && c.envoye_le >= depuisHier).length
 
-  // ── Encaissé 2026 ─────────────────────────────────────────
-  const encaisse = transactions
+  // ── Encaissé {année} — tout en TTC, même périmètre des deux côtés ──
+  // Attendu : l'échéancier des baux (bornés par leurs dates, TTC), limité aux
+  // mois échus. Encaissé : les virements rapprochés (réel) si la banque est
+  // connectée, les échéances déclarées payées (TTC) sinon.
+  const attendu = bauxActifs.reduce((s, b) => {
+    const coef = coefTva(b)
+    let somme = 0
+    for (let m = 0; m <= currentMonth; m++) somme += attenduMois(b, m, currentYear) * coef
+    return s + somme
+  }, 0)
+  const encaisseReel = reel
+    ? bankTransactions
+        .filter(t => Number(t.amount) > 0 && t.transaction_id
+          && t.statut_rapprochement?.startsWith('rapproche')
+          && t.booking_date && new Date(t.booking_date).getFullYear() === currentYear)
+        .reduce((s, t) => s + Number(t.amount), 0)
+    : null
+  const encaisse = encaisseReel ?? transactions
     .filter(t => t.annee === currentYear && t.statut === 'payé')
-    .reduce((s, t) => s + (t.montant_loyer || 0) + (t.montant_charges || 0), 0)
-  const attendu = loyersMensuels * 12
+    .reduce((s, t) => {
+      const coef = coefTva(baux.find(b => b.id === t.bail_id))
+      return s + ((t.montant_loyer || 0) + (t.montant_charges || 0)) * coef
+    }, 0)
   const pct = attendu > 0 ? Math.min(100, Math.round((encaisse / attendu) * 100)) : 0
+
+  // ── Opportunité de la semaine : la meilleure trouvaille récente de la veille ──
+  const [oppSemaine, setOppSemaine] = useState(null)
+  useEffect(() => {
+    let vivant = true
+    supabase.from('opportunites')
+      .select('id, recherche, adresse, ville, code_postal, prix, loyer_annuel, type_offre, rendement_brut, score, decouvert_le, lien')
+      .eq('statut', 'active').eq('hors_critere', false)
+      .not('score', 'is', null)
+      .order('decouvert_le', { ascending: false })
+      .limit(30)
+      .then(({ data }) => {
+        if (!vivant || !data?.length) return
+        // La mieux notée parmi les découvertes des 7 derniers jours ; à
+        // défaut, la mieux notée des 30 dernières entrées.
+        const semaine = data.filter(o =>
+          o.decouvert_le && (now - new Date(o.decouvert_le)) < 7 * 86400000)
+        const pool = semaine.length ? semaine : data
+        setOppSemaine([...pool].sort((a, b) => (b.score || 0) - (a.score || 0))[0])
+      })
+    return () => { vivant = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ── Nom + sync info ────────────────────────────────────────
   const firstName = (user?.user_metadata?.full_name || user?.email || '').split(/[\s@.]+/)[0] || ''
@@ -207,11 +261,11 @@ export default function Apercu({ navigate }) {
         onClick: () => navigate('flux', { tab: 'banque' }),
       }
     }
-    if (st === 'pending') {
+    if (st === 'expired') {
       return {
         bg: '#fdf9ef', fg: AMBER,
-        label: 'Connexion bancaire à finaliser',
-        title: "L'autorisation bancaire n'a pas été menée à son terme — cliquez pour la reprendre",
+        label: 'Consentement bancaire expiré',
+        title: "L'autorisation DSP2 est arrivée à échéance — cliquez pour reconnecter (l'historique est conservé)",
         onClick: () => navigate('parametres', { tab: 'banque' }),
       }
     }
@@ -258,7 +312,7 @@ export default function Apercu({ navigate }) {
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 mb-6">
         <KpiCard
-          label="Valeur du patrimoine"
+          label="Valeur d'acquisition (quote-part)"
           value={valeurPatrimoine ? fmt(valeurPatrimoine) : '—'}
           hint={
             agg.nbEnCours > 0
@@ -268,20 +322,20 @@ export default function Apercu({ navigate }) {
           hintColor={agg.nbEnCours > 0 ? AMBER : undefined}
         />
         <KpiCard
-          label="Loyers mensuels"
+          label="Loyers mensuels (HT)"
           value={fmt(loyersMensuels)}
-          hint={bauxActifs.length ? `${bauxActifs.length} bail${bauxActifs.length > 1 ? ' actifs' : ' actif'}` : 'Aucun bail actif'}
+          hint={bauxActifs.length ? `${bauxActifs.length} bail${bauxActifs.length > 1 ? ' actifs' : ' actif'} · baux en cours seulement` : 'Aucun bail actif'}
         />
         <KpiCard
-          label="Cashflow mensuel"
+          label="Cashflow mensuel estimé"
           value={(cashflowMensualise >= 0 ? '+' : '') + fmt(cashflowMensualise)}
-          hint="après annuités et charges"
+          hint="estimation fiches biens — le réel est dans Analyse"
           tone={cashflowMensualise >= 0 ? 'positive' : 'negative'}
         />
         <KpiCard
           label="Impayés"
           value={totalImpayes > 0 ? fmt(totalImpayes) : '0 €'}
-          hint={impayes.length ? `${impayes.length} échéance${impayes.length > 1 ? 's' : ''} en retard` : 'À jour'}
+          hint={impayes.length ? `${impayes.length} échéance${impayes.length > 1 ? 's' : ''} en retard (TTC)` : 'À jour'}
           tone={totalImpayes > 0 ? 'negative' : null}
           onClick={totalImpayes > 0 ? () => navigate('flux', { tab: 'relances' }) : undefined}
         />
@@ -403,11 +457,19 @@ export default function Apercu({ navigate }) {
               Traité cette nuit
             </h3>
             <div className="flex flex-col gap-2.5 text-[13px]">
-              {rapprochesJuillet > 0 && (
+              {rapprochesAuto > 0 && (
                 <div className="flex gap-2.5 items-start">
                   <Check size={15} style={{ color: POSITIVE, marginTop: 2 }} className="shrink-0" />
                   <p className="m-0 leading-[1.5]" style={{ color: '#39414d' }}>
-                    <strong>{rapprochesJuillet} loyer{rapprochesJuillet > 1 ? 's' : ''}</strong> de {MONTHS_SHORT[currentMonth].toLowerCase()} rapproché{rapprochesJuillet > 1 ? 's' : ''} automatiquement.
+                    <strong>{rapprochesAuto} virement{rapprochesAuto > 1 ? 's' : ''}</strong> rapproché{rapprochesAuto > 1 ? 's' : ''} automatiquement d'une échéance.
+                  </p>
+                </div>
+              )}
+              {courriersAuto > 0 && (
+                <div className="flex gap-2.5 items-start">
+                  <Check size={15} style={{ color: POSITIVE, marginTop: 2 }} className="shrink-0" />
+                  <p className="m-0 leading-[1.5]" style={{ color: '#39414d' }}>
+                    <strong>{courriersAuto} courrier{courriersAuto > 1 ? 's' : ''}</strong> (quittances, avis, relances) parti{courriersAuto > 1 ? 's' : ''} automatiquement.
                   </p>
                 </div>
               )}
@@ -440,11 +502,11 @@ export default function Apercu({ navigate }) {
                   </p>
                 </div>
               )}
-              {rapprochesJuillet === 0 && (
+              {rapprochesAuto === 0 && courriersAuto === 0 && (
                 <div className="flex gap-2.5 items-start">
-                  <Check size={15} style={{ color: POSITIVE, marginTop: 2 }} className="shrink-0" />
-                  <p className="m-0 leading-[1.5]" style={{ color: '#39414d' }}>
-                    Rien à traiter cette nuit. L'IA surveille en continu.
+                  <Check size={15} style={{ color: FAINT, marginTop: 2 }} className="shrink-0" />
+                  <p className="m-0 leading-[1.5]" style={{ color: FAINT }}>
+                    Aucun traitement automatique ces dernières 24 h.
                   </p>
                 </div>
               )}
@@ -456,9 +518,29 @@ export default function Apercu({ navigate }) {
             <div className="flex justify-between items-center mb-3.5">
               <h3 className="m-0 text-[15px] font-bold" style={{ color: NAVY }}>Opportunité de la semaine</h3>
             </div>
-            <p className="m-0 text-[13px] leading-[1.5]" style={{ color: FAINT }}>
-              Configurez votre veille pour découvrir des opportunités.
-            </p>
+            {oppSemaine ? (
+              <div className="text-[13px] leading-[1.5]">
+                <p className="m-0 font-semibold" style={{ color: NAVY }}>
+                  {oppSemaine.adresse || 'Adresse à confirmer'}{oppSemaine.ville ? ` — ${oppSemaine.ville}` : ''}
+                </p>
+                <p className="m-0 mt-1" style={{ color: '#39414d' }}>
+                  {oppSemaine.type_offre === 'location'
+                    ? (oppSemaine.loyer_annuel ? `${fmt(oppSemaine.loyer_annuel)}/an` : 'Loyer : nous consulter')
+                    : (oppSemaine.prix ? fmt(oppSemaine.prix) : 'Prix : nous consulter')}
+                  {oppSemaine.rendement_brut != null && (
+                    <> · <strong style={{ color: POSITIVE }}>{String(oppSemaine.rendement_brut).replace('.', ',')} % brut</strong></>
+                  )}
+                  {oppSemaine.score != null && ` · score ${oppSemaine.score}/100`}
+                </p>
+                <p className="m-0 mt-0.5 text-[11px]" style={{ color: FAINT }}>
+                  {oppSemaine.recherche} · veille du {oppSemaine.decouvert_le ? new Date(oppSemaine.decouvert_le).toLocaleDateString('fr-FR') : '—'}
+                </p>
+              </div>
+            ) : (
+              <p className="m-0 text-[13px] leading-[1.5]" style={{ color: FAINT }}>
+                Aucune opportunité active dans la veille pour l'instant.
+              </p>
+            )}
             <button
               onClick={() => navigate('opportunites')}
               className="mt-3.5 w-full text-[13px] font-semibold py-2.5 rounded-[10px] border-none cursor-pointer transition-colors flex items-center justify-center gap-1.5"
@@ -485,8 +567,8 @@ export default function Apercu({ navigate }) {
                 />
               </div>
               <div className="flex justify-between text-[12px]" style={{ color: FAINT }}>
-                <span>{pct} % de l'attendu</span>
-                <span>{fmt(attendu)} attendus</span>
+                <span>{pct} % de l'attendu à date{encaisseReel != null ? ' · réel (banque)' : ' · déclaré'}</span>
+                <span>{fmt(attendu)} TTC attendus (mois échus)</span>
               </div>
             </div>
           </Card>

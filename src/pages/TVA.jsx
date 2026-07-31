@@ -23,6 +23,9 @@ export default function TVA({ navigate }) {
     [bankAccounts, bankTransactions, transactions, baux, annee],
   )
 
+  const anneeCourante = new Date().getFullYear()
+  const anneeMin = reel?.debut ? new Date(reel.debut).getFullYear() : anneeCourante - 4
+
   if (reel) {
     const totaux = reel.mois.reduce((acc, m) => ({
       encaisseTTC: acc.encaisseTTC + m.encaisseTTC,
@@ -35,9 +38,11 @@ export default function TVA({ navigate }) {
       <div>
         <PageHeader title="Balance TVA" sub={`TVA sur encaissements réels ${annee}`}>
           <div className="flex items-center gap-2">
-            <button onClick={() => setAnnee(a => a - 1)} className="px-2 py-1 rounded bg-gray-100 text-gray-500 hover:bg-gray-200 cursor-pointer text-sm">←</button>
+            <button onClick={() => setAnnee(a => Math.max(anneeMin, a - 1))} disabled={annee <= anneeMin}
+              className="px-2 py-1 rounded bg-gray-100 text-gray-500 hover:bg-gray-200 cursor-pointer text-sm disabled:opacity-30 disabled:cursor-default">←</button>
             <span className="font-bold text-navy">{annee}</span>
-            <button onClick={() => setAnnee(a => a + 1)} className="px-2 py-1 rounded bg-gray-100 text-gray-500 hover:bg-gray-200 cursor-pointer text-sm">→</button>
+            <button onClick={() => setAnnee(a => Math.min(anneeCourante, a + 1))} disabled={annee >= anneeCourante}
+              className="px-2 py-1 rounded bg-gray-100 text-gray-500 hover:bg-gray-200 cursor-pointer text-sm disabled:opacity-30 disabled:cursor-default">→</button>
           </div>
         </PageHeader>
 
@@ -53,6 +58,18 @@ export default function TVA({ navigate }) {
           />
         </KpiRow>
 
+        {Math.abs(reel.ecartsRapprochement) > 0.02 && (
+          <Card className="p-4 mb-6 border-amber-200 bg-amber-50/40">
+            <p className="text-sm text-navy">
+              <strong>{fmt(Math.abs(reel.ecartsRapprochement))} d'écart entre les virements
+              rapprochés et le dû de leurs échéances</strong>
+              {reel.ecartsRapprochement > 0 ? ' (trop-perçu)' : ' (moins-perçu)'} — la TVA
+              affichée suit les montants réellement encaissés. Si un virement couvre autre
+              chose qu'un loyer (indemnité, régularisation), rapprochez-le plus finement :
+              sa TVA n'est peut-être pas au taux du bail.
+            </p>
+          </Card>
+        )}
         {reel.declaresNonRapproches > 0 && (
           <Card className="p-4 mb-6 border-amber-200 bg-amber-50/40">
             <p className="text-sm text-navy">

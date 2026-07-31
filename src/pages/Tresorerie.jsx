@@ -8,7 +8,7 @@ import { PageHeader, Card, Sel, Kpi, KpiRow } from '../components/UI'
 
 const COULEURS_SORTIES = {
   prets: '#3b82f6', impots: '#f59e0b', travaux: '#8b5cf6',
-  copro: '#94a3b8', exploitation: '#64748b', autres: '#cbd5e1',
+  copro: '#94a3b8', exploitation: '#64748b', capital: '#0ea5e9', autres: '#cbd5e1',
 }
 
 // Trésorerie sur flux bancaires réels : entrées et sorties telles qu'elles
@@ -26,7 +26,8 @@ export default function Tresorerie({ navigate }) {
     [bankAccounts, bankTransactions, year],
   )
 
-  const years = Array.from({ length: 5 }, (_, i) => currentYear - i)
+  const anneeDebut = reel?.debut ? new Date(reel.debut).getFullYear() : currentYear - 4
+  const years = Array.from({ length: Math.max(1, currentYear - anneeDebut + 1) }, (_, i) => currentYear - i)
 
   if (reel) {
     const data = reel.mois.map((m) => ({
@@ -37,7 +38,10 @@ export default function Tresorerie({ navigate }) {
     }))
     const totalEntrees = reel.mois.reduce((s, m) => s + m.entrees, 0)
     const totalSorties = reel.mois.reduce((s, m) => s + m.totalSorties, 0)
-    const nonQualifiees = reel.mois.reduce((s, m) => s + m.sorties.autres, 0)
+    // Seuls les mouvements réellement non qualifiés comptent ici — une
+    // dépense classée « autre dépense » a déjà été arbitrée.
+    const nonQualifiees = reel.mois.reduce((s, m) => s + m.aQualifier, 0)
+    const anneeVide = totalEntrees === 0 && totalSorties === 0
 
     // La trésorerie est un instantané : chaque point du graphe de solde est
     // daté précisément — les 1ers du mois couverts par l'historique, puis
@@ -74,6 +78,15 @@ export default function Tresorerie({ navigate }) {
             sub="Débits constatés en banque" />
         </KpiRow>
 
+        {anneeVide && (
+          <Card className="p-4 mb-6 border-gray-200 bg-gray-50/60">
+            <p className="text-sm text-gray-500">
+              Aucun flux bancaire en {year} : l'historique transmis par la banque
+              commence le {fmtDate(reel.debut)}. Les années antérieures n'ont pas
+              de vérité bancaire — rien n'est estimé à leur place.
+            </p>
+          </Card>
+        )}
         <p className="text-xs text-gray-400 mb-6">
           Données exactes depuis le {fmtDate(reel.debut)}, début de l'historique transmis par la
           banque — avant cette date, la courbe s'interrompt plutôt que d'estimer.

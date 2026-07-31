@@ -36,34 +36,36 @@ export const DOC_TYPES = [
 export const googleMapsUrl = (adresse, ville, cp) =>
   `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${adresse}, ${cp} ${ville}`)}`
 
-// ── Loyer progressif ────────────────────────────────────────
+// ── Loyer d'un bail pour un mois donné ──────────────────────
+//
+// Le loyer HT du bail au 1er du mois demandé : 0 hors de la période du
+// bail (avant date_debut, après date_fin), 0 pendant la franchise, palier
+// an1/an2/an3 pendant les trois premières années (décalées de la
+// franchise), loyer_ht ensuite. C'est LA source du loyer dans toute
+// l'application — biens.loyer_mensuel n'entre dans aucun calcul.
 
 export const getLoyerPourMois = (bail, mois, annee) => {
-  if (!bail.date_debut) return bail.loyer_ht
-  const debut = new Date(bail.date_debut)
   const target = new Date(annee, mois, 1)
+  // Hors période du bail : rien n'est dû.
+  if (bail.date_fin && target > new Date(bail.date_fin)) return 0
+  if (!bail.date_debut) return Number(bail.loyer_ht || 0)
+  const debut = new Date(bail.date_debut)
+  if (target < new Date(debut.getFullYear(), debut.getMonth(), 1)) return 0
   const moisEcoules =
     (target.getFullYear() - debut.getFullYear()) * 12 +
     (target.getMonth() - debut.getMonth())
-  // Franchise de loyer : 0€ pendant les N premiers mois
-  if (bail.franchise_mois && moisEcoules < bail.franchise_mois) return 0
-  // Loyer progressif par année
-  if (moisEcoules < 12 && bail.loyer_an1) return bail.loyer_an1
-  if (moisEcoules < 24 && bail.loyer_an2) return bail.loyer_an2
-  if (moisEcoules < 36 && bail.loyer_an3) return bail.loyer_an3
-  return bail.loyer_ht
+  // Franchise de loyer : 0 € pendant les N premiers mois — puis les paliers
+  // annuels courent à partir de la fin de la franchise, pas du bail.
+  const franchise = Number(bail.franchise_mois || 0)
+  if (moisEcoules < franchise) return 0
+  const moisPayants = moisEcoules - franchise
+  if (moisPayants < 12 && bail.loyer_an1 != null) return Number(bail.loyer_an1)
+  if (moisPayants < 24 && bail.loyer_an2 != null) return Number(bail.loyer_an2)
+  if (moisPayants < 36 && bail.loyer_an3 != null) return Number(bail.loyer_an3)
+  return Number(bail.loyer_ht || 0)
 }
 
 export const getLoyerActuel = (bail) => {
-  if (!bail.date_debut) return bail.loyer_ht
-  const debut = new Date(bail.date_debut)
   const n = new Date()
-  const moisEcoules =
-    (n.getFullYear() - debut.getFullYear()) * 12 +
-    (n.getMonth() - debut.getMonth())
-  if (bail.franchise_mois && moisEcoules < bail.franchise_mois) return 0
-  if (moisEcoules < 12 && bail.loyer_an1) return bail.loyer_an1
-  if (moisEcoules < 24 && bail.loyer_an2) return bail.loyer_an2
-  if (moisEcoules < 36 && bail.loyer_an3) return bail.loyer_an3
-  return bail.loyer_ht
+  return getLoyerPourMois(bail, n.getMonth(), n.getFullYear())
 }

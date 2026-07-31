@@ -1,5 +1,14 @@
 import { MONTHS, MONTHS_SHORT, getLoyerPourMois, fmt, fmtPct } from './utils'
-import { rendementBrut, rendementNet, cashflowMensuel, agregatsBiens, partSociete, quotePartPersonne, estAcquis } from './calculs'
+import { rendementBrut, rendementNet, cashflowMensuel, agregatsBiens, partSociete, quotePartPersonne, estAcquis, coefTva, loyerMensuelBien } from './calculs'
+
+// Le taux de TVA d'un document vient TOUJOURS du bail (tva_applicable,
+// taux_tva) : un bail non assujetti produit des documents sans TVA. Le
+// « 20 % » n'est qu'un défaut, plus jamais une constante d'affichage.
+const tvaDoc = (bail) => {
+  const coef = coefTva(bail)
+  const pct = Math.round((coef - 1) * 100)
+  return { coef, tvaDe: (ht) => ht * (coef - 1), ttcDe: (ht) => ht * coef, th: coef > 1 ? `TVA ${pct}%` : 'TVA (exonéré)' }
+}
 
 // Print a generated document by injecting it directly into the current page,
 // then printing the page itself.
@@ -119,16 +128,17 @@ const footer = (soc) => `<div class="footer">${soc?.nom || 'WB Partners'}${soc?.
 export const pdfAvisEcheance = (bail, bien, loc, soc, mois, annee) => {
   const loyerHT = getLoyerPourMois(bail, mois, annee)
   const total = loyerHT + bail.charges
+  const tva = tvaDoc(bail)
   const periode = `${MONTHS[mois]} ${annee}`
   const ref = genRef(bail, mois, annee)
   openPrint(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Avis d'échéance</title><style>${baseStyle}</style></head><body>
     ${header(soc, "Avis d'Échéance", `<p>Période : ${periode}</p><p>Émis le ${new Date().toLocaleDateString('fr-FR')}</p><p class="num" style="font-size:11px;color:#3b82f6;font-weight:600">Réf : ${ref}</p>`)}
     ${parties(soc, loc)}
     ${bienBox(bien)}
-    <table><thead><tr><th>Désignation</th><th style="text-align:right">HT</th><th style="text-align:right">TVA 20%</th><th style="text-align:right">TTC</th></tr></thead><tbody>
-      <tr><td>Loyer hors charges</td><td style="text-align:right">${loyerHT.toFixed(2)} €</td><td style="text-align:right">${(loyerHT * 0.2).toFixed(2)} €</td><td style="text-align:right">${(loyerHT * 1.2).toFixed(2)} €</td></tr>
-      ${bail.charges > 0 ? `<tr><td>Provisions sur charges</td><td style="text-align:right">${bail.charges.toFixed(2)} €</td><td style="text-align:right">${(bail.charges * 0.2).toFixed(2)} €</td><td style="text-align:right">${(bail.charges * 1.2).toFixed(2)} €</td></tr>` : ''}
-      <tr class="tot"><td colspan="2"><strong>Total à régler avant le 1er ${periode}</strong></td><td></td><td style="text-align:right"><strong>${(total * 1.2).toFixed(2)} €</strong></td></tr>
+    <table><thead><tr><th>Désignation</th><th style="text-align:right">HT</th><th style="text-align:right">${tva.th}</th><th style="text-align:right">TTC</th></tr></thead><tbody>
+      <tr><td>Loyer hors charges</td><td style="text-align:right">${loyerHT.toFixed(2)} €</td><td style="text-align:right">${tva.tvaDe(loyerHT).toFixed(2)} €</td><td style="text-align:right">${tva.ttcDe(loyerHT).toFixed(2)} €</td></tr>
+      ${bail.charges > 0 ? `<tr><td>Provisions sur charges</td><td style="text-align:right">${bail.charges.toFixed(2)} €</td><td style="text-align:right">${tva.tvaDe(bail.charges).toFixed(2)} €</td><td style="text-align:right">${tva.ttcDe(bail.charges).toFixed(2)} €</td></tr>` : ''}
+      <tr class="tot"><td colspan="2"><strong>Total à régler avant le 1er ${periode}</strong></td><td></td><td style="text-align:right"><strong>${tva.ttcDe(total).toFixed(2)} €</strong></td></tr>
     </tbody></table>
     ${ibanBlock(soc, ref)}
     <p class="note">Indice de révision : ${bail.indice_revision || 'ILC'} — Bail ${bail.type_bail || 'commercial'} du ${bail.date_debut || '—'}</p>
@@ -141,7 +151,8 @@ export const pdfAvisEcheance = (bail, bien, loc, soc, mois, annee) => {
 export const pdfFacture = (bail, bien, loc, soc, mois, annee) => {
   const loyerHT = getLoyerPourMois(bail, mois, annee)
   const totalHT = loyerHT + bail.charges
-  const totalTTC = totalHT * 1.2
+  const tva = tvaDoc(bail)
+  const totalTTC = tva.ttcDe(totalHT)
   const periode = `${MONTHS[mois]} ${annee}`
   const ref = genRef(bail, mois, annee)
   const num = `FAC-${annee}${String(mois + 1).padStart(2, '0')}-${bail.id?.slice(0, 6).toUpperCase()}`
@@ -149,10 +160,10 @@ export const pdfFacture = (bail, bien, loc, soc, mois, annee) => {
     ${header(soc, 'FACTURE', `<p class="num" style="font-size:14px;color:#3b82f6;font-weight:600">${num}</p><p>Date : ${new Date().toLocaleDateString('fr-FR')}</p><p>Période : ${periode}</p>`)}
     ${parties(soc, loc)}
     ${bienBox(bien)}
-    <table><thead><tr><th>Désignation</th><th style="text-align:right">P.U. HT</th><th style="text-align:right">TVA 20%</th><th style="text-align:right">TTC</th></tr></thead><tbody>
-      <tr><td>Loyer — ${periode}</td><td style="text-align:right">${loyerHT.toFixed(2)} €</td><td style="text-align:right">${(loyerHT * 0.2).toFixed(2)} €</td><td style="text-align:right">${(loyerHT * 1.2).toFixed(2)} €</td></tr>
-      ${bail.charges > 0 ? `<tr><td>Charges</td><td style="text-align:right">${bail.charges.toFixed(2)} €</td><td style="text-align:right">${(bail.charges * 0.2).toFixed(2)} €</td><td style="text-align:right">${(bail.charges * 1.2).toFixed(2)} €</td></tr>` : ''}
-      <tr class="tot"><td colspan="2"><strong>TOTAL</strong></td><td style="text-align:right"><strong>${(totalHT * 0.2).toFixed(2)} €</strong></td><td style="text-align:right"><strong>${totalTTC.toFixed(2)} €</strong></td></tr>
+    <table><thead><tr><th>Désignation</th><th style="text-align:right">P.U. HT</th><th style="text-align:right">${tva.th}</th><th style="text-align:right">TTC</th></tr></thead><tbody>
+      <tr><td>Loyer — ${periode}</td><td style="text-align:right">${loyerHT.toFixed(2)} €</td><td style="text-align:right">${tva.tvaDe(loyerHT).toFixed(2)} €</td><td style="text-align:right">${tva.ttcDe(loyerHT).toFixed(2)} €</td></tr>
+      ${bail.charges > 0 ? `<tr><td>Charges</td><td style="text-align:right">${bail.charges.toFixed(2)} €</td><td style="text-align:right">${tva.tvaDe(bail.charges).toFixed(2)} €</td><td style="text-align:right">${tva.ttcDe(bail.charges).toFixed(2)} €</td></tr>` : ''}
+      <tr class="tot"><td colspan="2"><strong>TOTAL</strong></td><td style="text-align:right"><strong>${tva.tvaDe(totalHT).toFixed(2)} €</strong></td><td style="text-align:right"><strong>${totalTTC.toFixed(2)} €</strong></td></tr>
     </tbody></table>
     ${ibanBlock(soc, ref)}
     ${footer(soc)}
@@ -165,16 +176,17 @@ export const pdfQuittance = (bail, bien, loc, soc, transaction) => {
   const loyerHT = transaction.montant_loyer
   const chargesHT = transaction.montant_charges
   const totalHT = loyerHT + chargesHT
-  const totalTTC = totalHT * 1.2
+  const tva = tvaDoc(bail)
+  const totalTTC = tva.ttcDe(totalHT)
   const periode = `${MONTHS[transaction.mois]} ${transaction.annee}`
   const datePaiement = transaction.date_paiement ? new Date(transaction.date_paiement).toLocaleDateString('fr-FR') : '—'
   openPrint(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Quittance</title><style>${baseStyle}</style></head><body>
     ${header(soc, 'Quittance de Loyer', `<p>Période : ${periode}</p><p>Date de paiement : ${datePaiement}</p>`)}
     ${parties(soc, loc)}
     ${bienBox(bien)}
-    <table><thead><tr><th>Désignation</th><th style="text-align:right">HT</th><th style="text-align:right">TVA 20%</th><th style="text-align:right">TTC</th></tr></thead><tbody>
-      <tr><td>Loyer</td><td style="text-align:right">${loyerHT.toFixed(2)} €</td><td style="text-align:right">${(loyerHT * 0.2).toFixed(2)} €</td><td style="text-align:right">${(loyerHT * 1.2).toFixed(2)} €</td></tr>
-      <tr><td>Charges</td><td style="text-align:right">${chargesHT.toFixed(2)} €</td><td style="text-align:right">${(chargesHT * 0.2).toFixed(2)} €</td><td style="text-align:right">${(chargesHT * 1.2).toFixed(2)} €</td></tr>
+    <table><thead><tr><th>Désignation</th><th style="text-align:right">HT</th><th style="text-align:right">${tva.th}</th><th style="text-align:right">TTC</th></tr></thead><tbody>
+      <tr><td>Loyer</td><td style="text-align:right">${loyerHT.toFixed(2)} €</td><td style="text-align:right">${tva.tvaDe(loyerHT).toFixed(2)} €</td><td style="text-align:right">${tva.ttcDe(loyerHT).toFixed(2)} €</td></tr>
+      <tr><td>Charges</td><td style="text-align:right">${chargesHT.toFixed(2)} €</td><td style="text-align:right">${tva.tvaDe(chargesHT).toFixed(2)} €</td><td style="text-align:right">${tva.ttcDe(chargesHT).toFixed(2)} €</td></tr>
       <tr class="tot"><td colspan="2"><strong>TOTAL ACQUITTÉ</strong></td><td></td><td style="text-align:right"><strong>${totalTTC.toFixed(2)} €</strong></td></tr>
     </tbody></table>
     <p class="note">Le bailleur soussigné reconnaît avoir reçu la somme de ${totalTTC.toFixed(2)} € TTC au titre du loyer et des charges pour la période de ${periode}. Cette quittance ne libère le locataire que pour la période indiquée.</p>
@@ -188,6 +200,7 @@ export const pdfQuittance = (bail, bien, loc, soc, transaction) => {
 export const pdfRelance = (bail, bien, loc, soc, transactions) => {
   const impayees = transactions.filter(t => t.bail_id === bail.id && t.statut === 'impayé')
   const totalDu = impayees.reduce((s, t) => s + t.montant_loyer + t.montant_charges, 0)
+  const tva = tvaDoc(bail)
   const periodes = impayees.map(t => `${MONTHS[t.mois]} ${t.annee}`).join(', ')
   const refStr = impayees.map(t => genRef(bail, t.mois, t.annee)).join(' / ')
   openPrint(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Relance amiable</title><style>${baseStyle}</style></head><body>
@@ -197,7 +210,7 @@ export const pdfRelance = (bail, bien, loc, soc, transactions) => {
     <p style="margin-bottom:20px">Madame, Monsieur,</p>
     <p style="margin-bottom:16px">Sauf erreur de notre part, nous constatons que le(s) loyer(s) suivant(s) reste(nt) impayé(s) :</p>
     <p style="margin-bottom:16px;font-weight:700">Périodes concernées : ${periodes}</p>
-    <p style="margin-bottom:16px;font-weight:700;font-size:16px;color:#dc2626">Montant total dû : ${(totalDu * 1.2).toFixed(2)} € TTC</p>
+    <p style="margin-bottom:16px;font-weight:700;font-size:16px;color:#dc2626">Montant total dû : ${tva.ttcDe(totalDu).toFixed(2)} € TTC</p>
     <p style="margin-bottom:16px">Nous vous prions de bien vouloir régulariser cette situation dans les meilleurs délais.</p>
     ${ibanBlock(soc, refStr)}
     <p class="note">Ce courrier constitue une relance amiable. À défaut de règlement sous 8 jours, nous nous réservons le droit d'engager toute procédure utile.</p>
@@ -210,6 +223,7 @@ export const pdfRelance = (bail, bien, loc, soc, transactions) => {
 export const pdfMiseEnDemeure = (bail, bien, loc, soc, transactions) => {
   const impayees = transactions.filter(t => t.bail_id === bail.id && t.statut === 'impayé')
   const totalDu = impayees.reduce((s, t) => s + t.montant_loyer + t.montant_charges, 0)
+  const tva = tvaDoc(bail)
   const rows = impayees.map(t => `<tr><td>${MONTHS[t.mois]} ${t.annee}</td><td style="text-align:right">${t.montant_loyer.toFixed(2)} €</td><td style="text-align:right">${t.montant_charges.toFixed(2)} €</td><td style="text-align:right">${(t.montant_loyer + t.montant_charges).toFixed(2)} €</td></tr>`).join('')
   const refStr = impayees.map(t => genRef(bail, t.mois, t.annee)).join(' / ')
   openPrint(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Mise en demeure</title><style>${baseStyle} .urgent{background:#fee2e2;border:2px solid #dc2626;border-radius:8px;padding:16px;margin-bottom:20px;text-align:center;color:#dc2626;font-weight:700;font-size:14px}</style></head><body>
@@ -220,7 +234,7 @@ export const pdfMiseEnDemeure = (bail, bien, loc, soc, transactions) => {
     <p style="margin-bottom:16px">Madame, Monsieur,</p>
     <p style="margin-bottom:16px">Malgré nos précédentes relances restées sans effet, nous constatons que les sommes suivantes restent dues :</p>
     <table><thead><tr><th>Période</th><th style="text-align:right">Loyer</th><th style="text-align:right">Charges</th><th style="text-align:right">Total</th></tr></thead>
-      <tbody>${rows}<tr class="tot"><td colspan="3"><strong>TOTAL DÛ</strong></td><td style="text-align:right"><strong>${(totalDu * 1.2).toFixed(2)} € TTC</strong></td></tr></tbody>
+      <tbody>${rows}<tr class="tot"><td colspan="3"><strong>TOTAL DÛ</strong></td><td style="text-align:right"><strong>${tva.ttcDe(totalDu).toFixed(2)} € TTC</strong></td></tr></tbody>
     </table>
     <p style="margin-bottom:16px"><strong>Nous vous mettons en demeure de régler l'intégralité de cette somme sous 8 jours</strong> à compter de la réception de la présente.</p>
     <p style="margin-bottom:16px">À défaut, nous nous réservons le droit de faire application de la clause résolutoire du bail et d'engager toute procédure judiciaire utile.</p>
@@ -234,15 +248,16 @@ export const pdfMiseEnDemeure = (bail, bien, loc, soc, transactions) => {
 export const pdfCommandement = (bail, bien, loc, soc, transactions) => {
   const impayees = transactions.filter(t => t.bail_id === bail.id && t.statut === 'impayé')
   const totalDu = impayees.reduce((s, t) => s + t.montant_loyer + t.montant_charges, 0)
-  const rows = impayees.map(t => `<tr><td>${MONTHS[t.mois]} ${t.annee}</td><td style="text-align:right">${(t.montant_loyer + t.montant_charges).toFixed(2)} €</td></tr>`).join('')
+  const tva = tvaDoc(bail)
+  const rows = impayees.map(t => `<tr><td>${MONTHS[t.mois]} ${t.annee}</td><td style="text-align:right">${tva.ttcDe(t.montant_loyer + t.montant_charges).toFixed(2)} €</td></tr>`).join('')
   openPrint(`<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Commandement de Payer</title><style>${baseStyle} .urgent{background:#dc2626;color:#fff;border-radius:8px;padding:20px;margin-bottom:24px;text-align:center;font-weight:900;font-size:16px;letter-spacing:1px}</style></head><body>
     ${header(soc, 'COMMANDEMENT DE PAYER', `<p>Par acte d'huissier</p><p>${new Date().toLocaleDateString('fr-FR')}</p>`)}
     ${parties(soc, loc)}
     <div class="urgent">COMMANDEMENT DE PAYER — CLAUSE RÉSOLUTOIRE</div>
     ${bienBox(bien)}
     <p style="margin-bottom:16px">En vertu du bail en date du ${bail.date_debut || '—'}, il est fait commandement de payer les sommes suivantes :</p>
-    <table><thead><tr><th>Période</th><th style="text-align:right">Montant HT</th></tr></thead>
-      <tbody>${rows}<tr class="tot"><td><strong>TOTAL</strong></td><td style="text-align:right"><strong>${(totalDu * 1.2).toFixed(2)} € TTC</strong></td></tr></tbody>
+    <table><thead><tr><th>Période</th><th style="text-align:right">Montant TTC</th></tr></thead>
+      <tbody>${rows}<tr class="tot"><td><strong>TOTAL</strong></td><td style="text-align:right"><strong>${tva.ttcDe(totalDu).toFixed(2)} € TTC</strong></td></tr></tbody>
     </table>
     <p style="margin-bottom:16px"><strong>Conformément à l'article L. 145-41 du Code de commerce</strong>, vous disposez d'un délai d'UN MOIS pour régler l'intégralité des sommes dues. Passé ce délai, la clause résolutoire sera acquise de plein droit.</p>
     ${footer(soc)}
@@ -256,23 +271,23 @@ export const pdfPortfolio = (soc, biens, baux, transactions, locataires) => {
   const year = now.getFullYear()
 
   const totalPatrimoine = biens.reduce((s, b) => s + (b.prix_achat || 0), 0)
-  const totalLoyer = biens.reduce((s, b) => s + (b.loyer_mensuel || 0), 0) * 12
-  const totalCashflow = biens.reduce((s, b) => s + cashflowMensuel(b), 0)
+  const totalLoyer = biens.reduce((s, b) => s + loyerMensuelBien(b, baux), 0) * 12
+  const totalCashflow = biens.reduce((s, b) => s + cashflowMensuel(b, baux), 0)
   const bauxActifs = baux.filter(b => b.actif)
   const tauxOcc = biens.length ? Math.round(bauxActifs.length / biens.length * 100) : 0
 
   const biensRows = biens.map(b => {
     const bail = baux.find(ba => ba.bien_id === b.id && ba.actif)
     const loc = bail ? locataires.find(l => l.id === bail.locataire_id) : null
-    const rb = rendementBrut(b)
-    const rn = rendementNet(b)
-    const cf = cashflowMensuel(b)
+    const rb = rendementBrut(b, baux)
+    const rn = rendementNet(b, baux)
+    const cf = cashflowMensuel(b, baux)
     return `<tr>
       <td style="font-weight:700">${b.reference || b.adresse?.slice(0, 25) || '—'}</td>
       <td>${b.ville || '—'}</td>
       <td>${(b.surface_rdc || 0)} m²</td>
       <td>${loc?.raison_sociale || (loc ? `${loc.prenom} ${loc.nom}` : '<em style="color:#ef4444">Vacant</em>')}</td>
-      <td style="text-align:right">${fmt(b.loyer_mensuel)}/mois</td>
+      <td style="text-align:right">${fmt(loyerMensuelBien(b, baux))}/mois</td>
       <td style="text-align:right">${rb !== null ? fmtPct(rb) : '—'}</td>
       <td style="text-align:right">${rn !== null ? fmtPct(rn) : '—'}</td>
       <td style="text-align:right;${cf >= 0 ? 'color:#22c55e' : 'color:#ef4444'}">${fmt(cf)}</td>
@@ -313,7 +328,7 @@ export const pdfPortfolio = (soc, biens, baux, transactions, locataires) => {
       <div class="item"><div class="val" style="color:#22c55e">${fmt(totalCashflow)}</div><div class="lbl">Cashflow mensuel</div></div>
       <div class="item"><div class="val">${bauxActifs.length}</div><div class="lbl">Baux actifs</div></div>
       <div class="item"><div class="val">${locataires.length}</div><div class="lbl">Locataires</div></div>
-      <div class="item"><div class="val">${biens.length ? fmtPct(biens.reduce((s, b) => s + (rendementBrut(b) || 0), 0) / biens.length) : '—'}</div><div class="lbl">Rendement brut moyen</div></div>
+      <div class="item"><div class="val">${biens.length ? fmtPct(biens.reduce((s, b) => s + (rendementBrut(b, baux) || 0), 0) / biens.length) : '—'}</div><div class="lbl">Rendement brut moyen</div></div>
     </div>
 
     <div class="section-title">Détail des biens</div>
@@ -362,8 +377,8 @@ export const pdfFichePatrimoniale = ({ userName, userEmail, societes }) => {
   let totalCashflow = 0
   let totalDette = 0
   let detentionPartielle = false
-  societes.forEach(({ biens, bienActionnaires }) => {
-    const agg = agregatsBiens(biens, bienActionnaires || [])
+  societes.forEach(({ biens, bienActionnaires, baux }) => {
+    const agg = agregatsBiens(biens, bienActionnaires || [], baux || [])
     totalBiens += biens.length
     totalPatrimoine += agg.valeurNette
     totalLoyer += agg.loyerMensuelNet * 12
@@ -375,13 +390,14 @@ export const pdfFichePatrimoniale = ({ userName, userEmail, societes }) => {
 
   // Quote-part consolidée de l'utilisateur, société par société.
   const maQuotePart = moi
-    ? societes.map(({ societe: soc, biens, actionnaires, bienActionnaires }) => {
+    ? societes.map(({ societe: soc, biens, actionnaires, bienActionnaires, baux }) => {
         const lien = (actionnaires || []).find(a => a.personne_id === moi.id)
         const qp = quotePartPersonne({
           personneId: moi.id,
           pctSociete: lien?.pourcentage || 0,
           biens,
           bienActionnaires: bienActionnaires || [],
+          baux: baux || [],
         })
         return { soc, pct: Number(lien?.pourcentage || 0), qp }
       }).filter(r => r.pct > 0 || r.qp.valeurDirecte > 0)
@@ -441,8 +457,8 @@ export const pdfFichePatrimoniale = ({ userName, userEmail, societes }) => {
         <th style="text-align:right">Patrimoine net</th>
       </tr></thead>
       <tbody>
-        ${societes.map(({ societe: soc, biens, bienActionnaires }) => {
-          const a = agregatsBiens(biens, bienActionnaires || [])
+        ${societes.map(({ societe: soc, biens, bienActionnaires, baux }) => {
+          const a = agregatsBiens(biens, bienActionnaires || [], baux || [])
           return `<tr>
             <td><strong>${soc.nom_affiche || soc.nom}</strong></td>
             <td><span style="font-size:10px;color:#64748b">${soc.rcs || soc.siret || '—'}</span></td>
@@ -458,7 +474,7 @@ export const pdfFichePatrimoniale = ({ userName, userEmail, societes }) => {
   const societesHtml = societes.map(({ societe: soc, biens, actionnaires, baux, bienActionnaires, personnes }) => {
     const bact = bienActionnaires || []
     const pers = personnes || []
-    const agg = agregatsBiens(biens, bact)
+    const agg = agregatsBiens(biens, bact, baux || [])
     const socPatrimoine = agg.valeurNette
     const socDette = agg.detteNette
     const socLoyer = agg.loyerMensuelNet * 12
@@ -489,6 +505,7 @@ export const pdfFichePatrimoniale = ({ userName, userEmail, societes }) => {
               pctSociete: a.pourcentage,
               biens,
               bienActionnaires: bact,
+              baux: baux || [],
             })
             const nom = p?.nom || a.nom
             const siret = p?.siret || a.siret
@@ -571,8 +588,8 @@ export const pdfFichePatrimoniale = ({ userName, userEmail, societes }) => {
             <td style="text-align:right;${pct < 99.99 ? 'font-weight:700;color:#f59e0b' : 'color:#94a3b8'}">${pct.toFixed(2)}%</td>
             <td style="text-align:right">${b.prix_achat ? fmt(b.prix_achat * part) : '—'}</td>
             <td style="text-align:right">${b.montant_emprunt ? fmt(b.montant_emprunt * part) : '—'}</td>
-            <td style="text-align:right">${b.loyer_mensuel ? fmt(b.loyer_mensuel * part) : '—'}</td>
-            <td style="text-align:right;${cashflowMensuel(b) >= 0 ? 'color:#22c55e' : 'color:#ef4444'}">${fmt(cashflowMensuel(b) * part)}</td>
+            <td style="text-align:right">${loyerMensuelBien(b, baux || []) ? fmt(loyerMensuelBien(b, baux || []) * part) : '—'}</td>
+            <td style="text-align:right;${cashflowMensuel(b, baux || []) >= 0 ? 'color:#22c55e' : 'color:#ef4444'}">${fmt(cashflowMensuel(b, baux || []) * part)}</td>
           </tr>`
           }).join('')}
           <tr class="tot">

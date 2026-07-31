@@ -36,6 +36,22 @@ export function SocieteProvider({ children }) {
   const [loadingData, setLoadingData] = useState(false)
   const hasLoadedData = useRef(false)
 
+  // Tous les mouvements bancaires d'une société, paginés par 1000 : la
+  // reconstruction de trésorerie (solde actuel − mouvements postérieurs)
+  // exige l'historique complet — une troncature la fausserait en silence.
+  const chargerTousLesMouvements = async (sid) => {
+    const tous = []
+    for (let de = 0; ; de += 1000) {
+      const { data } = await supabase.from('bank_transactions').select('*')
+        .eq('societe_id', sid)
+        .order('booking_date', { ascending: false })
+        .range(de, de + 999)
+      tous.push(...(data || []))
+      if (!data || data.length < 1000) break
+    }
+    return tous
+  }
+
   // Load sociétés list
   const loadSocietes = useCallback(async () => {
     if (!user) return
@@ -100,10 +116,11 @@ export function SocieteProvider({ children }) {
       // le navigateur (elle ne contient que des jetons de consentement) :
       // l'état de la connexion se lit sur les comptes.
       supabase.from('bank_accounts').select('*').eq('societe_id', sid).order('name'),
-      // 500 derniers mouvements : suffisant pour l'écran Banque, borné pour
-      // ne pas alourdir le chargement de l'application.
-      supabase.from('bank_transactions').select('*').eq('societe_id', sid)
-        .order('booking_date', { ascending: false }).limit(500),
+      // TOUS les mouvements bancaires : la trésorerie est reconstruite à
+      // rebours depuis le solde actuel — un seul mouvement manquant fausse
+      // toute la courbe et la balance TVA. Pagination par 1000 (plafond
+      // PostgREST), le volume reste faible (quelques années de relevés).
+      chargerTousLesMouvements(sid),
       // Historique des courriers (quittances, relances…) : alimente la
       // colonne « dernier courrier » du suivi des loyers.
       supabase.from('courriers_envoyes').select('*').eq('societe_id', sid)
@@ -124,7 +141,7 @@ export function SocieteProvider({ children }) {
     setPersonnes(pers.data || [])
     const comptes = bkAcc.data || []
     setBankAccounts(comptes)
-    setBankTransactions(bkTx.data || [])
+    setBankTransactions(bkTx || [])
     setCourriers(crr.data || [])
     setEnvoisConfig(envCfg.data || null)
 

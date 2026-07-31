@@ -3,12 +3,12 @@ import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useSociete } from '../contexts/Societe'
 import { fmt, fmtPct } from '../lib/utils'
-import { rendementBrut, cashflowMensuel } from '../lib/calculs'
+import { rendementBrut, cashflowMensuel, loyerMensuelBien } from '../lib/calculs'
 import { PageHeader, Card, Empty } from '../components/UI'
 import { Map as MapIcon } from 'lucide-react'
 
-const getColor = (bien) => {
-  const rdt = rendementBrut(bien)
+const getColor = (bien, baux) => {
+  const rdt = rendementBrut(bien, baux)
   if (rdt === null) return '#94a3b8'
   if (rdt >= 0.08) return '#22c55e'
   if (rdt >= 0.05) return '#f59e0b'
@@ -30,7 +30,19 @@ export default function Carte() {
     return [lat, lng]
   }, [biensGeo])
 
-  const zoom = biensGeo.length === 0 ? 6 : biensGeo.length === 1 ? 14 : 6
+    // Zoom d'ouverture : cadré sur l'étendue réelle des biens, pas sur la
+  // France entière dès le deuxième bien.
+  const zoom = useMemo(() => {
+    if (biensGeo.length === 0) return 6
+    if (biensGeo.length === 1) return 14
+    const lats = biensGeo.map(b => Number(b.latitude))
+    const lngs = biensGeo.map(b => Number(b.longitude))
+    const etendue = Math.max(Math.max(...lats) - Math.min(...lats), Math.max(...lngs) - Math.min(...lngs))
+    if (etendue < 0.05) return 13
+    if (etendue < 0.3) return 11
+    if (etendue < 1.5) return 9
+    return 6
+  }, [biensGeo])
 
   const sansCoords = biens.filter(b => !b.latitude || !b.longitude).length
 
@@ -56,21 +68,21 @@ export default function Carte() {
             {biensGeo.map(b => {
               const bail = baux.find(ba => ba.bien_id === b.id && ba.actif)
               const loc = bail ? locataires.find(l => l.id === bail.locataire_id) : null
-              const rdt = rendementBrut(b)
-              const cf = cashflowMensuel(b)
+              const rdt = rendementBrut(b, baux)
+              const cf = cashflowMensuel(b, baux)
               return (
                 <CircleMarker
                   key={b.id}
                   center={[b.latitude, b.longitude]}
                   radius={10}
-                  pathOptions={{ color: getColor(b), fillColor: getColor(b), fillOpacity: 0.8, weight: 2 }}
+                  pathOptions={{ color: getColor(b, baux), fillColor: getColor(b, baux), fillOpacity: 0.8, weight: 2 }}
                 >
                   <Popup>
                     <div className="text-xs leading-relaxed min-w-[200px]">
                       <p className="font-bold text-sm">{b.reference || b.adresse}</p>
                       <p className="text-gray-500">{b.adresse}, {b.code_postal} {b.ville}</p>
                       <hr className="my-1.5" />
-                      <p>Loyer : <strong>{fmt(b.loyer_mensuel)}/mois</strong></p>
+                      <p>Loyer (bail, HT) : <strong>{fmt(loyerMensuelBien(b, baux))}/mois</strong></p>
                       {rdt !== null && <p>Rendement brut : <strong>{fmtPct(rdt)}</strong></p>}
                       <p>Cashflow : <strong className={cf >= 0 ? 'text-green-600' : 'text-red-600'}>{fmt(cf)}/mois</strong></p>
                       {loc && <p className="mt-1">Locataire : {loc.raison_sociale || `${loc.prenom} ${loc.nom}`}</p>}

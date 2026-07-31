@@ -28,6 +28,9 @@ const EMPTY_BAIL = {
   loyer_ht: '', loyer_an1: '', loyer_an2: '', loyer_an3: '', franchise_mois: '', charges: '', depot: '',
   type_bail: 'commercial', utilisation: '', indice_revision: 'ILC',
   date_revision_anniversaire: '', actif: true, auto_avis: false, auto_relance: false,
+  // La TVA pilote tout : conversion HT→TTC du suivi, rapprochement bancaire,
+  // documents. Un bail non assujetti DOIT pouvoir le dire ici.
+  tva_applicable: true, taux_tva: '20',
 }
 
 const EMPTY_LOC = { raison_sociale: '', prenom: '', nom: '', email: '', telephone: '' }
@@ -90,9 +93,9 @@ export default function Patrimoine({ navigate, navState, setNavState }) {
     return transactions.filter(t => bailIds.includes(t.bail_id) && t.statut === 'impayé')
   }
 
-  const rb = (b) => { const r = rendementBrut(b); return r !== null ? (r * 100).toFixed(1) + '%' : '—' }
-  const rn = (b) => { const r = rendementNet(b); return r !== null ? (r * 100).toFixed(1) + '%' : '—' }
-  const cf = (b) => cashflowMensuel(b)
+  const rb = (b) => { const r = rendementBrut(b, baux); return r !== null ? (r * 100).toFixed(1) + '%' : '—' }
+  const rn = (b) => { const r = rendementNet(b, baux); return r !== null ? (r * 100).toFixed(1) + '%' : '—' }
+  const cf = (b) => cashflowMensuel(b, baux)
 
   const u = (k, v) => setF(p => ({ ...p, [k]: v }))
   const num = (k, v) => u(k, v === '' ? '' : v)
@@ -198,10 +201,11 @@ export default function Patrimoine({ navigate, navState, setNavState }) {
       return
     }
     const data = { ...bf }
-    for (const k of ['loyer_ht','loyer_an1','loyer_an2','loyer_an3','franchise_mois','charges','depot']) {
+    for (const k of ['loyer_ht','loyer_an1','loyer_an2','loyer_an3','franchise_mois','charges','depot','taux_tva']) {
       data[k] = data[k] === '' || data[k] === null ? null : Number(data[k])
     }
     data.actif = Boolean(data.actif)
+    data.tva_applicable = data.tva_applicable !== false
     delete data.id; delete data.created_at
 
     let error
@@ -1175,6 +1179,20 @@ export default function Patrimoine({ navigate, navState, setNavState }) {
             options={[{v:'commercial',l:'Commercial'},{v:'professionnel',l:'Professionnel'},{v:'habitation',l:'Habitation'}]} />
           <div />
         </Grid3>
+
+        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3 mt-4">TVA</h4>
+        <Grid2>
+          <Check label="Loyer soumis à TVA" checked={bf.tva_applicable !== false}
+            onChange={e => setBf(p => ({ ...p, tva_applicable: e.target.checked }))} />
+          {bf.tva_applicable !== false && (
+            <Field label="Taux de TVA (%)" type="number" value={bf.taux_tva ?? '20'}
+              onChange={e => setBf(p => ({ ...p, taux_tva: e.target.value }))} />
+          )}
+        </Grid2>
+        <p className="text-xs text-gray-300 -mt-1 mb-2">
+          Détermine la conversion HT → TTC dans tout le suivi (rapprochement bancaire,
+          balance TVA, quittances et avis).
+        </p>
 
         <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3 mt-4">Dates & révision</h4>
         <Grid3>

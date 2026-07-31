@@ -1,21 +1,39 @@
-import { getLoyerPourMois } from './utils'
+import { getLoyerPourMois, getLoyerActuel } from './utils'
+
+// ── Loyer d'un bien ──────────────────────────────────────────
+//
+// LE loyer vient des baux, jamais de la fiche bien : biens.loyer_mensuel
+// était une seconde source de vérité qui divergeait des baux (progressifs,
+// franchises, dates de fin ignorées). Toutes les fonctions ci-dessous
+// prennent donc les baux en paramètre.
+
+/** Loyer mensuel HT courant d'un bien : somme de ses baux actifs, bornés
+ *  par leurs dates (un bail terminé ou pas encore commencé compte 0). */
+export const loyerMensuelBien = (bien, baux = []) =>
+  baux
+    .filter((b) => b.bien_id === bien.id && b.actif)
+    .reduce((s, b) => s + getLoyerActuel(b), 0)
 
 /**
  * Rendement brut = (loyer mensuel × 12) / prix d'achat
  */
-export const rendementBrut = (bien) => {
-  if (!bien.prix_achat || !bien.loyer_mensuel) return null
-  return (bien.loyer_mensuel * 12) / bien.prix_achat
+export const rendementBrut = (bien, baux = []) => {
+  const loyer = loyerMensuelBien(bien, baux)
+  if (!bien.prix_achat || !loyer) return null
+  return (loyer * 12) / bien.prix_achat
 }
 
 /**
  * Rendement net = ((loyer - charges - annuités - TF/12) × 12) / apport
+ * (à défaut d'apport saisi : sur le prix d'achat — c'est alors un
+ * rendement net sur prix, pas un cash-on-cash).
  */
-export const rendementNet = (bien) => {
+export const rendementNet = (bien, baux = []) => {
   const apport = bien.apport || bien.prix_achat
-  if (!apport || !bien.loyer_mensuel) return null
+  const loyer = loyerMensuelBien(bien, baux)
+  if (!apport || !loyer) return null
   const mensuelNet =
-    bien.loyer_mensuel -
+    loyer -
     (bien.charges || 0) -
     (bien.annuites || 0) -
     (bien.taxe_fonciere || 0) / 12
@@ -23,15 +41,16 @@ export const rendementNet = (bien) => {
 }
 
 /**
- * Cashflow mensuel = loyer - charges - annuités - TF/12
+ * Cashflow mensuel estimé = loyer - charges - annuités - TF/12
  *
  * Valeur « 100 % du bien », indépendante de la détention. Les rendements
  * ci-dessus restent eux aussi à 100 % : ce sont des ratios, ils ne changent
- * pas quand on ne détient qu'une fraction du bien.
+ * pas quand on ne détient qu'une fraction du bien. C'est une ESTIMATION de
+ * fiche (le cashflow constaté vit dans les flux bancaires réels).
  */
-export const cashflowMensuel = (bien) => {
+export const cashflowMensuel = (bien, baux = []) => {
   return (
-    (bien.loyer_mensuel || 0) -
+    loyerMensuelBien(bien, baux) -
     (bien.charges || 0) -
     (bien.annuites || 0) -
     (bien.taxe_fonciere || 0) / 12
@@ -101,7 +120,7 @@ export const partDirectePersonne = (bienId, personneId, bienActionnaires = []) =
  * détenue par la société. Retourne aussi les valeurs brutes (100 %) pour
  * pouvoir afficher les deux.
  */
-export const agregatsBiens = (biens = [], bienActionnaires = [], ref = new Date()) => {
+export const agregatsBiens = (biens = [], bienActionnaires = [], baux = [], ref = new Date()) => {
   const acc = {
     valeurBrute: 0, valeurNette: 0,
     detteBrute: 0, detteNette: 0,
@@ -127,8 +146,8 @@ export const agregatsBiens = (biens = [], bienActionnaires = [], ref = new Date(
       return
     }
 
-    const loyer = b.loyer_mensuel || 0
-    const cf = cashflowMensuel(b)
+    const loyer = loyerMensuelBien(b, baux)
+    const cf = cashflowMensuel(b, baux)
 
     acc.valeurBrute += prix
     acc.detteBrute += dette
@@ -158,6 +177,7 @@ export const quotePartPersonne = ({
   pctSociete = 0,
   biens = [],
   bienActionnaires = [],
+  baux = [],
   ref = new Date(),
 }) => {
   const r = {
@@ -171,8 +191,8 @@ export const quotePartPersonne = ({
   biens.filter(b => estAcquis(b, ref)).forEach(b => {
     const prix = b.prix_achat || 0
     const dette = b.montant_emprunt || 0
-    const loyer = b.loyer_mensuel || 0
-    const cf = cashflowMensuel(b)
+    const loyer = loyerMensuelBien(b, baux)
+    const cf = cashflowMensuel(b, baux)
 
     const indirect = partSociete(b.id, bienActionnaires) * fracSoc
     const direct = partDirectePersonne(b.id, personneId, bienActionnaires)
@@ -381,6 +401,9 @@ export const suiviLoyers = ({
       let verdict
       if (attendu === 0) verdict = 'horsBail'
       else if (futur) verdict = 'futur'
+      // Déclaré payé à la main sans virement en face : pas un impayé — on ne
+      // relance pas un locataire qui a payé. C'est un « à rattacher ».
+      else if (recu === 0 && ech?.statut === 'payé') verdict = 'declare'
       else if (recu === 0) verdict = 'flag'
       else if (Math.abs(ecart) < 0.02) verdict = 'ok'
       else if (ecart < 0) verdict = 'watch'
@@ -399,9 +422,10 @@ export const suiviLoyers = ({
       lignes,
       totaux: {
         attendu: lignes.reduce((s, l) => s + l.attendu, 0),
+        // Attendu et écart à date ne comptent que le passé : un loyer de
+        // décembre non encore dû n'est ni un manque ni un dénominateur.
+        attenduADate: duesADate.reduce((s, l) => s + l.attendu, 0),
         recu: lignes.reduce((s, l) => s + l.recu, 0),
-        // L'écart total ne compte que le passé : un loyer de décembre non
-        // encore dû n'est pas un manque à encaisser.
         ecart: duesADate.reduce((s, l) => s + l.ecart, 0),
         moisSansVirement: duesADate.filter(l => l.recu === 0).length,
       },
@@ -410,10 +434,11 @@ export const suiviLoyers = ({
 
   const total = parBail.reduce((a, b) => ({
     attendu: a.attendu + b.totaux.attendu,
+    attenduADate: a.attenduADate + b.totaux.attenduADate,
     recu: a.recu + b.totaux.recu,
     ecart: a.ecart + b.totaux.ecart,
     moisSansVirement: a.moisSansVirement + b.totaux.moisSansVirement,
-  }), { attendu: 0, recu: 0, ecart: 0, moisSansVirement: 0 })
+  }), { attendu: 0, attenduADate: 0, recu: 0, ecart: 0, moisSansVirement: 0 })
 
   // Argent entré sans échéance en face : crédits non rattachés ou qualifiés
   // hors loyer, sur l'année affichée.
@@ -479,14 +504,17 @@ export const tresorerieReelle = ({ bankAccounts = [], bankTransactions = [] }) =
   return { soldeActuel, debut, mvts, soldeALaDate, soldeFinMois }
 }
 
-/** Postes de sorties pour la ventilation des flux réels. */
+/** Postes de sorties pour la ventilation des flux réels. Toute catégorie du
+ *  catalogue doit être mappée : « autres » est réservé aux mouvements non
+ *  encore qualifiés dans Banque. */
 export const POSTES_SORTIES = [
   { k: 'prets', l: 'Échéances de prêt', cats: ['echeance_pret'] },
   { k: 'impots', l: 'Impôts et taxes', cats: ['taxe_fonciere', 'taxe_bureaux', 'impots_taxes'] },
   { k: 'travaux', l: 'Travaux', cats: ['travaux'] },
   { k: 'copro', l: 'Charges de copropriété', cats: ['charges_copropriete'] },
-  { k: 'exploitation', l: 'Assurance, honoraires, frais', cats: ['assurance', 'honoraires', 'frais_bancaires', 'charges_diverses'] },
-  { k: 'autres', l: 'Autres sorties', cats: null },
+  { k: 'exploitation', l: 'Assurance, honoraires, frais', cats: ['assurance', 'honoraires', 'frais_bancaires', 'charges_diverses', 'autre_depense'] },
+  { k: 'capital', l: 'Capital & associés', cats: ['restitution_depot', 'remboursement_cca', 'dividendes'] },
+  { k: 'autres', l: 'À qualifier', cats: null },
 ]
 
 /**
@@ -518,7 +546,11 @@ export const fluxReelsParMois = ({ bankAccounts = [], bankTransactions = [], ann
       .reduce((s, t) => s + Number(t.amount), 0)
 
     const sorties = Object.fromEntries(POSTES_SORTIES.map((p) => [p.k, 0]))
-    for (const t of debits) sorties[posteDe(t.categorie)] += -Number(t.amount)
+    let aQualifier = 0
+    for (const t of debits) {
+      sorties[posteDe(t.categorie)] += -Number(t.amount)
+      if (t.statut_rapprochement === 'a_qualifier') aQualifier += -Number(t.amount)
+    }
 
     // Un mois entièrement antérieur à la fenêtre bancaire, ou pas encore
     // entamé, n'a pas de solde réel à montrer.
@@ -530,6 +562,7 @@ export const fluxReelsParMois = ({ bankAccounts = [], bankTransactions = [], ann
       loyers,
       autresRecettes,
       sorties,
+      aQualifier,
       totalSorties: Object.values(sorties).reduce((s, v) => s + v, 0),
       solde: horsFenetre || futur ? null : soldeFinMois(annee, m),
     }
@@ -562,6 +595,7 @@ export const tvaReelle = ({ bankAccounts = [], bankTransactions = [], transactio
 
     let encaisseTTC = 0
     let collectee = 0
+    let ecartRapprochement = 0
     for (const t of duMois) {
       if (!(Number(t.amount) > 0 && t.transaction_id && t.statut_rapprochement?.startsWith('rapproche'))) continue
       rapproches.add(t.transaction_id)
@@ -569,6 +603,13 @@ export const tvaReelle = ({ bankAccounts = [], bankTransactions = [], transactio
       const coef = coefTva(bailParId.get(ech?.bail_id))
       encaisseTTC += Number(t.amount)
       collectee += Number(t.amount) * (coef - 1) / coef
+      // Un virement peut dépasser (ou manquer) le dû de son échéance : la
+      // TVA calculée suit le montant réellement encaissé, mais l'écart doit
+      // rester visible — il porte peut-être une autre nature de produit.
+      if (ech) {
+        const duTTC = (Number(ech.montant_loyer || 0) + Number(ech.montant_charges || 0)) * coef
+        ecartRapprochement += Number(t.amount) - duTTC
+      }
     }
 
     let deductible = 0
@@ -580,7 +621,7 @@ export const tvaReelle = ({ bankAccounts = [], bankTransactions = [], transactio
       }
     }
 
-    return { mois: m, encaisseTTC, collectee, deductible, baseDeductible, solde: collectee - deductible }
+    return { mois: m, encaisseTTC, collectee, deductible, baseDeductible, ecartRapprochement, solde: collectee - deductible }
   })
 
   // Vigilance : les échéances déclarées payées sans virement rapproché ne
@@ -593,5 +634,11 @@ export const tvaReelle = ({ bankAccounts = [], bankTransactions = [], transactio
     return s + (Number(t.montant_loyer || 0) + Number(t.montant_charges || 0)) * (coef - 1)
   }, 0)
 
-  return { mois, debut: reel.debut, declaresNonRapproches: declaresNonRapproches.length, tvaDeclareeNonComptee }
+  return {
+    mois,
+    debut: reel.debut,
+    declaresNonRapproches: declaresNonRapproches.length,
+    tvaDeclareeNonComptee,
+    ecartsRapprochement: mois.reduce((s, m) => s + m.ecartRapprochement, 0),
+  }
 }

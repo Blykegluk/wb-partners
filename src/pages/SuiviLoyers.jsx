@@ -185,8 +185,8 @@ export default function SuiviLoyers({ navigate }) {
 
   // ── Rendu ─────────────────────────────────────────────────────
 
-  const tauxGlobal = suivi.total.attendu > 0
-    ? Math.round(suivi.total.recu / suivi.total.attendu * 100) : 0
+  const tauxGlobal = suivi.total.attenduADate > 0
+    ? Math.round(suivi.total.recu / suivi.total.attenduADate * 100) : 0
   const courriersEnvoyes = suivi.courriersAnnee.filter(c => c.statut === 'envoye')
   const horsEcheanceTotal = suivi.horsEcheance.reduce((s, t) => s + Number(t.amount || 0), 0)
 
@@ -235,7 +235,7 @@ export default function SuiviLoyers({ navigate }) {
         <Kpi label={`Attendu ${annee}`} value={fmt(suivi.total.attendu)} tone="brand"
           sub="Loyers et charges des baux en cours" />
         <Kpi label="Réellement encaissé" value={fmt(suivi.total.recu)} tone="positive"
-          sub={`${tauxGlobal} % de l'attendu`} />
+          sub={`${tauxGlobal} % de l'attendu à date`} />
         <Kpi label="Écart à ce jour" value={fmt(suivi.total.ecart)}
           tone={suivi.total.ecart < -0.01 ? 'negative' : 'positive'}
           sub={suivi.total.moisSansVirement > 0
@@ -244,7 +244,7 @@ export default function SuiviLoyers({ navigate }) {
         <Kpi label="Reçu hors échéance" value={fmt(horsEcheanceTotal)} tone="warn"
           sub={`${suivi.horsEcheance.length} virement${suivi.horsEcheance.length > 1 ? 's' : ''} à affecter`} />
         <Kpi label="Courriers envoyés" value={courriersEnvoyes.length}
-          sub={envoisConfig ? 'Envois automatiques configurés' : 'Envois automatiques non configurés'} />
+          sub={envoisConfig ? 'Envois automatiques paramétrés' : 'Envois automatiques non paramétrés'} />
       </KpiRow>
       <p className="text-xs text-gray-400 mb-8">
         Les envois (quittances, avis, relances) partent de contact@wbpartners.fr.{' '}
@@ -298,7 +298,7 @@ export default function SuiviLoyers({ navigate }) {
                   <td className="px-4 py-3 text-navy text-sm">Total {annee}</td>
                   <td className="px-4 py-3 text-right text-navy text-sm">{fmt(totaux.attendu)}</td>
                   <td className="px-4 py-3 text-emerald-600 text-sm">{fmt(totaux.recu)}</td>
-                  <td className="px-4 py-3"><Jauge pct={totaux.attendu > 0 ? totaux.recu / totaux.attendu : 0} /></td>
+                  <td className="px-4 py-3"><Jauge pct={totaux.attenduADate > 0 ? totaux.recu / totaux.attenduADate : 0} /></td>
                   <td className="px-4 py-3">
                     <BadgeEcart valeur={totaux.ecart} />
                   </td>
@@ -419,6 +419,9 @@ export default function SuiviLoyers({ navigate }) {
 
 const VERDICT_DOT = {
   ok: 'bg-green-500', watch: 'bg-amber-400', flag: 'bg-red-500', futur: 'bg-gray-200',
+  // Déclaré payé à la main, aucun virement en face : ni vert (pas confirmé),
+  // ni rouge (pas un impayé) — à rattacher.
+  declare: 'bg-amber-300',
 }
 
 function LigneMois({
@@ -488,7 +491,7 @@ function LigneMois({
       <td className="px-4 py-3">
         {canEdit && (
           <div className="flex items-center gap-1.5 relative">
-            {!ligne.futur && ligne.verdict === 'flag' && (
+            {!ligne.futur && ligne.verdict === 'flag' && retardJours >= relanceJ && (
               <BoutonAction disabled={busy} onClick={() => onEmail(palier)} tone="danger">
                 <Send size={11} className="mr-1" />
                 {busy ? 'Envoi…' : palier === 'mise_en_demeure' ? 'Mise en demeure' : 'Relancer'}
