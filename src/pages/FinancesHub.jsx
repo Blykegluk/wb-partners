@@ -49,7 +49,7 @@ export default function FinancesHub({ navigate, navState, setNavState }) {
         <Banque navigate={navigate} />
       </div>
       <div style={{ display: tab === 'tva' ? 'block' : 'none' }}>
-        <TVA />
+        <TVA navigate={navigate} />
       </div>
     </div>
   )

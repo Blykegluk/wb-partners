@@ -6,7 +6,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceD
 import { useAuth } from '../contexts/Auth'
 import { useSociete } from '../contexts/Societe'
 import { fmt, MONTHS_SHORT, getLoyerActuel } from '../lib/utils'
-import { agregatsBiens, partSociete, estAcquis } from '../lib/calculs'
+import { agregatsBiens, partSociete, estAcquis, tresorerieReelle } from '../lib/calculs'
 
 const NAVY = '#16294a'
 const BRAND = '#3f6ad8'
@@ -58,7 +58,7 @@ function KpiCard({ label, value, hint, hintColor, tone, onClick }) {
 // ── Component ─────────────────────────────────────────────────
 export default function Apercu({ navigate }) {
   const { user } = useAuth()
-  const { biens, locataires, baux, transactions, bienActionnaires, bankConnection } = useSociete()
+  const { biens, locataires, baux, transactions, bienActionnaires, bankConnection, bankAccounts, bankTransactions } = useSociete()
 
   const bauxActifs = baux.filter(b => b.actif)
 
@@ -119,10 +119,30 @@ export default function Apercu({ navigate }) {
 
   const aTraiter = [...impayesAlerts, ...revisionAlerts]
 
-  // ── Trésorerie 2026 (solde cumulé projeté) ─────────────────
+  // ── Trésorerie 2026 ────────────────────────────────────────
+  // Banque connectée : solde réel en fin de chaque mois, reconstruit à
+  // rebours depuis le solde actuel avec les mouvements réels — exact sur
+  // toute la fenêtre bancaire, interrompu avant elle plutôt qu'inventé.
+  // Sans banque : l'ancienne projection déclarative, clairement étiquetée.
   const currentYear = now.getFullYear()
   const currentMonth = now.getMonth()
+  const reel = useMemo(
+    () => tresorerieReelle({ bankAccounts, bankTransactions }),
+    [bankAccounts, bankTransactions],
+  )
   const treso = useMemo(() => {
+    if (reel) {
+      return Array.from({ length: 12 }, (_, m) => {
+        const horsFenetre = reel.debut
+          ? new Date(currentYear, m + 1, 1) <= new Date(reel.debut)
+          : true
+        const futur = new Date(currentYear, m, 1) > now
+        return {
+          mois: MONTHS_SHORT[m],
+          solde: horsFenetre || futur ? null : Math.round(reel.soldeFinMois(currentYear, m)),
+        }
+      })
+    }
     const monthly = Array.from({ length: 12 }, (_, m) => {
       const entrees = transactions
         .filter(t => t.annee === currentYear && t.mois === m && t.statut === 'payé')
@@ -138,7 +158,7 @@ export default function Apercu({ navigate }) {
     let cum = 0
     monthly.forEach(row => { cum += row.net; row.solde = Math.round(cum) })
     return monthly
-  }, [transactions, biens, bienActionnaires, currentYear])
+  }, [reel, transactions, biens, bienActionnaires, currentYear])
 
   // ── Traité cette nuit (simulé depuis données réelles) ──────
   const rapprochesJuillet = transactions.filter(t => t.mois === currentMonth && t.annee === currentYear && t.statut === 'payé').length
@@ -322,7 +342,11 @@ export default function Apercu({ navigate }) {
           <Card style={{ padding: '24px' }}>
             <div className="flex justify-between items-center mb-3.5">
               <h3 className="m-0 text-[15px] font-bold" style={{ color: NAVY }}>Trésorerie {currentYear}</h3>
-              <span className="text-[12px]" style={{ color: FAINT }}>solde cumulé projeté</span>
+              <span className="text-[12px]" style={{ color: FAINT }}>
+                {reel
+                  ? <>solde bancaire réel · <strong style={{ color: NAVY }}>{fmt(reel.soldeActuel)}</strong></>
+                  : 'projection déclarative — banque non connectée'}
+              </span>
             </div>
             <div style={{ width: '100%', height: 150 }}>
               <ResponsiveContainer>
@@ -349,8 +373,11 @@ export default function Apercu({ navigate }) {
                     stroke={BRAND}
                     strokeWidth={2.5}
                     dot={false}
+                    connectNulls={false}
                   />
-                  <ReferenceDot x={MONTHS_SHORT[currentMonth]} y={treso[currentMonth]?.solde} r={4} fill={BRAND} stroke="none" />
+                  {treso[currentMonth]?.solde != null && (
+                    <ReferenceDot x={MONTHS_SHORT[currentMonth]} y={treso[currentMonth].solde} r={4} fill={BRAND} stroke="none" />
+                  )}
                 </LineChart>
               </ResponsiveContainer>
             </div>

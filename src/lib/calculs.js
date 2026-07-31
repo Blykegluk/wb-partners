@@ -427,3 +427,164 @@ export const suiviLoyers = ({
 
   return { parBail, total, horsEcheance, courriersAnnee }
 }
+
+// ── Trésorerie et flux réels (banque) ───────────────────────────
+//
+// Les écrans financiers reposaient sur des projections : loyers déclarés
+// « payé » en HT face à des sorties forfaitaires tirées des fiches biens.
+// Depuis la connexion bancaire, la vérité est disponible : le solde réel de
+// chaque compte, rafraîchi à chaque synchronisation, et tous les mouvements.
+// La limite est la fenêtre d'historique consentie par la banque (90 jours à
+// 6 mois avant la connexion) : avant `debut`, il n'existe pas de vérité
+// bancaire, et les courbes doivent s'interrompre plutôt qu'inventer.
+
+const comptesSuivisEur = (bankAccounts = []) =>
+  bankAccounts.filter((c) => c.suivi !== false && (c.currency || 'EUR') === 'EUR')
+
+/** Premier jour du mois suivant, en ISO local (pas de décalage UTC). */
+const debutMoisSuivant = (annee, mois) => {
+  const d = new Date(annee, mois + 1, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+}
+
+/**
+ * Trésorerie réelle : solde actuel des comptes suivis (EUR) et solde
+ * reconstruit à rebours à n'importe quelle fin de mois — exact sur toute la
+ * fenêtre couverte, puisque solde(fin M) = solde actuel − mouvements
+ * postérieurs à M. Renvoie null si aucun compte n'est connecté.
+ */
+export const tresorerieReelle = ({ bankAccounts = [], bankTransactions = [] }) => {
+  const comptes = comptesSuivisEur(bankAccounts)
+  if (comptes.length === 0) return null
+  const uids = new Set(comptes.map((c) => c.account_uid))
+  const soldeActuel = comptes.reduce((s, c) => s + Number(c.solde || 0), 0)
+  const mvts = bankTransactions.filter((t) => uids.has(t.account_uid) && t.booking_date)
+  const debut = mvts.reduce((min, t) => (min === null || t.booking_date < min ? t.booking_date : min), null)
+
+  const soldeFinMois = (annee, mois) => {
+    const seuil = debutMoisSuivant(annee, mois)
+    const posterieurs = mvts
+      .filter((t) => t.booking_date >= seuil)
+      .reduce((s, t) => s + Number(t.amount || 0), 0)
+    return soldeActuel - posterieurs
+  }
+
+  return { soldeActuel, debut, mvts, soldeFinMois }
+}
+
+/** Postes de sorties pour la ventilation des flux réels. */
+export const POSTES_SORTIES = [
+  { k: 'prets', l: 'Échéances de prêt', cats: ['echeance_pret'] },
+  { k: 'impots', l: 'Impôts et taxes', cats: ['taxe_fonciere', 'taxe_bureaux', 'impots_taxes'] },
+  { k: 'travaux', l: 'Travaux', cats: ['travaux'] },
+  { k: 'copro', l: 'Charges de copropriété', cats: ['charges_copropriete'] },
+  { k: 'exploitation', l: 'Assurance, honoraires, frais', cats: ['assurance', 'honoraires', 'frais_bancaires', 'charges_diverses'] },
+  { k: 'autres', l: 'Autres sorties', cats: null },
+]
+
+/**
+ * Flux réels d'une année, mois par mois : loyers encaissés (crédits
+ * rapprochés d'une échéance), autres recettes, sorties ventilées par poste,
+ * et solde bancaire réel en fin de mois (null hors de la fenêtre couverte).
+ */
+export const fluxReelsParMois = ({ bankAccounts = [], bankTransactions = [], annee }) => {
+  const reel = tresorerieReelle({ bankAccounts, bankTransactions })
+  if (!reel) return null
+  const { mvts, debut, soldeActuel, soldeFinMois } = reel
+  const now = new Date()
+  const posteDe = (categorie) =>
+    POSTES_SORTIES.find((p) => p.cats?.includes(categorie))?.k || 'autres'
+
+  const mois = Array.from({ length: 12 }, (_, m) => {
+    const duMois = mvts.filter((t) => {
+      const d = new Date(t.booking_date)
+      return d.getFullYear() === annee && d.getMonth() === m
+    })
+    const credits = duMois.filter((t) => Number(t.amount) > 0)
+    const debits = duMois.filter((t) => Number(t.amount) < 0)
+
+    const loyers = credits
+      .filter((t) => t.transaction_id && t.statut_rapprochement?.startsWith('rapproche'))
+      .reduce((s, t) => s + Number(t.amount), 0)
+    const autresRecettes = credits
+      .filter((t) => !(t.transaction_id && t.statut_rapprochement?.startsWith('rapproche')))
+      .reduce((s, t) => s + Number(t.amount), 0)
+
+    const sorties = Object.fromEntries(POSTES_SORTIES.map((p) => [p.k, 0]))
+    for (const t of debits) sorties[posteDe(t.categorie)] += -Number(t.amount)
+
+    // Un mois entièrement antérieur à la fenêtre bancaire, ou pas encore
+    // entamé, n'a pas de solde réel à montrer.
+    const horsFenetre = debut ? debutMoisSuivant(annee, m) <= debut : true
+    const futur = new Date(annee, m, 1) > now
+    return {
+      mois: m,
+      entrees: loyers + autresRecettes,
+      loyers,
+      autresRecettes,
+      sorties,
+      totalSorties: Object.values(sorties).reduce((s, v) => s + v, 0),
+      solde: horsFenetre || futur ? null : soldeFinMois(annee, m),
+    }
+  })
+
+  return { mois, debut, soldeActuel }
+}
+
+/**
+ * Balance TVA sur flux réels. Collectée : virement par virement rapproché
+ * d'une échéance, au taux et à l'assujettissement du bail — c'est de la TVA
+ * sur les encaissements, son fait générateur pour les loyers. Déductible :
+ * estimée par nature des débits (travaux et honoraires à 20 % dans le TTC) ;
+ * assurance et frais bancaires exonérés, taxes et annuités hors champ, TVA
+ * de copropriété non estimable depuis un flux bancaire.
+ */
+export const tvaReelle = ({ bankAccounts = [], bankTransactions = [], transactions = [], baux = [], annee }) => {
+  const reel = tresorerieReelle({ bankAccounts, bankTransactions })
+  if (!reel) return null
+  const echParId = new Map(transactions.map((t) => [t.id, t]))
+  const bailParId = new Map(baux.map((b) => [b.id, b]))
+  const CATS_DEDUCTIBLES = ['travaux', 'honoraires']
+
+  const rapproches = new Set()
+  const mois = Array.from({ length: 12 }, (_, m) => {
+    const duMois = reel.mvts.filter((t) => {
+      const d = new Date(t.booking_date)
+      return d.getFullYear() === annee && d.getMonth() === m
+    })
+
+    let encaisseTTC = 0
+    let collectee = 0
+    for (const t of duMois) {
+      if (!(Number(t.amount) > 0 && t.transaction_id && t.statut_rapprochement?.startsWith('rapproche'))) continue
+      rapproches.add(t.transaction_id)
+      const ech = echParId.get(t.transaction_id)
+      const coef = coefTva(bailParId.get(ech?.bail_id))
+      encaisseTTC += Number(t.amount)
+      collectee += Number(t.amount) * (coef - 1) / coef
+    }
+
+    let deductible = 0
+    let baseDeductible = 0
+    for (const t of duMois) {
+      if (Number(t.amount) < 0 && CATS_DEDUCTIBLES.includes(t.categorie)) {
+        baseDeductible += -Number(t.amount)
+        deductible += -Number(t.amount) * 0.2 / 1.2
+      }
+    }
+
+    return { mois: m, encaisseTTC, collectee, deductible, baseDeductible, solde: collectee - deductible }
+  })
+
+  // Vigilance : les échéances déclarées payées sans virement rapproché ne
+  // portent aucune TVA réelle — leur TVA théorique est donnée à titre indicatif.
+  const declaresNonRapproches = transactions.filter(
+    (t) => t.annee === annee && t.statut === 'payé' && !rapproches.has(t.id),
+  )
+  const tvaDeclareeNonComptee = declaresNonRapproches.reduce((s, t) => {
+    const coef = coefTva(bailParId.get(t.bail_id))
+    return s + (Number(t.montant_loyer || 0) + Number(t.montant_charges || 0)) * (coef - 1)
+  }, 0)
+
+  return { mois, debut: reel.debut, declaresNonRapproches: declaresNonRapproches.length, tvaDeclareeNonComptee }
+}
