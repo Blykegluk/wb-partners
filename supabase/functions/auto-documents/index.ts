@@ -31,23 +31,64 @@ const MONTHS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Aoû
 const fmt = (n: number) =>
   new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n || 0);
 
-// Reprend src/lib/utils.js getLoyerPourMois : paliers an1/an2/an3 + franchise.
+// Reprend src/lib/utils.js getLoyerPourMois : borné par les dates du bail,
+// franchise décalant les paliers an1/an2/an3. Un bail terminé ou pas encore
+// commencé compte 0 — le cron ne doit jamais facturer hors période.
 function getLoyerPourMois(bail: any, mois: number, annee: number): number {
-  if (!bail.date_debut) return bail.loyer_ht || 0;
-  const debut = new Date(bail.date_debut);
   const target = new Date(annee, mois, 1);
+  if (bail.date_fin && target > new Date(bail.date_fin)) return 0;
+  if (!bail.date_debut) return Number(bail.loyer_ht || 0);
+  const debut = new Date(bail.date_debut);
+  if (target < new Date(debut.getFullYear(), debut.getMonth(), 1)) return 0;
   const moisEcoules = (target.getFullYear() - debut.getFullYear()) * 12 + (target.getMonth() - debut.getMonth());
-  if (bail.franchise_mois && moisEcoules < bail.franchise_mois) return 0;
-  if (moisEcoules < 12 && bail.loyer_an1) return bail.loyer_an1;
-  if (moisEcoules < 24 && bail.loyer_an2) return bail.loyer_an2;
-  if (moisEcoules < 36 && bail.loyer_an3) return bail.loyer_an3;
-  return bail.loyer_ht || 0;
+  const franchise = Number(bail.franchise_mois || 0);
+  if (moisEcoules < franchise) return 0;
+  const moisPayants = moisEcoules - franchise;
+  if (moisPayants < 12 && bail.loyer_an1 != null) return Number(bail.loyer_an1);
+  if (moisPayants < 24 && bail.loyer_an2 != null) return Number(bail.loyer_an2);
+  if (moisPayants < 36 && bail.loyer_an3 != null) return Number(bail.loyer_an3);
+  return Number(bail.loyer_ht || 0);
 }
 
 // Reprend src/lib/calculs.js coefTva : l'ancienne version de cette fonction
 // appliquait 20 % à tous les baux, y compris non assujettis.
 const coefTva = (bail: any) =>
   bail?.tva_applicable === false ? 1 : 1 + Number(bail?.taux_tva ?? 20) / 100;
+
+// ── Expéditeur par société ──────────────────────────────────────
+//
+// Chaque société peut choisir son adresse d'envoi (envois_config.email_envoi).
+// Resend n'expédie que depuis un domaine vérifié (DNS) : la liste est relue à
+// l'API et mise en cache. Une adresse sur domaine non vérifié (Gmail…) ne
+// peut pas être usurpée — elle devient l'adresse de réponse, l'expéditeur
+// technique restant l'adresse par défaut.
+const EXPEDITEUR_DEFAUT = "contact@wbpartners.fr";
+
+let domainesCache: { noms: string[]; quand: number } | null = null;
+async function domainesVerifies(): Promise<string[]> {
+  if (domainesCache && Date.now() - domainesCache.quand < 600000) return domainesCache.noms;
+  try {
+    const res = await fetch("https://api.resend.com/domains", {
+      headers: { Authorization: `Bearer ${RESEND_KEY}` },
+    });
+    const json = await res.json();
+    const noms = (json.data ?? [])
+      .filter((d: any) => d.status === "verified")
+      .map((d: any) => String(d.name).toLowerCase());
+    if (noms.length > 0) domainesCache = { noms, quand: Date.now() };
+    return noms.length > 0 ? noms : ["wbpartners.fr"];
+  } catch {
+    return ["wbpartners.fr"];
+  }
+}
+
+async function expedition(emailConfig: string | null | undefined): Promise<{ from: string; replyTo?: string }> {
+  const e = (emailConfig || "").trim().toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) || e === EXPEDITEUR_DEFAUT) return { from: EXPEDITEUR_DEFAUT };
+  const domaine = e.split("@")[1];
+  if ((await domainesVerifies()).includes(domaine)) return { from: e };
+  return { from: EXPEDITEUR_DEFAUT, replyTo: e };
+}
 
 const nomLocataire = (loc: any) =>
   loc.raison_sociale || `${loc.prenom || ''} ${loc.nom || ''}`.trim() || 'Locataire';
@@ -204,7 +245,7 @@ type Envoi = {
   envoye_par: string | null;
 };
 
-async function envoyerEtJournaliser(supabase: any, soc: any, e: Envoi): Promise<{ ok: boolean; erreur?: string }> {
+async function envoyerEtJournaliser(supabase: any, soc: any, exp: { from: string; replyTo?: string }, e: Envoi): Promise<{ ok: boolean; erreur?: string }> {
   let ok = false;
   let erreur: string | undefined;
   try {
@@ -212,7 +253,8 @@ async function envoyerEtJournaliser(supabase: any, soc: any, e: Envoi): Promise<
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${RESEND_KEY}` },
       body: JSON.stringify({
-        from: `${soc.nom_affiche || soc.nom || 'WB Partners'} <contact@wbpartners.fr>`,
+        from: `${soc.nom_affiche || soc.nom || 'WB Partners'} <${exp.from}>`,
+        ...(exp.replyTo ? { reply_to: exp.replyTo } : {}),
         to: [e.destinataire],
         subject: e.sujet,
         html: e.html,
@@ -252,6 +294,7 @@ async function passeQuotidienne(supabase: any) {
   for (const cfg of configs || []) {
     const { data: soc } = await supabase.from("societe").select("*").eq("id", cfg.societe_id).single();
     if (!soc) continue;
+    const exp = await expedition(cfg.email_envoi);
 
     const { data: baux } = await supabase.from("baux").select("*")
       .eq("societe_id", soc.id).eq("actif", true);
@@ -272,7 +315,7 @@ async function passeQuotidienne(supabase: any) {
 
         for (const ech of (echeances || []).filter((e: any) => e.statut === 'payé' && idsRapproches.has(e.id))) {
           if (await dejaEnvoye(supabase, { transaction_id: ech.id, type: 'quittance' })) continue;
-          const r = await envoyerEtJournaliser(supabase, soc, {
+          const r = await envoyerEtJournaliser(supabase, soc, exp, {
             societe_id: soc.id, bail_id: bail.id, transaction_id: ech.id,
             type: 'quittance', mois: ech.mois, annee: ech.annee,
             destinataire: loc.email,
@@ -289,7 +332,7 @@ async function passeQuotidienne(supabase: any) {
         const mois = now.getMonth(), annee = now.getFullYear();
         if (getLoyerPourMois(bail, mois, annee) > 0
           && !(await dejaEnvoye(supabase, { bail_id: bail.id, type: 'avis_echeance', mois, annee }))) {
-          const r = await envoyerEtJournaliser(supabase, soc, {
+          const r = await envoyerEtJournaliser(supabase, soc, exp, {
             societe_id: soc.id, bail_id: bail.id, transaction_id: null,
             type: 'avis_echeance', mois, annee,
             destinataire: loc.email,
@@ -316,7 +359,7 @@ async function passeQuotidienne(supabase: any) {
           const html = type === 'mise_en_demeure'
             ? buildMiseEnDemeureHtml(soc, bail, bien, loc, impayees)
             : buildRelanceHtml(soc, bail, bien, loc, impayees);
-          const r = await envoyerEtJournaliser(supabase, soc, {
+          const r = await envoyerEtJournaliser(supabase, soc, exp, {
             societe_id: soc.id, bail_id: bail.id, transaction_id: ech.id,
             type, mois: ech.mois, annee: ech.annee,
             destinataire: loc.email,
@@ -369,6 +412,9 @@ async function envoiUnitaire(supabase: any, userId: string, body: any) {
   const { data: loc } = await supabase.from("locataires").select("*").eq("id", bail.locataire_id).single();
   const { data: bien } = await supabase.from("biens").select("*").eq("id", bail.bien_id).single();
   if (!loc || !bien) throw new Error("locataire ou bien introuvable");
+  const { data: cfgU } = await supabase.from("envois_config")
+    .select("email_envoi").eq("societe_id", soc.id).maybeSingle();
+  const exp = await expedition(cfgU?.email_envoi);
   if (!loc.email) throw new Error(`aucune adresse email pour ${nomLocataire(loc)} — à renseigner dans Locataires`);
 
   let html: string, sujet: string;
@@ -393,7 +439,7 @@ async function envoiUnitaire(supabase: any, userId: string, body: any) {
     sujet = `${type === 'mise_en_demeure' ? 'Mise en demeure' : 'Relance de paiement'} — ${bien.adresse}, ${bien.ville}`;
   }
 
-  const r = await envoyerEtJournaliser(supabase, soc, {
+  const r = await envoyerEtJournaliser(supabase, soc, exp, {
     societe_id: soc.id, bail_id: bail.id, transaction_id: ech?.id || null,
     type, mois: m ?? null, annee: a ?? null,
     destinataire: loc.email, sujet, html,

@@ -71,6 +71,7 @@ function EnvoisTab() {
   const [f, setF] = useState({
     quittance_auto: false, avis_actif: false, avis_jour: 1,
     relance_apres_jours: 5, mise_en_demeure_apres_jours: 15, commandement_apres_jours: 30,
+    email_envoi: '',
   })
   const [saved, setSaved] = useState(false)
 
@@ -83,6 +84,7 @@ function EnvoisTab() {
         relance_apres_jours: envoisConfig.relance_apres_jours,
         mise_en_demeure_apres_jours: envoisConfig.mise_en_demeure_apres_jours,
         commandement_apres_jours: envoisConfig.commandement_apres_jours,
+        email_envoi: envoisConfig.email_envoi || '',
       })
     }
   }, [envoisConfig])
@@ -97,6 +99,7 @@ function EnvoisTab() {
       relance_apres_jours: Number(f.relance_apres_jours),
       mise_en_demeure_apres_jours: Number(f.mise_en_demeure_apres_jours),
       commandement_apres_jours: Number(f.commandement_apres_jours),
+      email_envoi: f.email_envoi.trim() || null,
       updated_at: new Date().toISOString(),
     })
     if (error) { alert(`Enregistrement impossible : ${error.message}`) ; return }
@@ -118,9 +121,26 @@ function EnvoisTab() {
         )}
       </div>
       <p className="text-xs text-gray-400 mb-6">
-        Les documents partent par email depuis <strong className="text-gray-500">contact@wbpartners.fr</strong>,
+        Les documents partent par email depuis{' '}
+        <strong className="text-gray-500">{envoisConfig?.email_envoi || 'contact@wbpartners.fr'}</strong>,
         chaque matin vers 8h30. Chaque envoi est tracé dans le suivi des loyers.
         {!envoisConfig && ' Tant que rien n’est enregistré ici, aucun envoi automatique n’a lieu.'}
+      </p>
+
+      <h4 className="text-xs font-bold uppercase text-gray-400 mb-3">Adresse d'expédition</h4>
+      <div className="w-80">
+        <Field label="Email expéditeur de cette société" type="email"
+          placeholder="contact@wbpartners.fr" value={f.email_envoi} disabled={!isAdmin}
+          onChange={e => u('email_envoi', e.target.value)} />
+      </div>
+      <p className="text-xs text-gray-400 mb-6">
+        Vide = contact@wbpartners.fr. Une adresse sur domaine vérifié (aujourd'hui{' '}
+        <strong className="text-gray-500">@wbpartners.fr</strong>) expédie directement.
+        Une adresse sur un autre domaine (Gmail, @creb.fr non vérifié…) ne peut pas servir
+        d'expéditeur — elle devient automatiquement l'<strong className="text-gray-500">adresse
+        de réponse</strong> : le locataire qui répond écrit chez vous, l'envoi partant de
+        contact@wbpartners.fr. Pour expédier depuis votre propre domaine, une vérification
+        DNS est à faire une fois auprès du service d'envoi.
       </p>
 
       <h4 className="text-xs font-bold uppercase text-gray-400 mb-3">Quittances</h4>

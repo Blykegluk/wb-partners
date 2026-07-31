@@ -247,7 +247,7 @@ export default function SuiviLoyers({ navigate }) {
           sub={envoisConfig ? 'Envois automatiques paramétrés' : 'Envois automatiques non paramétrés'} />
       </KpiRow>
       <p className="text-xs text-gray-400 mb-8">
-        Les envois (quittances, avis, relances) partent de contact@wbpartners.fr.{' '}
+        Les envois (quittances, avis, relances) partent de {envoisConfig?.email_envoi || 'contact@wbpartners.fr'}.{' '}
         <button onClick={() => navigate?.('parametres', { tab: 'envois' })}
           className="font-semibold text-blue-500 hover:underline cursor-pointer">
           Paramétrer les envois automatiques
