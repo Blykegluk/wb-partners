@@ -3,6 +3,9 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  # Relance manuelle (ou via API) sans commit — un re-run du job échoue avec
+  # "Multiple artifacts named github-pages", il faut un run neuf.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -55,3 +58,7 @@ jobs:
 
       - id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          # File de publication Pages parfois lente (06/08/2026 : >10 min en
+          # deployment_queued) — on attend jusqu'à 30 min avant d'abandonner.
+          timeout: 1800000
