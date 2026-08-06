@@ -342,7 +342,7 @@ function VueDetails({ opps, commentairesParOpp, onOpen, recherche }) {
 
 // ── Fiche détail ─────────────────────────────────────────────
 
-function DetailModal({ opp, onClose, onStatutChange }) {
+function DetailModal({ opp, onClose, onStatutChange, onCommentAdded }) {
   const { user } = useAuth()
   const [comments, setComments] = useState(null)
   const [newComment, setNewComment] = useState('')
@@ -364,9 +364,20 @@ function DetailModal({ opp, onClose, onStatutChange }) {
     const contenu = newComment.trim()
     if (!contenu) return
     setSaving(true)
-    const { error } = await supabase.from('commentaires').insert({ opportunite_id: opp.id, auteur: user.id, contenu })
+    // Le select en retour d'insert récupère la ligne créée (avec le profil de
+    // l'auteur) pour mettre à jour l'état local ET l'état de la page — sans
+    // ça, les encarts de la liste / carte / vue Détails restaient figés
+    // jusqu'au rechargement complet de la page.
+    const { data, error } = await supabase.from('commentaires')
+      .insert({ opportunite_id: opp.id, auteur: user.id, contenu })
+      .select('id, opportunite_id, contenu, cree_le, auteur, profiles:auteur(full_name, email)')
+      .single()
     setSaving(false)
-    if (!error) { setNewComment(''); loadComments() }
+    if (!error) {
+      setNewComment('')
+      setComments(prev => [...(prev || []), data])
+      onCommentAdded?.(data)
+    }
   }
 
   const changeStatut = async (v) => {
@@ -908,7 +919,8 @@ export default function Pipeline() {
         Ne constitue pas un conseil juridique, fiscal ou en investissement.
       </p>
 
-      {detail && <DetailModal opp={detail} onClose={() => setDetail(null)} onStatutChange={onStatutChange} />}
+      {detail && <DetailModal opp={detail} onClose={() => setDetail(null)} onStatutChange={onStatutChange}
+        onCommentAdded={c => setCommentaires(prev => [c, ...prev])} />}
       {showRapports && <RapportsModal runs={runs} onClose={() => setShowRapports(false)} />}
     </div>
   )
