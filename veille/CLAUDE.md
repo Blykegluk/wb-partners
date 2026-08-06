@@ -55,7 +55,14 @@ R1/R2/R3 ») : exécute **toutes** les recherches définies ici, ni plus ni moin
 - Pour chaque local, **mini-étude d'implantation** :
   1. **Concurrence** à 500 m et 1 km, nommément avec distances : bio (Naturalia, Biocoop, La Vie Claire, Bio c' Bon, Naturéo…) ET conventionnel (Franprix, Carrefour City/Express, Monoprix/Monop', G20, Auchan Piéton, Lidl, Aldi, Coccinelle…).
   2. **Zone de chalandise** : densité résidentielle, bureaux, flux, transports.
-  3. **CA potentiel** (méthode "CA Naturalia") : bio ~3 500–6 000 €/m² de vente/an ; conventionnel proximité ~6 000–9 000 €/m²/an — modulé par la concurrence. Fourchette basse/centrale/haute + **recommandation bio vs conventionnel**.
+  3. **CA potentiel — TOUJOURS LES DEUX SCÉNARIOS** : estimer le CA central pour
+     (a) une enseigne bio type **Naturalia** (3 500–6 000 €/m² de vente/an) ET
+     (b) un conventionnel de proximité type **G20** (6 000–9 000 €/m²/an), chacun
+     modulé par la concurrence de son format. Stocker les deux dans `ca_potentiel`
+     (`ca_naturalia`, `ca_g20`) en plus de la fourchette basse/centrale/haute du
+     format recommandé + **recommandation bio vs conventionnel** (valeur stricte :
+     `bio` ou `conventionnel` — les nuances vont dans `hypotheses`). Le dashboard
+     affiche les deux colonnes côte à côte dans la vue Détails.
   4. **Bilan loyer** : location → ratio loyer/CA (cible ≤ 5–6 % bio, ≤ 4–5 % conventionnel ; au-delà "loyer trop lourd") ; vente → coût d'occupation équivalent / CA.
 
 **Scoring R3 (/100)** : potentiel de CA de la zone 30 · intensité concurrentielle sur le format recommandé 20 · économie (loyer/CA ou coût d'occupation) 20 · configuration (surface de vente, réserve, livraison, ERP, extraction/froid) 15 · accessibilité & flux 10 · disponibilité/timing 5.
@@ -192,5 +199,5 @@ si tu le peux, signale-le dans ta réponse finale, et arrête-toi.
 
 - `score_detail` : `{ "critère (poids)": points, ... }`
 - `analyse_concurrence` (R3) : `{ "concurrents": [ { "enseigne", "type": "bio"|"conventionnel", "distance", "adresse" } ], "synthese": "..." }`
-- `ca_potentiel` (R3) : `{ "basse": €, "central": €, "haute": €, "recommandation": "bio"|"conventionnel", "hypotheses": "..." }`
+- `ca_potentiel` (R3) : `{ "basse": €, "central": €, "haute": €, "ca_naturalia": €, "ca_g20": €, "recommandation": "bio"|"conventionnel", "hypotheses": "..." }` — basse/centrale/haute = le format recommandé ; `ca_naturalia` et `ca_g20` = CA central de chaque scénario.
 - `runs.requetes` : `{ "R1": [...], "R2": [...], "R3": [...], "R4": [...] }`

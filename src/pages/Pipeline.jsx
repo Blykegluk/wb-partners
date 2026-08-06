@@ -191,6 +191,14 @@ function OppCard({ o, onOpen, commentaires = [] }) {
 // Toutes les informations lisibles d'un coup, tri par clic sur les
 // en-têtes comme dans un tableur. Le clic sur une ligne ouvre la fiche.
 
+// Colonnes propres à R3 : les deux scénarios d'exploitation estimés par la
+// veille — CA si enseigne bio (Naturalia), CA si conventionnel (G20). Le
+// format recommandé est affiché en gras.
+const COLONNES_R3 = [
+  { k: 'ca_naturalia', l: 'CA Naturalia', num: true, get: o => o.ca_potentiel?.ca_naturalia != null ? Number(o.ca_potentiel.ca_naturalia) : null },
+  { k: 'ca_g20', l: 'CA G20', num: true, get: o => o.ca_potentiel?.ca_g20 != null ? Number(o.ca_potentiel.ca_g20) : null },
+]
+
 const COLONNES_DETAILS = [
   { k: 'score', l: 'Score', num: true, get: o => o.score },
   { k: 'statut', l: 'Statut', get: o => statutCfg(o.statut).l },
@@ -206,13 +214,22 @@ const COLONNES_DETAILS = [
   { k: 'detecte', l: 'Détecté le', num: true, get: o => o.detecte_le ? new Date(o.detecte_le).getTime() : null, aff: o => fmtDate(o.detecte_le) },
 ]
 
-function VueDetails({ opps, commentairesParOpp, onOpen }) {
+function VueDetails({ opps, commentairesParOpp, onOpen, recherche }) {
   const [tri, setTri] = useState({ k: 'score', desc: true })
 
   const cliquer = (k) => setTri(t => t.k === k ? { k, desc: !t.desc } : { k, desc: true })
 
+  // Les colonnes de CA n'ont de sens que pour la recherche supermarché.
+  const colonnes = useMemo(() => {
+    if (recherche !== 'R3') return COLONNES_DETAILS
+    const cols = [...COLONNES_DETAILS]
+    const apres = cols.findIndex(c => c.k === 'rendement')
+    cols.splice(apres + 1, 0, ...COLONNES_R3)
+    return cols
+  }, [recherche])
+
   const lignes = useMemo(() => {
-    const col = COLONNES_DETAILS.find(c => c.k === tri.k)
+    const col = colonnes.find(c => c.k === tri.k) || COLONNES_DETAILS[0]
     const val = (o) => col.get(o, commentairesParOpp.get(o.id) || [])
     return [...opps].sort((a, b) => {
       const va = val(a), vb = val(b)
@@ -222,7 +239,7 @@ function VueDetails({ opps, commentairesParOpp, onOpen }) {
       const cmp = col.num ? va - vb : String(va).localeCompare(String(vb), 'fr')
       return tri.desc ? -cmp : cmp
     })
-  }, [opps, tri, commentairesParOpp])
+  }, [opps, tri, commentairesParOpp, colonnes])
 
   if (opps.length === 0) {
     return <Empty icon={<Table2 size={40} />} text="Aucune opportunité ne correspond aux filtres." />
@@ -233,7 +250,7 @@ function VueDetails({ opps, commentairesParOpp, onOpen }) {
       <table className="w-full border-collapse" style={{ minWidth: 1450 }}>
         <thead>
           <tr className="bg-gray-50 text-left">
-            {COLONNES_DETAILS.map(c => (
+            {colonnes.map(c => (
               <th key={c.k} onClick={() => cliquer(c.k)}
                 className={`px-3 py-3 text-[11px] font-bold uppercase tracking-wide cursor-pointer select-none whitespace-nowrap hover:text-navy ${tri.k === c.k ? 'text-navy' : 'text-gray-400'}`}>
                 <span className="inline-flex items-center gap-1">
@@ -281,6 +298,16 @@ function VueDetails({ opps, commentairesParOpp, onOpen }) {
                     ? <span className={seuil && o.rendement_brut >= seuil ? 'text-green-600' : 'text-orange-500'}>{String(o.rendement_brut).replace('.', ',')} %</span>
                     : '—'}
                 </td>
+                {recherche === 'R3' && (
+                  <>
+                    <td className={`px-3 py-2.5 text-sm text-right whitespace-nowrap ${String(o.ca_potentiel?.recommandation || '').startsWith('bio') ? 'font-bold text-emerald-700' : 'text-gray-600'}`}>
+                      {o.ca_potentiel?.ca_naturalia != null ? `${fmtNum(o.ca_potentiel.ca_naturalia)} €/an` : '—'}
+                    </td>
+                    <td className={`px-3 py-2.5 text-sm text-right whitespace-nowrap ${String(o.ca_potentiel?.recommandation || '').startsWith('conventionnel') ? 'font-bold text-emerald-700' : 'text-gray-600'}`}>
+                      {o.ca_potentiel?.ca_g20 != null ? `${fmtNum(o.ca_potentiel.ca_g20)} €/an` : '—'}
+                    </td>
+                  </>
+                )}
                 <td className="px-3 py-2.5 text-xs text-green-700" style={{ minWidth: 200, maxWidth: 280 }}>
                   <span className="line-clamp-3" title={o.points_forts || ''}>{o.points_forts || '—'}</span>
                 </td>
@@ -843,7 +870,7 @@ export default function Pipeline() {
             {RECHERCHES[tab].sub} — {filtered.length + horsCriteres.length} opportunité{filtered.length + horsCriteres.length > 1 ? 's' : ''} ·
             cliquez sur un en-tête pour trier, sur une ligne pour ouvrir la fiche
           </p>
-          <VueDetails opps={[...filtered, ...horsCriteres]} commentairesParOpp={commentairesParOpp} onOpen={setDetail} />
+          <VueDetails opps={[...filtered, ...horsCriteres]} commentairesParOpp={commentairesParOpp} onOpen={setDetail} recherche={tab} />
         </>
       ) : (
         <>

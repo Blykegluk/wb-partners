@@ -9,6 +9,16 @@ const opp = (id, r, extra) => ({
 })
 const TABLES = {
   opportunites: [
+    opp('o4', 'R3', { adresse: '13 Chemin Latéral (Carré des Vives)', ville: 'Bondy', code_postal: '93140',
+      type_offre: 'location', loyer_annuel: 66000, prix_m2: null, surface_totale: 420, score: 67,
+      ca_potentiel: { central: 1200000, ca_naturalia: 760000, ca_g20: 1200000, recommandation: 'conventionnel' },
+      points_forts: 'Zone commerciale établie, parking, quai de livraison',
+      points_vigilance: 'Concurrence Leclerc à 800 m' }),
+    opp('o5', 'R3', { adresse: 'Zone des Flanades', ville: 'Sarcelles', code_postal: '95200',
+      type_offre: 'vente', prix: 890000, surface_totale: 380, score: 57,
+      ca_potentiel: { central: 1100000, ca_naturalia: 1100000, ca_g20: 1737000, recommandation: 'bio' },
+      points_forts: 'Densité résidentielle forte',
+      points_vigilance: "Pouvoir d'achat de la zone à valider pour du bio" }),
     opp('o1', 'R4', { adresse: 'ZAC du Landy, local neuf angle', ville: 'Noisy-le-Sec', code_postal: '93130',
       prix: 338000, prix_m2: 1300, surface_totale: 260, rendement_brut: 10.8, score: 64,
       points_forts: "Angle très visible, brut de béton, proche RER E, prix 35 % sous le neuf du secteur",
