@@ -3,7 +3,7 @@ import { Calendar, Landmark, MoreHorizontal, Send, FileText } from 'lucide-react
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/Auth'
 import { useSociete } from '../contexts/Societe'
-import { fmt, fmtDate, MONTHS, getLoyerPourMois, today } from '../lib/utils'
+import { fmt, fmtDate, MONTHS, getLoyerPourMois, chargesPourMois, today } from '../lib/utils'
 import { suiviLoyers } from '../lib/calculs'
 import {
   pdfAvisEcheance, pdfFacture, pdfQuittance, pdfRelance, pdfMiseEnDemeure, pdfCommandement,
@@ -77,7 +77,7 @@ export default function SuiviLoyers({ navigate }) {
     const { data } = await supabase.from('transactions').insert({
       societe_id: selected.id, bail_id: bail.id, mois: ligne.mois, annee,
       montant_loyer: getLoyerPourMois(bail, ligne.mois, annee),
-      montant_charges: bail.charges || 0,
+      montant_charges: chargesPourMois(bail, ligne.mois, annee),
       statut, date_paiement: statut === 'payé' ? today() : null, relance_count: 0,
     }).select().single()
     return data

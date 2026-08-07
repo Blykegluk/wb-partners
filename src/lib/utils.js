@@ -65,6 +65,23 @@ export const getLoyerPourMois = (bail, mois, annee) => {
   return Number(bail.loyer_ht || 0)
 }
 
+// Charges d'un bail pour un mois donné : mêmes bornes que le loyer, et la
+// franchise les couvre aussi — pendant la franchise, ni loyer ni charges ne
+// sont dus. Toute addition « loyer + charges » doit passer par ici, sinon un
+// bail en franchise paraît devoir ses provisions sur charges.
+export const chargesPourMois = (bail, mois, annee) => {
+  const target = new Date(annee, mois, 1)
+  if (bail.date_fin && target > new Date(bail.date_fin)) return 0
+  if (!bail.date_debut) return Number(bail.charges || 0)
+  const debut = new Date(bail.date_debut)
+  if (target < new Date(debut.getFullYear(), debut.getMonth(), 1)) return 0
+  const moisEcoules =
+    (target.getFullYear() - debut.getFullYear()) * 12 +
+    (target.getMonth() - debut.getMonth())
+  if (moisEcoules < Number(bail.franchise_mois || 0)) return 0
+  return Number(bail.charges || 0)
+}
+
 export const getLoyerActuel = (bail) => {
   const n = new Date()
   return getLoyerPourMois(bail, n.getMonth(), n.getFullYear())

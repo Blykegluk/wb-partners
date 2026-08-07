@@ -50,6 +50,19 @@ function getLoyerPourMois(bail: any, mois: number, annee: number): number {
   return Number(bail.loyer_ht || 0);
 }
 
+// Reprend src/lib/utils.js chargesPourMois : la franchise suspend aussi les
+// provisions sur charges — un bail en franchise ne doit rien du tout.
+function getChargesPourMois(bail: any, mois: number, annee: number): number {
+  const target = new Date(annee, mois, 1);
+  if (bail.date_fin && target > new Date(bail.date_fin)) return 0;
+  if (!bail.date_debut) return Number(bail.charges || 0);
+  const debut = new Date(bail.date_debut);
+  if (target < new Date(debut.getFullYear(), debut.getMonth(), 1)) return 0;
+  const moisEcoules = (target.getFullYear() - debut.getFullYear()) * 12 + (target.getMonth() - debut.getMonth());
+  if (moisEcoules < Number(bail.franchise_mois || 0)) return 0;
+  return Number(bail.charges || 0);
+}
+
 // Reprend src/lib/calculs.js coefTva : l'ancienne version de cette fonction
 // appliquait 20 % à tous les baux, y compris non assujettis.
 const coefTva = (bail: any) =>
@@ -125,7 +138,7 @@ function blocIban(soc: any): string {
 
 function tableMontants(bail: any, mois: number, annee: number): { html: string; totalTTC: number } {
   const loyerHT = getLoyerPourMois(bail, mois, annee);
-  const charges = Number(bail.charges || 0);
+  const charges = getChargesPourMois(bail, mois, annee);
   const coef = coefTva(bail);
   const tvaPct = Math.round((coef - 1) * 100);
   const totalTTC = (loyerHT + charges) * coef;

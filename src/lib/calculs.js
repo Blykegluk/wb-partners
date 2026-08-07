@@ -1,4 +1,4 @@
-import { getLoyerPourMois, getLoyerActuel } from './utils'
+import { getLoyerPourMois, getLoyerActuel, chargesPourMois } from './utils'
 
 // ── Loyer d'un bien ──────────────────────────────────────────
 //
@@ -239,7 +239,9 @@ export const attenduMois = (bail, mois, annee) => {
     if (premierDuMois < new Date(d.getFullYear(), d.getMonth(), 1)) return 0
   }
   if (bail.date_fin && premierDuMois > new Date(bail.date_fin)) return 0
-  return getLoyerPourMois(bail, mois, annee) + Number(bail.charges || 0)
+  // chargesPourMois et non bail.charges : la franchise suspend aussi les
+  // provisions sur charges — un bail en franchise ne doit rien du tout.
+  return getLoyerPourMois(bail, mois, annee) + chargesPourMois(bail, mois, annee)
 }
 
 /**
@@ -445,11 +447,14 @@ export const suiviLoyers = ({
     moisSansVirement: a.moisSansVirement + b.totaux.moisSansVirement,
   }), { attendu: 0, attenduADate: 0, recu: 0, ecart: 0, moisSansVirement: 0 })
 
-  // Argent entré sans échéance en face : crédits non rattachés ou qualifiés
-  // hors loyer, sur l'année affichée.
+  // Argent entré sans échéance en face ET sans nature connue : crédits ni
+  // rattachés à une échéance, ni qualifiés dans Banque. Un crédit qualifié
+  // (dépôt de garantie reçu, apport en compte courant…) a déjà sa réponse —
+  // le compter « à affecter » ferait croire que la qualification s'est perdue.
   const horsEcheance = bankTransactions.filter(t =>
     Number(t.amount) > 0
     && !t.transaction_id
+    && !t.categorie
     && t.booking_date && new Date(t.booking_date).getFullYear() === annee,
   )
 

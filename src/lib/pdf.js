@@ -1,4 +1,4 @@
-import { MONTHS, MONTHS_SHORT, getLoyerPourMois, fmt, fmtPct } from './utils'
+import { MONTHS, MONTHS_SHORT, getLoyerPourMois, chargesPourMois, fmt, fmtPct } from './utils'
 import { rendementBrut, rendementNet, cashflowMensuel, agregatsBiens, partSociete, quotePartPersonne, estAcquis, coefTva, loyerMensuelBien } from './calculs'
 
 // Le taux de TVA d'un document vient TOUJOURS du bail (tva_applicable,
@@ -127,7 +127,8 @@ const footer = (soc) => `<div class="footer">${soc?.nom || 'WB Partners'}${soc?.
 
 export const pdfAvisEcheance = (bail, bien, loc, soc, mois, annee) => {
   const loyerHT = getLoyerPourMois(bail, mois, annee)
-  const total = loyerHT + bail.charges
+  const chargesHT = chargesPourMois(bail, mois, annee)
+  const total = loyerHT + chargesHT
   const tva = tvaDoc(bail)
   const periode = `${MONTHS[mois]} ${annee}`
   const ref = genRef(bail, mois, annee)
@@ -137,7 +138,7 @@ export const pdfAvisEcheance = (bail, bien, loc, soc, mois, annee) => {
     ${bienBox(bien)}
     <table><thead><tr><th>Désignation</th><th style="text-align:right">HT</th><th style="text-align:right">${tva.th}</th><th style="text-align:right">TTC</th></tr></thead><tbody>
       <tr><td>Loyer hors charges</td><td style="text-align:right">${loyerHT.toFixed(2)} €</td><td style="text-align:right">${tva.tvaDe(loyerHT).toFixed(2)} €</td><td style="text-align:right">${tva.ttcDe(loyerHT).toFixed(2)} €</td></tr>
-      ${bail.charges > 0 ? `<tr><td>Provisions sur charges</td><td style="text-align:right">${bail.charges.toFixed(2)} €</td><td style="text-align:right">${tva.tvaDe(bail.charges).toFixed(2)} €</td><td style="text-align:right">${tva.ttcDe(bail.charges).toFixed(2)} €</td></tr>` : ''}
+      ${chargesHT > 0 ? `<tr><td>Provisions sur charges</td><td style="text-align:right">${chargesHT.toFixed(2)} €</td><td style="text-align:right">${tva.tvaDe(chargesHT).toFixed(2)} €</td><td style="text-align:right">${tva.ttcDe(chargesHT).toFixed(2)} €</td></tr>` : ''}
       <tr class="tot"><td colspan="2"><strong>Total à régler avant le 1er ${periode}</strong></td><td></td><td style="text-align:right"><strong>${tva.ttcDe(total).toFixed(2)} €</strong></td></tr>
     </tbody></table>
     ${ibanBlock(soc, ref)}
@@ -150,7 +151,8 @@ export const pdfAvisEcheance = (bail, bien, loc, soc, mois, annee) => {
 
 export const pdfFacture = (bail, bien, loc, soc, mois, annee) => {
   const loyerHT = getLoyerPourMois(bail, mois, annee)
-  const totalHT = loyerHT + bail.charges
+  const chargesHT = chargesPourMois(bail, mois, annee)
+  const totalHT = loyerHT + chargesHT
   const tva = tvaDoc(bail)
   const totalTTC = tva.ttcDe(totalHT)
   const periode = `${MONTHS[mois]} ${annee}`
@@ -162,7 +164,7 @@ export const pdfFacture = (bail, bien, loc, soc, mois, annee) => {
     ${bienBox(bien)}
     <table><thead><tr><th>Désignation</th><th style="text-align:right">P.U. HT</th><th style="text-align:right">${tva.th}</th><th style="text-align:right">TTC</th></tr></thead><tbody>
       <tr><td>Loyer — ${periode}</td><td style="text-align:right">${loyerHT.toFixed(2)} €</td><td style="text-align:right">${tva.tvaDe(loyerHT).toFixed(2)} €</td><td style="text-align:right">${tva.ttcDe(loyerHT).toFixed(2)} €</td></tr>
-      ${bail.charges > 0 ? `<tr><td>Charges</td><td style="text-align:right">${bail.charges.toFixed(2)} €</td><td style="text-align:right">${tva.tvaDe(bail.charges).toFixed(2)} €</td><td style="text-align:right">${tva.ttcDe(bail.charges).toFixed(2)} €</td></tr>` : ''}
+      ${chargesHT > 0 ? `<tr><td>Charges</td><td style="text-align:right">${chargesHT.toFixed(2)} €</td><td style="text-align:right">${tva.tvaDe(chargesHT).toFixed(2)} €</td><td style="text-align:right">${tva.ttcDe(chargesHT).toFixed(2)} €</td></tr>` : ''}
       <tr class="tot"><td colspan="2"><strong>TOTAL</strong></td><td style="text-align:right"><strong>${tva.tvaDe(totalHT).toFixed(2)} €</strong></td><td style="text-align:right"><strong>${totalTTC.toFixed(2)} €</strong></td></tr>
     </tbody></table>
     ${ibanBlock(soc, ref)}
