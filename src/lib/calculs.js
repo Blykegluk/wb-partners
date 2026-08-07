@@ -458,9 +458,19 @@ export const suiviLoyers = ({
     && t.booking_date && new Date(t.booking_date).getFullYear() === annee,
   )
 
+  // Crédits qualifiés hors loyers (dépôts de garantie, apports, indemnités…) :
+  // leur nature est connue, ils ne sont pas « à affecter » — mais ils doivent
+  // rester visibles ici sans obliger à fouiller la liste bancaire.
+  const encaissementsQualifies = bankTransactions.filter(t =>
+    Number(t.amount) > 0
+    && !t.transaction_id
+    && t.categorie
+    && t.booking_date && new Date(t.booking_date).getFullYear() === annee,
+  )
+
   const courriersAnnee = courriers.filter(c => c.annee === annee || (!c.annee && new Date(c.envoye_le).getFullYear() === annee))
 
-  return { parBail, total, horsEcheance, courriersAnnee }
+  return { parBail, total, horsEcheance, encaissementsQualifies, courriersAnnee }
 }
 
 // ── Trésorerie et flux réels (banque) ───────────────────────────
@@ -551,8 +561,15 @@ export const fluxReelsParMois = ({ bankAccounts = [], bankTransactions = [], ann
     const loyers = credits
       .filter((t) => t.transaction_id && t.statut_rapprochement?.startsWith('rapproche'))
       .reduce((s, t) => s + Number(t.amount), 0)
+    // Les dépôts de garantie sont de la trésorerie mais pas un produit : ils
+    // sortent des « autres recettes » pour être montrés à part, sans jamais
+    // entrer dans une rentabilité.
+    const depots = credits
+      .filter((t) => t.categorie === 'depot_garantie_recu')
+      .reduce((s, t) => s + Number(t.amount), 0)
     const autresRecettes = credits
-      .filter((t) => !(t.transaction_id && t.statut_rapprochement?.startsWith('rapproche')))
+      .filter((t) => !(t.transaction_id && t.statut_rapprochement?.startsWith('rapproche'))
+        && t.categorie !== 'depot_garantie_recu')
       .reduce((s, t) => s + Number(t.amount), 0)
 
     const sorties = Object.fromEntries(POSTES_SORTIES.map((p) => [p.k, 0]))
@@ -568,8 +585,9 @@ export const fluxReelsParMois = ({ bankAccounts = [], bankTransactions = [], ann
     const futur = new Date(annee, m, 1) > now
     return {
       mois: m,
-      entrees: loyers + autresRecettes,
+      entrees: loyers + depots + autresRecettes,
       loyers,
+      depots,
       autresRecettes,
       sorties,
       aQualifier,
@@ -578,7 +596,18 @@ export const fluxReelsParMois = ({ bankAccounts = [], bankTransactions = [], ann
     }
   })
 
-  return { mois, debut, soldeActuel, soldeALaDate }
+  // Dépôts de garantie détenus : reçus moins restitués, sur toute la fenêtre
+  // bancaire (pas seulement l'année affichée). C'est de l'argent en caisse
+  // qui n'appartient pas à la société — à connaître avant de le dépenser.
+  // Un dépôt encaissé avant le début de l'historique bancaire échappe au
+  // calcul : la fenêtre est la seule vérité disponible.
+  const depotsDetenus = mvts.reduce((s, t) => {
+    if (t.categorie === 'depot_garantie_recu') return s + Number(t.amount || 0)
+    if (t.categorie === 'restitution_depot') return s + Number(t.amount || 0)
+    return s
+  }, 0)
+
+  return { mois, debut, soldeActuel, soldeALaDate, depotsDetenus }
 }
 
 /**

@@ -33,10 +33,12 @@ export default function Tresorerie({ navigate }) {
     const data = reel.mois.map((m) => ({
       mois: MONTHS_SHORT[m.mois],
       loyers: Math.round(m.loyers),
+      depots: Math.round(m.depots),
       autresRecettes: Math.round(m.autresRecettes),
       ...Object.fromEntries(POSTES_SORTIES.map((p) => [p.k, Math.round(m.sorties[p.k])])),
     }))
     const totalEntrees = reel.mois.reduce((s, m) => s + m.entrees, 0)
+    const totalDepots = reel.mois.reduce((s, m) => s + m.depots, 0)
     const totalSorties = reel.mois.reduce((s, m) => s + m.totalSorties, 0)
     // Seuls les mouvements réellement non qualifiés comptent ici — une
     // dépense classée « autre dépense » a déjà été arbitrée.
@@ -69,13 +71,17 @@ export default function Tresorerie({ navigate }) {
           <Sel value={year} onChange={e => setYear(parseInt(e.target.value))} options={years.map(y => ({ v: y, l: y }))} />
         </PageHeader>
 
-        <KpiRow cols={3}>
+        <KpiRow cols={reel.depotsDetenus !== 0 ? 4 : 3}>
           <Kpi label="Solde bancaire actuel" value={fmt(reel.soldeActuel)} tone="brand"
             sub="Comptes suivis, rafraîchi chaque matin" />
           <Kpi label={`Entrées réelles ${year}`} value={fmt(totalEntrees)} tone="positive"
-            sub="Crédits constatés en banque" />
+            sub={totalDepots > 0 ? `Dont ${fmt(totalDepots)} de dépôts de garantie` : 'Crédits constatés en banque'} />
           <Kpi label={`Sorties réelles ${year}`} value={fmt(totalSorties)} tone="negative"
             sub="Débits constatés en banque" />
+          {reel.depotsDetenus !== 0 && (
+            <Kpi label="Dépôts de garantie détenus" value={fmt(reel.depotsDetenus)}
+              sub="Reçus − restitués. Dette envers les locataires, hors rentabilité" />
+          )}
         </KpiRow>
 
         {anneeVide && (
@@ -111,6 +117,7 @@ export default function Tresorerie({ navigate }) {
               <Tooltip formatter={(v) => fmt(v)} />
               <Legend />
               <Bar dataKey="loyers" name="Loyers encaissés" stackId="in" fill="#22c55e" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="depots" name="Dépôts de garantie reçus" stackId="in" fill="#38bdf8" radius={[4, 4, 0, 0]} />
               <Bar dataKey="autresRecettes" name="Autres recettes" stackId="in" fill="#86efac" radius={[4, 4, 0, 0]} />
               {POSTES_SORTIES.map((p, i) => (
                 <Bar key={p.k} dataKey={p.k} name={p.l} stackId="out"

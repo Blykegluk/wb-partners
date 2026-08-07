@@ -95,12 +95,20 @@ export default function Fiscal({ navigate }) {
     }
 
     // Recettes hors loyers (indemnités, refacturations…) : informatives,
-    // leur traitement fiscal dépend de leur nature.
-    const autresRecettes = reel
+    // leur traitement fiscal dépend de leur nature. Les mouvements de
+    // capital (dépôts de garantie, apports, déblocages de prêt) n'en font
+    // pas partie : ce ne sont pas des produits.
+    const CATS_CAPITAL = ['depot_garantie_recu', 'apport_cca', 'apport_capital', 'emprunt_debloque']
+    const creditsLibres = reel
       ? reel.mvts.filter(t => duAnnee(t) && Number(t.amount) > 0
           && !(t.transaction_id && t.statut_rapprochement?.startsWith('rapproche')))
-          .reduce((s, t) => s + Number(t.amount), 0)
-      : 0
+      : []
+    const autresRecettes = creditsLibres
+      .filter(t => !CATS_CAPITAL.includes(t.categorie))
+      .reduce((s, t) => s + Number(t.amount), 0)
+    const depotsRecus = creditsLibres
+      .filter(t => t.categorie === 'depot_garantie_recu')
+      .reduce((s, t) => s + Number(t.amount), 0)
 
     // ── Charges décaissées, par nature qualifiée dans Banque ──
     const charges = Object.fromEntries(POSTES_CHARGES.map(p => [p.k, 0]))
@@ -124,7 +132,7 @@ export default function Fiscal({ navigate }) {
     const reintegrations = saisies.reintegrations || 0
     const resultat = loyersHT - totalCharges - interets - chargesComp + reintegrations
 
-    return { loyersHT, loyersTTC, autresRecettes, charges, totalCharges, aQualifier, interets, pretsSansTaux, resultat }
+    return { loyersHT, loyersTTC, autresRecettes, depotsRecus, charges, totalCharges, aQualifier, interets, pretsSansTaux, resultat }
   }, [reel, transactions, baux, biens, annee, saisies])
 
   const exportCsv = () => {
@@ -186,7 +194,7 @@ export default function Fiscal({ navigate }) {
           sub="Avant amortissements et IS" />
       </KpiRow>
 
-      {(data.aQualifier > 0 || data.pretsSansTaux.length > 0 || data.autresRecettes > 0) && (
+      {(data.aQualifier > 0 || data.pretsSansTaux.length > 0 || data.autresRecettes > 0 || data.depotsRecus > 0) && (
         <Card className="p-4 mb-6 border-amber-200 bg-amber-50/40">
           <ul className="text-sm text-navy space-y-1">
             {data.aQualifier > 0 && (
@@ -203,6 +211,10 @@ export default function Fiscal({ navigate }) {
             {data.autresRecettes > 0 && (
               <li>{fmt(data.autresRecettes)} de recettes hors loyers (indemnités, refacturations…) —
                 traitement fiscal selon leur nature, non intégrées au résultat ci-dessus.</li>
+            )}
+            {data.depotsRecus > 0 && (
+              <li>{fmt(data.depotsRecus)} de dépôts de garantie reçus — ni produit ni recette :
+                somme détenue pour le compte des locataires, hors résultat.</li>
             )}
           </ul>
         </Card>

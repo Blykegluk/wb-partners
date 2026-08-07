@@ -313,6 +313,36 @@ export default function SuiviLoyers({ navigate }) {
       ))}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-2">
+        {suivi.encaissementsQualifies.length > 0 && (
+          <Card className="p-5">
+            <h3 className="text-sm font-bold text-navy flex items-center gap-2 mb-1">
+              Encaissements qualifiés hors loyers
+              <span className="text-xs font-semibold text-gray-300">{suivi.encaissementsQualifies.length}</span>
+            </h3>
+            <p className="text-xs text-gray-400 mb-3">
+              Dépôts de garantie, apports, indemnités… Leur nature est connue :
+              ils ne comptent ni dans les loyers attendus ni dans la rentabilité.
+            </p>
+            <div className="space-y-1.5 max-h-64 overflow-y-auto">
+              {suivi.encaissementsQualifies.map(t => (
+                <div key={t.id} className="flex items-center justify-between gap-3 bg-sky-50/60 rounded-lg px-3 py-2">
+                  <span className="text-sm text-gray-600 truncate">
+                    <strong className="text-navy">{fmtDate(t.booking_date)}</strong>
+                    {' · '}<span className="font-semibold text-sky-700">{libelleCategorie(t.categorie)}</span>
+                    {t.remittance_information || t.counterparty_name
+                      ? <span className="text-xs text-gray-400"> · {(t.remittance_information || t.counterparty_name).slice(0, 45)}</span>
+                      : ''}
+                  </span>
+                  <span className="text-sm font-semibold text-navy whitespace-nowrap">{fmt(Number(t.amount))}</span>
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 text-xs text-gray-500">
+              Total : <strong className="text-navy">{fmt(suivi.encaissementsQualifies.reduce((s, t) => s + Number(t.amount), 0))}</strong>
+            </p>
+          </Card>
+        )}
+
         <Card className="p-5">
           <h3 className="text-sm font-bold text-navy flex items-center gap-2 mb-1">
             Reçu sans échéance en face
