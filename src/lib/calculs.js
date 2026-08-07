@@ -610,6 +610,137 @@ export const fluxReelsParMois = ({ bankAccounts = [], bankTransactions = [], ann
   return { mois, debut, soldeActuel, soldeALaDate, depotsDetenus }
 }
 
+// ── Prévisionnel des prochains mois ─────────────────────────────
+//
+// Projection mois par mois de ce que les contrats prévoient : loyers TTC
+// des baux (franchise et paliers compris — un bail en franchise démarre à 0
+// puis bascule à son loyer plein), mensualités de prêt (différé compris —
+// la première mensualité tombe à date_acquisition + decalage_pret mois),
+// taxe foncière à son échéance d'octobre, charges d'exploitation des fiches
+// biens. Le solde projeté part du solde bancaire réel quand une banque est
+// connectée. C'est un prévisionnel contractuel : la TVA collectée à
+// reverser, les travaux et les imprévus n'y figurent pas.
+
+/** Mensualité d'un prêt : calculée du taux quand il est renseigné, sinon
+ *  reprise de la fiche (annuites) ; null quand rien ne permet de la
+ *  connaître — l'appelant doit le dire plutôt que compter 0. */
+export const mensualitePret = (bien) => {
+  const K = Number(bien.montant_emprunt || 0)
+  if (K <= 0) return { montant: 0, estime: false }
+  const taux = Number(bien.taux_interet)
+  const duree = Number(bien.duree_credit)
+  if (taux && duree) {
+    const r = taux / 100 / 12
+    return { montant: K * r / (1 - Math.pow(1 + r, -duree)), estime: false }
+  }
+  if (Number(bien.annuites) > 0) return { montant: Number(bien.annuites), estime: true }
+  return { montant: null, estime: true }
+}
+
+export const previsionnelMensuel = ({ biens = [], baux = [], bankAccounts = [], bankTransactions = [], horizon = 12 }) => {
+  const now = new Date()
+  const reel = tresorerieReelle({ bankAccounts, bankTransactions })
+  const actifs = baux.filter(b => b.actif)
+  const bienParId = new Map(biens.map(b => [b.id, b]))
+
+  // Premier mois de mensualité de chaque prêt (différé compris), en index
+  // absolu année*12+mois pour comparer sans arithmétique de dates.
+  const prets = biens
+    .filter(b => Number(b.montant_emprunt) > 0 && b.date_acquisition)
+    .map(b => {
+      const d = new Date(b.date_acquisition)
+      const debut = d.getFullYear() * 12 + d.getMonth() + Number(b.decalage_pret || 0)
+      const { montant, estime } = mensualitePret(b)
+      return { bien: b, debut, fin: debut + Number(b.duree_credit || 0), mensualite: montant, estime }
+    })
+  const pretsInconnus = prets.filter(p => p.mensualite === null)
+
+  const evenements = []
+  const mois = []
+  let soldeProjete = reel ? reel.soldeActuel : null
+
+  for (let i = 0; i < horizon; i++) {
+    const date = new Date(now.getFullYear(), now.getMonth() + i, 1)
+    const y = date.getFullYear(), m = date.getMonth()
+    const abs = y * 12 + m
+
+    // Loyers TTC des baux dont le bien est acquis à ce mois-là (un bien
+    // sous promesse compte à partir de sa date d'acquisition).
+    let loyers = 0
+    let tvaCollectee = 0
+    for (const bail of actifs) {
+      const bien = bienParId.get(bail.bien_id)
+      if (bien && !estAcquis(bien, new Date(y, m, 28))) continue
+      const du = attenduMois(bail, m, y)
+      const coef = coefTva(bail)
+      loyers += du * coef
+      tvaCollectee += du * (coef - 1)
+      // Bascule 0 → dû : fin de franchise ou début de bail, à signaler.
+      if (i > 0 && du > 0 && attenduMois(bail, (m + 11) % 12, m === 0 ? y - 1 : y) === 0) {
+        const enFranchise = Number(bail.franchise_mois || 0) > 0
+        evenements.push({
+          quand: date, type: 'loyer',
+          titre: `Premier loyer ${bien ? `— ${bien.reference || bien.adresse}` : ''}`,
+          detail: `${(enFranchise ? 'Fin de la franchise de ' + bail.franchise_mois + ' mois — ' : 'Début du bail — ')}${fmtEuros(du * coef)} TTC/mois`,
+        })
+      }
+    }
+
+    // Mensualités de prêt dues ce mois-ci (différé écoulé, durée non échue).
+    let mensualites = 0
+    for (const p of prets) {
+      if (abs < p.debut || abs >= p.fin) continue
+      mensualites += p.mensualite || 0
+      if (abs === p.debut) {
+        evenements.push({
+          quand: date, type: 'pret',
+          titre: `Première mensualité — ${p.bien.reference || p.bien.adresse}`,
+          detail: p.mensualite === null
+            ? `Fin du différé de ${p.bien.decalage_pret || 0} mois — mensualité inconnue (taux non renseigné)`
+            : `${(Number(p.bien.decalage_pret) > 0 ? 'Fin du différé de ' + p.bien.decalage_pret + ' mois — ' : '')}${fmtEuros(p.mensualite)}/mois${p.estime ? ' (repris de la fiche)' : ''}`,
+        })
+      }
+    }
+
+    // Taxe foncière : exigible en octobre pour les biens acquis.
+    let taxeFonciere = 0
+    if (m === 9) {
+      for (const b of biens) {
+        if (Number(b.taxe_fonciere) > 0 && estAcquis(b, new Date(y, m, 28))) taxeFonciere += Number(b.taxe_fonciere)
+      }
+      if (taxeFonciere > 0) evenements.push({
+        quand: date, type: 'taxe',
+        titre: 'Taxe foncière',
+        detail: `${fmtEuros(taxeFonciere)} — échéance d'octobre`,
+      })
+    }
+
+    // Charges d'exploitation mensuelles des fiches biens (estimation).
+    let chargesExpl = 0
+    for (const b of biens) {
+      if (Number(b.charges) > 0 && estAcquis(b, new Date(y, m, 28))) chargesExpl += Number(b.charges)
+    }
+
+    const sorties = mensualites + taxeFonciere + chargesExpl
+    const net = loyers - sorties
+    if (soldeProjete !== null) soldeProjete += net
+
+    mois.push({
+      date, annee: y, mois: m,
+      loyers, tvaCollectee, mensualites, taxeFonciere, chargesExpl,
+      sorties, net, soldeProjete,
+    })
+  }
+
+  evenements.sort((a, b) => a.quand - b.quand)
+  return { mois, evenements, pretsInconnus, soldeDepart: reel ? reel.soldeActuel : null }
+}
+
+// Montants entiers dans les libellés d'événements : l'à-peu-près suffit
+// pour une projection, les décimales iraient contre la lecture.
+const fmtEuros = (n) =>
+  new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n || 0)
+
 /**
  * Balance TVA sur flux réels. Collectée : virement par virement rapproché
  * d'une échéance, au taux et à l'assujettissement du bail — c'est de la TVA

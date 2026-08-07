@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import Tresorerie from './Tresorerie'
+import Previsionnel from './Previsionnel'
 import Fiscal from './Fiscal'
 import FichePatrimoniale from './FichePatrimoniale'
 
 const TABS = [
   { key: 'tresorerie', label: 'Trésorerie' },
+  { key: 'previsionnel', label: 'Prévisionnel' },
   { key: 'fiscal', label: 'Fiscal' },
   { key: 'fiche', label: 'Fiche patrimoniale' },
 ]
@@ -33,6 +35,9 @@ export default function Analyse({ navigate, navState, setNavState }) {
       </div>
       <div style={{ display: tab === 'tresorerie' ? 'block' : 'none' }}>
         <Tresorerie navigate={navigate} />
+      </div>
+      <div style={{ display: tab === 'previsionnel' ? 'block' : 'none' }}>
+        <Previsionnel navigate={navigate} />
       </div>
       <div style={{ display: tab === 'fiscal' ? 'block' : 'none' }}>
         <Fiscal navigate={navigate} />
