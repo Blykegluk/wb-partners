@@ -149,8 +149,9 @@ export default function SmartUpload({ onClose, bienId: initialBienId, initialFil
     if (e) { setError(e.message); setSaving(false); return }
 
     // Store document
-    await storeDoc(bId, 'bail', d)
+    const docErr = await storeDoc(bId, 'bail')
     setSaving(false)
+    if (docErr) { setError(`Le bail a été créé, mais le document n'a pas pu être joint — ${docErr}`); return }
     reload()
     onClose()
   }
@@ -168,8 +169,9 @@ export default function SmartUpload({ onClose, bienId: initialBienId, initialFil
     }).eq('id', bId)
     if (e) { setError(e.message); setSaving(false); return }
 
-    await storeDoc(bId, 'amortissement', d)
+    const docErr = await storeDoc(bId, 'amortissement')
     setSaving(false)
+    if (docErr) { setError(`Données enregistrées, mais document non joint — ${docErr}`); return }
     reload()
     onClose()
   }
@@ -193,8 +195,9 @@ export default function SmartUpload({ onClose, bienId: initialBienId, initialFil
     if (e1) { setError(e1.message); setSaving(false); return }
 
     await supabase.from('biens').update({ charges_refacturables: ref, charges_non_refacturables: nonRef }).eq('id', bId)
-    await storeDoc(bId, 'appel_charges', d)
+    const docErr = await storeDoc(bId, 'appel_charges')
     setSaving(false)
+    if (docErr) { setError(`Charges enregistrées, mais document non joint — ${docErr}`); return }
     reload()
     onClose()
   }
@@ -208,9 +211,12 @@ export default function SmartUpload({ onClose, bienId: initialBienId, initialFil
       await supabase.from('transactions').update({ statut: 'payé', date_paiement: d.date_paiement || new Date().toISOString().slice(0, 10) })
         .eq('bail_id', d.bail_id).eq('mois', d.mois).eq('annee', d.annee)
     }
-    const bId = initialBienId || bienChoice || biens[0]?.id
-    if (bId) await storeDoc(bId, 'quittance', d)
+    // Le sélecteur de bien de l'écran quittance alimente genericBien : il
+    // était ignoré ici (le document partait sur le premier bien de la liste).
+    const bId = initialBienId || genericBien || biens[0]?.id
+    const docErr = await storeDoc(bId, 'quittance')
     setSaving(false)
+    if (docErr) { setError(docErr); return }
     reload()
     onClose()
   }
@@ -219,23 +225,34 @@ export default function SmartUpload({ onClose, bienId: initialBienId, initialFil
   const saveGeneric = async () => {
     setSaving(true)
     const bId = genericBien || initialBienId
-    if (bId && file) await storeDoc(bId, genericType, null)
+    const docErr = await storeDoc(bId, genericType)
     setSaving(false)
+    if (docErr) { setError(docErr); return }
     reload()
     onClose()
   }
 
   // ── Store document in DB + Storage ──────────────────────
+  // Retourne null en cas de succès, un message d'erreur sinon. Un échec
+  // silencieux ici fermait le modal comme si le document était enregistré
+  // alors qu'il n'existait nulle part.
   const storeDoc = async (bienId, type) => {
-    if (!file || !bienId) return
-    const path = `${selected.id}/${bienId}/${type}/${Date.now()}_${file.name}`
+    if (!file) return 'Aucun fichier à enregistrer.'
+    if (!bienId) return 'Aucun bien sélectionné.'
+    // Les clés Storage refusent les caractères accentués (é, è, à…) : un nom
+    // comme « Diagnostic électricité.pdf » faisait échouer l'upload. On
+    // stocke sous un nom translittéré ; le nom d'origine reste dans la fiche.
+    const nomSur = file.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9 ._()-]+/g, '_')
+    const path = `${selected.id}/${bienId}/${type}/${Date.now()}_${nomSur}`
     const { error: upErr } = await supabase.storage.from('documents').upload(path, file)
-    if (upErr) return
+    if (upErr) return `Échec du téléversement : ${upErr.message}`
     // Bucket is private — store only the path; signed URLs are generated on demand at view time.
-    await supabase.from('documents').insert({
+    const { error: insErr } = await supabase.from('documents').insert({
       societe_id: selected.id, bien_id: bienId,
       type, nom: file.name, fichier_url: path, taille: file.size,
     })
+    if (insErr) return `Fichier téléversé mais fiche non créée : ${insErr.message}`
+    return null
   }
 
   // ── Bien selector component ─────────────────────────────
@@ -298,25 +315,34 @@ export default function SmartUpload({ onClose, bienId: initialBienId, initialFil
 
       {/* ── IDLE: file picker (drag-and-drop + click) ─ */}
       {step === 'idle' && (
-        <label
-          onDragOver={e => { e.preventDefault(); setDrag(true) }}
-          onDragLeave={() => setDrag(false)}
-          onDrop={e => {
-            e.preventDefault(); setDrag(false)
-            const f = e.dataTransfer.files?.[0]
-            if (f) handleFile(f)
-          }}
-          className={`flex flex-col items-center justify-center gap-3 py-12 px-6 rounded-2xl border-2 border-dashed cursor-pointer transition-colors ${drag ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'}`}>
-          <div className={`w-20 h-20 rounded-2xl flex items-center justify-center transition-colors ${drag ? 'bg-blue-100' : 'bg-blue-50'}`}>
-            <Upload size={32} className="text-blue-500" />
-          </div>
-          <span className="text-sm font-semibold text-navy">
-            {drag ? 'Déposez le fichier ici' : 'Glissez un fichier ou cliquez pour choisir'}
-          </span>
-          <span className="text-xs text-gray-400 text-center">PDF, image — bail, tableau d'amortissement, appel de charges, quittance...</span>
-          <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden"
-            onChange={e => { if (e.target.files[0]) handleFile(e.target.files[0]) }} />
-        </label>
+        <>
+          <label
+            onDragOver={e => { e.preventDefault(); setDrag(true) }}
+            onDragLeave={() => setDrag(false)}
+            onDrop={e => {
+              e.preventDefault(); setDrag(false)
+              const f = e.dataTransfer.files?.[0]
+              if (f) handleFile(f)
+            }}
+            className={`flex flex-col items-center justify-center gap-3 py-12 px-6 rounded-2xl border-2 border-dashed cursor-pointer transition-colors ${drag ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'}`}>
+            <div className={`w-20 h-20 rounded-2xl flex items-center justify-center transition-colors ${drag ? 'bg-blue-100' : 'bg-blue-50'}`}>
+              <Upload size={32} className="text-blue-500" />
+            </div>
+            <span className="text-sm font-semibold text-navy">
+              {drag ? 'Déposez le fichier ici' : 'Glissez un fichier ou cliquez pour choisir'}
+            </span>
+            <span className="text-xs text-gray-400 text-center">PDF, image — bail, tableau d'amortissement, appel de charges, quittance...</span>
+            <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden"
+              onChange={e => { if (e.target.files[0]) handleFile(e.target.files[0]) }} />
+          </label>
+          {/* Ajout direct : classement à la main, aucun passage par l'IA */}
+          <label className="mt-3 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-gray-200 cursor-pointer text-sm text-gray-500 hover:text-navy hover:bg-gray-50 transition-colors">
+            <FileText size={15} />
+            Ajouter sans analyse — je classe le document moi-même
+            <input type="file" className="hidden"
+              onChange={e => { const f = e.target.files[0]; if (f) { setFile(f); setResult({}); setError(''); setStep('confirm_generic') } }} />
+          </label>
+        </>
       )}
 
       {/* ── EXTRACTING: spinner ──────────────────────── */}
@@ -505,7 +531,14 @@ export default function SmartUpload({ onClose, bienId: initialBienId, initialFil
       {/* ── CONFIRM: Generic doc ─────────────────────── */}
       {step === 'confirm_generic' && (
         <>
-          <p className="text-sm text-gray-400 mb-4">Type non reconnu automatiquement. Classez le document manuellement.</p>
+          {file && (
+            <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 mb-3 text-sm">
+              <FileText size={15} className="text-gray-400 shrink-0" />
+              <span className="text-navy font-medium truncate">{file.name}</span>
+              <span className="text-gray-300 text-xs shrink-0">{file.size ? `${Math.round(file.size / 1024)} Ko` : ''}</span>
+            </div>
+          )}
+          <p className="text-sm text-gray-400 mb-4">Classez le document et rattachez-le à un bien — il sera enregistré tel quel.</p>
           {!initialBienId && (
             <Sel label="Bien *" value={genericBien} onChange={e => setGenericBien(e.target.value)}
               options={[{ v: '', l: 'Sélectionner un bien' }, ...biens.map(b => ({ v: b.id, l: b.reference || b.adresse }))]} />
