@@ -56,18 +56,25 @@ Je vous remercie de joindre les factures des entreprises ITEC et MISTRAL corresp
 
 ---
 
-**Second sujet, distinct du précédent : l'indexation du loyer**
+**Second sujet, distinct du précédent : le non-respect du protocole d'annulation de l'indexation**
 
-Par votre courriel du 11 septembre 2023, vous m'avez confirmé qu'au titre du plafonnement de 3,5 % applicable aux PME (loi du 16 août 2022), mon loyer annuel hors taxes et hors charges serait porté à **165 600 euros** à compter du 1er septembre 2023.
+Par courriel du 25 juillet 2024, M. Leroulley m'a transmis « le protocole d'accord pour l'annulation de l'indexation du loyer du 1er septembre 2024 au 31 août 2025 », également adressé par voie postale. M. Duarte l'a confirmé le 12 décembre 2024 au conseil de ma société, Maître Jean-Michel Azoulai : « Nous ne pouvons pas envisager un autre accompagnement que celui proposé dans le protocole transmis valant annulation de l'indexation. »
 
-Sur cette base, la trajectoire contractuelle est la suivante :
+J'ai retourné ce protocole signé le 30 décembre 2024 et j'ai exécuté l'échéancier convenu sur les arriérés (virements notamment des 24 janvier et 27 février 2025, de 10 000 euros chacun).
 
-- 1er septembre 2024 : 165 600 × 1,035 = **171 396,00 €**, ce qui correspond exactement aux appels des premier, deuxième et troisième trimestres 2025 ;
-- 1er septembre 2025 : l'ILC du premier trimestre 2025 s'établit à 135,87 contre 134,58 un an plus tôt, soit **+0,96 %**. Le loyer aurait donc dû être porté à **173 038,90 €**.
+Le loyer annuel hors taxes et hors charges était donc de **165 600 euros** du 1er septembre 2024 au 31 août 2025 — l'indexation du 1er septembre 2024 étant annulée par le protocole.
 
-Or l'appel du quatrième trimestre 2025 correspond à un loyer annuel de **174 943,67 €**, soit une progression de 2,07 %. **Merci de me communiquer le détail du calcul retenu** : indice de référence, indice de comparaison et coefficient appliqué à chaque échéance depuis le 1er septembre 2023, ainsi que la justification de cet écart de 1 904,77 € par an.
+Or les appels des premier, deuxième et troisième trimestres 2025 (52 738,80 € TTC chacun) correspondent à un loyer annuel de **171 396 euros**, soit précisément 165 600 × 1,035 : **l'indexation annulée par le protocole a été facturée**. L'écart est de 1 738,80 € TTC par trimestre, soit **5 216,40 € TTC** sur ces trois trimestres — auxquels s'ajoute, le cas échéant, le quatrième trimestre 2024, appelé pendant la période couverte par le protocole.
 
-Enfin, l'ILC du premier trimestre 2026 s'établit à **135,26**, contre 135,87 au premier trimestre 2025, soit une **variation de −0,45 %**. L'article 7 du bail prévoyant une indexation « en fonction de la variation de l'indice », **je vous remercie de bien vouloir en tenir compte pour l'échéance du 1er septembre 2026** et de m'adresser le nouveau montant du loyer avant émission du prochain avis d'échéance.
+En conséquence :
+
+a) merci de **recalculer l'ensemble des appels de loyer émis depuis le 1er octobre 2024** sur la base du protocole, et d'établir l'avoir correspondant ;
+
+b) l'indexation du 1er septembre 2025 devait s'appliquer à la base protocolaire de 165 600 euros. L'ILC du premier trimestre 2025 s'établissant à 135,87 contre 134,58 (+0,96 %), le loyer devait être porté à **167 190 euros** — et non aux 174 943,67 euros ressortant de l'appel du quatrième trimestre 2025. Merci de me communiquer le détail du calcul retenu (indices de référence et de comparaison, coefficient) pour chaque échéance depuis le 1er septembre 2023 ;
+
+c) l'ILC du premier trimestre 2026 s'établit à **135,26**, soit une variation de **−0,45 %**. L'article 7 du bail prévoyant une indexation « en fonction de la variation de l'indice », je vous remercie d'en tenir compte pour l'échéance du 1er septembre 2026 et de m'adresser le nouveau montant du loyer avant émission du prochain avis d'échéance.
+
+Une copie du protocole signé et des échanges susvisés est à votre disposition sur simple demande.
 
 ---
 

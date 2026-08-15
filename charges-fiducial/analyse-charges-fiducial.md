@@ -299,6 +299,28 @@ d'autant plus utile que les travaux litigieux étaient prévisibles.
 Aucun doublon détecté entre 2021, 2024 et 2025. Contrôle à refaire dès réception de 2022 et 2023, avec une
 attention particulière à la ligne « SOLDE CHARGES AU 31/12/2023 : 0,13 € » figurant au RGD 2024.
 
+### 4.4 bis Le protocole d'annulation de l'indexation — violé par la facturation 2025
+
+Pièce découverte dans le fil « Travaux 132 rue de la Roquette 10663 » : par courriel du **25/07/2024**,
+Fiducial a transmis un « **protocole d'accord pour l'annulation de l'indexation du loyer du 1er septembre
+2024 au 31 août 2025** » (envoyé aussi par voie postale), confirmé le 12/12/2024 à Me Jean-Michel Azoulai
+(« protocole transmis **valant annulation de l'indexation** »). AEJB l'a **retourné signé le 30/12/2024**
+(PJ `20240725105713011.pdf`) en s'engageant sur des arriérés de 30 457,82 €, avec deux virements de
+10 000 € documentés les 24/01 et 27/02/2025.
+
+Le loyer protocolaire était donc de **165 600 € HT/an** jusqu'au 31/08/2025. Or les appels 1T-3T 2025
+(52 738,80 € TTC/trimestre) correspondent à **171 396 €/an = 165 600 × 1,035** : l'indexation annulée a été
+facturée. Trop-facturé : **1 738,80 € TTC/trimestre** (5 216,40 € sur les trois trimestres connus, ~6 955 €
+si le 4T 2024 est concerné). Par propagation, l'indexation du 01/09/2025 devait partir de la base 165 600
+(→ ~167 190 €/an avec l'ILC T1 2025 à +0,96 %), et non aboutir aux 174 943,67 €/an du 4T 2025
+(+2 326,17 € TTC/trimestre depuis).
+
+**Réserves** : le texte du protocole n'a pas encore été lu (lecture « annulation définitive » vs
+« suspension avec reprise » à trancher sur pièce) ; vérifier l'existence d'un exemplaire contresigné par
+Ficommerce — leur rédaction du texte, le courriel du 12/12/2024 et l'encaissement des versements rendant
+toutefois l'accord difficilement contestable. Une partie du « solde » réclamé correspond mécaniquement à
+cette indexation annulée puis refacturée.
+
 ### 4.5 Le solde reporté
 
 La facture du 05/06/2026 fait état d'un solde antérieur de **38 619 €**, tandis que le solde reporté
