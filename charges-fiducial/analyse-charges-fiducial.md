@@ -1,385 +1,399 @@
 # Analyse de recevabilité — régularisations de charges FIDUCIAL GÉRANCE / FICOMMERCE
 
-**Local** : 132 rue de la Roquette, 75011 Paris (immeuble 10663)
-**Preneur** : SAS AEJB — **Bailleur** : SCPI FICOMMERCE — **Gestionnaire** : FIDUCIAL GÉRANCE
-**Sommes réclamées** : 11 332,83 € TTC de régularisation (exercices 2021 à 2024) + solde reporté de 10 823,17 €
+**Local** : 132 rue de la Roquette, 75011 Paris (immeuble 10663, lots 1, 2, 19, 20)
+**Preneur** : SASU AEJB — **Bailleur** : SCPI FICOMMERCE — **Gestionnaire** : FIDUCIAL GÉRANCE
+**Syndic de la copropriété** : CITYA MODERN'IMM (immeuble 0183), gestionnaire Harald MOURIN
 **Date de l'analyse** : 15 août 2026
 
-> **Avertissement.** Ce document n'est pas une consultation juridique. Il est destiné à préparer un dossier
-> pour votre avocat. Les points de droit sont formulés comme des **arguments à faire valider**, jamais comme
-> des conclusions acquises.
+> **Avertissement.** Ce document n'est pas une consultation juridique. Il prépare un dossier pour votre
+> avocat. Les points de droit sont formulés comme des **arguments à faire valider**.
 
 ---
 
-## 0. État des sources — ce qui a pu être exploité, ce qui manque
+## L'essentiel en dix lignes
 
-| Source | Statut | Ce qui en a été tiré |
-|---|---|---|
-| Bail commercial du 28/06/2019 (16 p. scannées) | ✅ Obtenu et OCRisé (`extraits/BAIL.txt`) | Tantièmes, base de répartition, inventaire des charges, clauses travaux |
-| Métadonnées Gmail 2021→2026 | ✅ Exploitées | **Chronologie complète des envois d'états récapitulatifs** |
-| « SOLDE CHARGES 2020 » (avoir du 19/12/2025) | ✅ Récupéré via Google Drive (`extraits/SOLDE_CHARGES_2020.txt`) | Format des documents Fiducial, référence de comparaison |
-| 5 PDF du solde 2025 (msg `19fad52a9fa37400`) | ❌ **Non récupérés** | — |
-| Facture du 05/06/2026, solde antérieur 38 619 € (msg `19e98465072846cf`) | ❌ **Non récupérée** | — |
-| Soldes charges 2021 (11/02/2026) et 2022 (17/02/2026) | ❌ **Non récupérés** | — |
-| PJ de Sandrine Da Costa du 30/06/2026 (msg `19f1932901779d54`) | ⚠️ Identifiée, non exploitable | Voir § 0.2 |
-| Comptabilité AEJB (Pennylane) | ❌ Accès refusé par le plan/rôle | — |
-
-### 0.1 Pourquoi les pièces jointes n'ont pas pu être téléchargées
-
-L'étape 1 du cahier des charges (montage OAuth Gmail) s'est révélée **inutile** : un connecteur Gmail en
-lecture seule était déjà actif sur la session, ce qui a permis de lire les messages immédiatement. En
-revanche ce connecteur **n'expose aucune fonction de téléchargement de pièce jointe** — uniquement la
-lecture des messages et de leurs métadonnées. Les noms, types MIME et identifiants des PJ sont visibles ;
-leur contenu binaire ne l'est pas.
-
-Aucun accès navigateur n'est disponible dans cet environnement (session distante isolée, sans connecteur
-Claude-in-Chrome), et un téléchargement effectué sur votre poste n'atteindrait pas ce conteneur.
-
-**Deux voies fonctionnent** — voir § 6.
-
-### 0.2 Anomalie sur le « détail des régularisations 2022→2024 »
-
-Le message du 30/06/2026 de Sandrine Da Costa (`19f1932901779d54`), annoncé comme portant le détail des
-régularisations, contient en réalité une seule pièce jointe :
-
-> `Provisoire_PENNYLANE_AEJB_Grand_livre2026_01_01..2026_12_31.pdf`
-
-C'est le **grand livre comptable provisoire d'AEJB pour l'exercice 2026**, pas le décompte de Fiducial.
-Autrement dit : ce message ne contient pas le détail par poste des régularisations 2022-2024, et rien
-n'indique à ce stade que ce détail vous ait jamais été transmis. Ce point converge avec le § 1.
+1. **Le syndic lui-même qualifie 12 279,37 € de charges 2024 de « NON RÉCUPÉRABLE »** et ne retient que
+   **2 906,38 €** comme récupérables sur le locataire.
+2. **Fiducial vous facture pourtant 14 022,74 €** au titre de 2024 — soit environ **11 100 € de plus** que
+   ce que le syndic identifie comme récupérable.
+3. Les deux gros postes — **réfection d'étanchéité de toiture-terrasse (24 398,46 €)** et **modernisation
+   de l'ascenseur (32 090,01 €)** — sont marqués **« Locatif : 0,00 »** sur chacun de vos quatre lots dans
+   le décompte du syndic.
+4. Ces deux postes sont aussi **expressément à la charge du bailleur par votre bail** (§ 13.2.1).
+5. La quasi-totalité de la somme réclamée provient d'un **seul exercice, 2024** (11 547,29 € TTC), et non
+   d'un étalement 2021-2024.
+6. **L'exercice 2021 est en votre faveur** : avoir de 1 000,34 € TTC.
+7. Les comptes 2024 de la copropriété ont été approuvés en **AG du 10/06/2025** ; l'état récapitulatif ne
+   vous a été facturé que le **26/02/2026** — soit **plus de 5 mois après le délai de trois mois** de
+   R.145-36.
+8. Aucun état récapitulatif **2023** n'a été retrouvé, ni dans Gmail ni dans Drive.
+9. Un **écart de 1 077,15 €** entre le décompte du syndic et la facturation Fiducial reste inexpliqué.
+10. La clé de répartition **183/1000èmes est correctement appliquée** — ce n'est pas là qu'est l'erreur.
 
 ---
 
-## 1. Chronologie — le point déterminant
+## 1. Chronologie et recevabilité
 
 ### 1.1 Règle applicable
 
-Le bail a été signé le **28 juin 2019**, pour prendre effet le **1er septembre 2019** (§ 2 du bail,
-`extraits/BAIL.txt`). Il est donc **postérieur au 5 novembre 2014**, date d'entrée en vigueur de la loi
-Pinel : les articles **L.145-40-2 du code de commerce** et ses textes d'application **R.145-35 et R.145-36**
-lui sont pleinement applicables. Ce n'est pas discutable et c'est le socle de tout ce qui suit.
+Bail signé le **28 juin 2019**, effet au **1er septembre 2019**, durée neuf ans (§ 1 et 2 du bail). Étant
+postérieur au 5 novembre 2014, il relève pleinement de **L.145-40-2 du code de commerce** et de ses textes
+d'application **R.145-35** et **R.145-36**.
 
-L'immeuble est **en copropriété** — le bail le confirme à plusieurs reprises (§ 1 « les 98/1000èmes de la
-propriété du sol et des parties communes générales », § 8 « tantièmes de copropriété », § 27 « les trois
-derniers procès-verbaux de l'assemblée des copropriétaires »). Le délai applicable est donc celui de
-**R.145-36 pour les immeubles en copropriété : l'état récapitulatif annuel doit être communiqué au locataire
-dans les trois mois suivant la reddition des charges de copropriété** — et non au 30 septembre, qui ne vaut
-que pour la monopropriété.
+L'immeuble est **en copropriété** (tantièmes au § 1 du bail, décompte du syndicat produit). Le délai
+applicable est donc celui de R.145-36 pour la copropriété : **l'état récapitulatif annuel doit être
+communiqué dans les trois mois suivant la reddition des charges de copropriété** — et non au 30 septembre,
+qui ne vaut que pour la monopropriété.
 
-### 1.2 Dates réelles de communication des états récapitulatifs
+### 1.2 Dates établies
 
-Établies de façon exhaustive à partir de la boîte Gmail. La recherche `subject:"SOLDE CHARGES"` ne remonte
-que **quatre** messages sur toute la période ; une recherche élargie (`from:fiducial.net` sur 2021→2026,
-201 messages balayés, plus une recherche ciblée sur *charges / récapitulatif / régularisation / reddition*)
-n'en fait apparaître aucun autre.
+| Exercice | Reddition des comptes de copropriété | Échéance des 3 mois | État récapitulatif / facture Fiducial | Retard |
+|---|---|---|---|---|
+| 2020 | non produite | — | 19/12/2025 (envoi 22/12/2025) | ~5 ans |
+| 2021 | non produite | — | 09/02/2026 (envoi 11/02/2026) | ~4 ans |
+| 2022 | non produite | — | envoi 17/02/2026 | ~3 ans |
+| **2023** | non produite | — | **aucun document retrouvé** | — |
+| **2024** | **AG du 10/06/2025**, décompte syndic du **13/06/2025** | **~13/09/2025** | **26/02/2026** | **~5 mois ½** |
+| 2025 | non produite | — | 29/07/2026 (envoi 29/07/2026) | à déterminer |
 
-| Exercice | État récapitulatif communiqué le | Délai écoulé depuis la clôture de l'exercice | Source |
+Sources : `extraits/SDC_2024_pdf.txt` (mention « SUITE À L'APPROBATION DES COMPTES LORS DE L'ASSEMBLÉE
+GÉNÉRALE DU 10/06/2025 », document daté du 13/06/2025) ; dates d'émission lues sur chaque facture ; dates
+d'envoi issues des métadonnées Gmail.
+
+**L'exercice 2024 est le seul pour lequel le dépassement est aujourd'hui documenté de bout en bout** : date
+de reddition connue, date de facturation connue, retard chiffré. C'est aussi celui qui porte la quasi-
+totalité de la somme réclamée. Pour 2021 et 2022, le retard est manifeste mais les dates de reddition
+restent à produire.
+
+### 1.3 Sur l'exercice 2023
+
+Aucun état récapitulatif 2023 n'apparaît ni dans la boîte Gmail (recherche exhaustive sur
+`from:fiducial.net` 2021→2026 et sur `subject:"SOLDE CHARGES"`) ni parmi les documents déposés dans Drive.
+Une ligne « SOLDE CHARGES AU 31/12/2023 : 0,13 € » figure toutefois au RGD 2024, ce qui laisse penser que
+l'exercice 2023 a bien été arrêté côté copropriété. **À demander expressément à Fiducial.**
+
+### 1.4 Provenance des documents 2024 — à clarifier
+
+Le jeu de documents 2024 (facture, relevé individuel, SDC, RGD) est daté du 26/02/2026 et présent dans votre
+Drive, mais **aucun message Gmail ne le transmet**. Les envois Fiducial identifiés en février 2026 portent
+sur 2021 (11/02) et 2022 (17/02) uniquement. Deux hypothèses : transmission par un autre canal (courrier,
+extranet Citya, remise par votre expert-comptable), ou téléchargement de votre part.
+
+**C'est une question à trancher avant toute discussion** : si l'état récapitulatif 2024 ne vous a jamais été
+formellement communiqué, le moyen tiré du défaut de communication s'ajoute à celui du hors-délai.
+Dites-moi ce dont vous vous souvenez.
+
+---
+
+## 2. Décomposition des sommes réclamées
+
+### 2.1 Solde par exercice (source : factures Fiducial)
+
+| Exercice | Facture émise le | HT | TVA | **TTC** | Sens |
+|---|---|---|---|---|---|
+| 2020 | 19/12/2025 | −31,79 | −6,36 | **−38,15** | avoir |
+| 2021 | 09/02/2026 | −833,62 | −166,72 | **−1 000,34** | **avoir** |
+| 2022 | *document non fourni* | — | — | *à obtenir* | — |
+| 2023 | *aucun document* | — | — | *à obtenir* | — |
+| **2024** | **26/02/2026** | **9 622,74** | **1 924,55** | **11 547,29** | **débit** |
+| 2025 | 29/07/2026 | 1 495,17 | 299,03 | **1 794,20** | débit |
+
+**Reconstitution des 11 332,83 € annoncés** : −1 000,34 (2021) + 11 547,29 (2024) = 10 546,95 €. L'écart
+avec 11 332,83 € est de **785,88 €**, qui correspondrait au cumul 2022 + 2023. Hypothèse cohérente, **à
+confirmer par les factures 2022 et 2023**.
+
+> À retenir : **le litige porte à plus de 100 % sur l'exercice 2024.** Les exercices 2020 et 2021 sont en
+> votre faveur. Concentrer les moyens sur 2024 est le choix rationnel.
+
+### 2.2 Composition des relevés individuels
+
+| Poste | 2021 | 2024 | 2025 |
 |---|---|---|---|
-| 2020 | **22/12/2025** (facture émise le 19/12/2025) | ~5 ans | Msg `19b451be3e48d680` + `extraits/SOLDE_CHARGES_2020.txt` |
-| 2021 | **11/02/2026** | ~4 ans 1 mois | Msg `19c4be76da549e2c` |
-| 2022 | **17/02/2026** | ~3 ans 1 mois | Msg `19c6a92cdf81dbd1` |
-| **2023** | **Jamais communiqué** | — | Absence constatée |
-| **2024** | **Jamais communiqué** | — | Absence constatée |
-| 2025 | **29/07/2026** | ~7 mois | Msg `19fad52a9fa37400` |
+| Charges communes générales | 3 471,49 | 4 632,17 | 5 344,32 |
+| Assurance | 94,89 | 130,33 | 142,01 |
+| **Travaux** | — | **9 260,24** | 408,84 |
+| **Total** | 3 566,38 | **14 022,74** | 5 895,17 |
+| Provisions (acompte) | −4 400,00 | −4 400,00 | −4 400,00 |
+| **Solde HT** | **−833,62** | **+9 622,74** | **+1 495,17** |
 
-### 1.3 Ce qu'il faut en retenir
+Deux observations :
 
-**Les dates de reddition des comptes de copropriété par le syndic ne sont pas connues** — elles figurent
-dans les documents « SDC » et « RGD » non récupérés. Le calcul du délai de trois mois de R.145-36 ne peut
-donc pas être fait poste à poste. Mais l'écart est tel que la conclusion ne dépend pas de cette précision :
+- **Les provisions sont restées à 4 400 € HT/an sur toute la période**, ce qui correspond exactement aux
+  1 100 € HT par trimestre du § 8 du bail. Elles n'ont jamais été réajustées malgré des charges courantes
+  qui les dépassent depuis 2023 au moins.
+- **Les charges communes générales progressent de 54 %** entre 2021 (3 471,49) et 2025 (5 344,32). Cette
+  dérive mérite une explication mais n'est pas en soi irrégulière.
 
-- **Exercices 2021 et 2022** : un syndic de copropriété rend ses comptes dans l'année qui suit l'exercice,
-  après approbation en assemblée générale. Que la reddition 2021 ait eu lieu en 2022 ou même en 2023, une
-  communication au **11 février 2026** excède le délai de trois mois de plusieurs années. L'argument du
-  **hors-délai** est ici très solide, sous réserve de la production des dates exactes de reddition.
-- **Exercices 2023 et 2024** : aucun état récapitulatif n'a jamais été communiqué. Or c'est précisément sur
-  ces exercices que porte une partie des 11 332,83 €. **Réclamer une régularisation sans avoir jamais
-  communiqué l'état récapitulatif correspondant** est l'argument le plus fort du dossier. À faire valider :
-  l'articulation entre l'inopposabilité tirée du défaut de communication et la prescription quinquennale de
-  l'article L.145-60.
-- **Exercice 2025** : communiqué le 29/07/2026, soit ~7 mois après la clôture. C'est **le seul exercice pour
-  lequel le respect du délai est plausible** — tout dépend de la date de reddition des comptes du syndic. Si
-  le syndic a rendu ses comptes après le 29 avril 2026, le délai est respecté.
+### 2.3 Quote-part : la clé est juste
 
-**Élément de contexte utile** : la régularisation de l'exercice 2020, communiquée le 22/12/2025, s'est
-soldée par un **avoir de 38,15 € TTC** en votre faveur (31,79 € HT). Un exercice à quasi-équilibre en 2020,
-suivi de 11 332,83 € réclamés sur 2021-2024, justifie à lui seul d'exiger le détail poste par poste.
+Le bail attribue à AEJB quatre lots totalisant **183/1000èmes** (lot 1 : 98 ; lot 2 : 73 ; lot 19 : 5 ;
+lot 20 : 7). Le décompte du syndic applique exactement ces tantièmes, lot par lot. Vérification arithmétique
+intégrale sur l'exercice 2024 :
+
+| Poste | Base copropriété | × 183/1000 | Décompte syndic |
+|---|---|---|---|
+| Charges générales | 26 493,76 | 4 848,36 | 4 848,36 ✓ |
+| Réfection étanchéité terrasse | 24 398,46 | 4 464,92 | 4 464,92 ✓ |
+| Modernisation ascenseur | 32 090,01 | 5 872,47 | 5 872,47 ✓ |
+| **Total** | | **15 185,75** | **15 185,75 ✓** |
+
+**Aucune erreur de clé de répartition.** Ce terrain-là est à abandonner : le combat n'est pas sur le
+*combien de la quote-part*, mais sur le *caractère récupérable des postes*.
 
 ---
 
-## 2. Ce que dit le bail — inventaire et base de répartition
+## 3. Le point central : les travaux 2024
 
-### 2.1 Quote-part : 183/1000èmes
+### 3.1 Ce que dit le décompte du syndic
 
-Le § 1 du bail (DÉSIGNATION) détaille quatre lots :
+Le décompte de charges 2024 établi par CITYA MODERN'IMM à l'attention de la SCPI FICOMMERCE
+(`extraits/SDC_2024_pdf.txt`) comporte une colonne « Locatif », qui identifie la part récupérable sur le
+locataire. Pour **chacun de vos quatre lots** :
 
-| Lot | Description | Tantièmes |
+| Poste | Quote-part AEJB | **Colonne « Locatif »** |
 |---|---|---|
-| 1 | RdC à droite de la porte d'entrée, local commercial (deux bureaux, dégagement) | 98/1000 |
-| 2 | RdC à gauche, local sur rue, dégagement, quatre bureaux, deux débarras, deux WC | 73/1000 |
-| 19 | Cave au sous-sol, à droite du local technique | 5/1000 |
-| 20 | Cave au sous-sol, à gauche du local technique | 7/1000 |
-| | **TOTAL** | **183/1000** |
+| Charges générales | 4 848,36 | 2 906,38 |
+| **Réfection étanchéité terrasse** | 4 464,92 | **0,00** |
+| **Modernisation ascenseur** | 5 872,47 | **0,00** |
 
-Les lots 1 et 2 « sont actuellement réunis pour former un seul local commercial ».
+Et le pied du décompte est sans ambiguïté :
 
-Le § 8 fixe la base de répartition : les charges « sont calculées sur la base [des tantièmes] de copropriété
-ou au prorata des surfaces si l'immeuble n'est pas sous le régime de la copropriété ». L'immeuble étant en
-copropriété, **c'est la clé en tantièmes qui s'applique — 183/1000èmes**.
+> **Part non récupérable : 12 279,37** — Total des charges sur cette période : **15 185,75** dont
+> **2 906,38** de part locative.
 
-> ⚠️ **À vérifier dès réception des relevés** : que Fiducial applique bien 183/1000 et non une autre clé.
-> Les charges de copropriété se répartissent souvent selon des clés spéciales (ascenseur, chauffage,
-> escalier) distinctes des tantièmes généraux. Un local commercial en rez-de-chaussée n'a normalement
-> **aucune quote-part d'ascenseur ni d'escalier**. C'est un point de contrôle classique et souvent
-> productif.
+**Le syndic de la copropriété considère donc que 12 279,37 € des 15 185,75 € de charges 2024 afférentes à
+vos lots ne sont pas récupérables sur le locataire.** Fiducial vous en facture pourtant 14 022,74 €.
 
-### 2.2 Provisions contractuelles
+> ⚠️ **Nuance à faire valider par votre avocat.** La colonne « Locatif » du syndic applique les catégories
+> du décret n° 87-713 relatif aux charges récupérables, conçu pour le bail d'habitation, qui ne s'impose pas
+> de plein droit au bail commercial — lequel obéit d'abord au contrat, dans les limites de R.145-35. Cette
+> qualification n'est donc pas automatiquement opposable. **Mais elle constitue un élément de preuve
+> considérable**, émanant d'un professionnel tiers, et elle converge exactement avec ce que dit votre propre
+> bail (§ 3.2 ci-dessous). C'est la pièce maîtresse du dossier.
 
-Le § 8 prévoit une provision de **1 100 € HT par trimestre**, soit **4 400 € HT par an**, « à valoir sur sa
-quote-part de charges dans l'attente du décompte qui sera arrêté et apuré une fois par an ».
+### 3.2 Ce que dit votre bail — convergence complète
 
-Sur quatre exercices (2021-2024), cela représente **17 600 € HT de provisions appelées**. Si la
-régularisation réclamée est de 11 332,83 € TTC (~9 444 € HT), les charges réelles ressortiraient à ~27 000 €
-HT sur quatre ans, soit ~6 760 € HT/an contre 4 400 € provisionnés — un dépassement de plus de 50 % par an.
-
-> ⚠️ **Hypothèse à confirmer** : que la provision soit bien restée à 1 100 € HT/trimestre sur toute la
-> période et qu'elle ait effectivement été appelée. Les avis d'échéance non récupérés le diront.
-
-### 2.3 L'inventaire des charges du § 8
-
-Le § 8 énumère les charges remboursables :
-
-- eau et électricité des parties communes, remplacement des ampoules et tubes, minuteries et installations
-  électriques, groupes électrogènes ;
-- contrôles obligatoires des installations électriques, abonnements aux services de distribution ;
-- chauffage collectif et autres prestations collectives ;
-- contrats d'entretien ascenseurs et chaudières, abonnement, exploitation, entretien, électricité et
-  combustible de ces équipements ;
-- main-d'œuvre, salaires et charges du personnel de surveillance, d'entretien, de propreté, de sécurité et
-  de gardiennage ; **« les honoraires de syndic »** ;
-- primes d'assurances de l'immeuble et des locaux.
-
-Le § 9 (CONTRIBUTION — IMPÔTS — TAXES) met à votre charge la taxe foncière et ses taxes additionnelles, la
-contribution sur les revenus locatifs, la TEOM, la taxe de déversement à l'égout et la taxe sur les bureaux,
-« le tout en sorte que le loyer touché par le BAILLEUR soit net ».
-
----
-
-## 3. Postes contestables — grille d'analyse
-
-Cette grille est **prête à être appliquée** aux relevés dès leur réception. Chaque ligne indique la position
-du bail et l'argument opposable.
-
-### 3.1 Travaux relevant de l'article 606 du code civil — **non récupérables**
-
-Le bail est ici **explicite et favorable** (§ 13.2.1, dernier alinéa) :
+**Réfection d'étanchéité de toiture-terrasse.** Il s'agit de la couverture de l'immeuble : c'est le domaine
+même de l'**article 606 du code civil** (« gros murs, voûtes, poutres, couvertures entières »). Or le
+§ 13.2.1 du bail, dernier alinéa, est explicite :
 
 > « Le Bailleur ne conservera à sa charge que les grosses réparations prévues à l'article 606 du Code Civil
 > ainsi que les dépenses occasionnées par la vétusté ou par la mise en conformité avec la réglementation
 > mais uniquement celles relevant de l'article 606 du code Civil »
 
-et au premier alinéa du même § : toutes réparations sont au Preneur « **sauf celles incombant au Bailleur en
-vertu de l'article 606 du Code Civil** et celles relatives au remplacement des gros équipements de
-l'immeuble qui demeureront à la charge du Bailleur ».
+Et le premier alinéa du même paragraphe met les réparations au Preneur « **sauf celles incombant au Bailleur
+en vertu de l'article 606 du Code Civil** ». **R.145-35 1° exclut par ailleurs impérativement** de la
+refacturation au locataire les dépenses relatives aux grosses réparations de l'article 606, pour tout bail
+postérieur au 5 novembre 2014.
 
-**À traquer dans les relevés** : gros œuvre, toiture, étanchéité, murs de refend, ravalement, réfection des
-canalisations enterrées, remplacement de la chaudière collective ou de l'ascenseur.
+Trois fondements convergents : le bail, le décret, et la qualification du syndic.
 
-> **Signal d'alerte concret** : un fil de mails de mars 2023 porte sur une « **réfection étanchéité
-> terrasse** » (`filipe.duarte@fiducial.net`, 15/03/2023 et suivants), et un autre d'avril 2024 sur des
-> « Travaux 132 rue de la Roquette ». Des travaux d'étanchéité de terrasse relèvent typiquement de
-> l'article 606. **Si ces travaux apparaissent dans les régularisations 2023 ou 2024, c'est un poste à
-> contester frontalement** — d'autant qu'aucun état récapitulatif n'a été communiqué pour ces exercices.
+**Modernisation de l'ascenseur.** Le même § 13.2.1 réserve au bailleur, en plus de l'article 606 :
 
-### 3.2 La clause de ravalement — **contradiction interne à faire valoir**
+> « celles relatives au **remplacement des gros équipements de l'immeuble** qui demeureront à la charge du
+> Bailleur »
 
-Le § 13.2.2 met à votre charge :
+Une modernisation d'ascenseur à 32 090,01 € est, par nature, un remplacement de gros équipement.
+**Contractuellement à la charge du bailleur, sans qu'il soit même besoin d'invoquer l'article 606.**
 
-> « Les frais de ravalement intérieur ou extérieur de l'immeuble, même si celui-ci résulte de la vétusté de
-> l'immeuble ou fait suite à une injonction municipale **mais pour la partie uniquement esthétique
-> (nettoyage des façades, gommage, peinture)** »
+S'ajoute un second moyen, propre à votre situation. Le § 13.2.2 met certes à la charge du Preneur le coût de
+remplacement des équipements collectifs, mais **sous une condition expresse** :
 
-Deux arguments :
+> « à la condition que ces équipements collectifs **desservent les locaux** »
 
-1. **La clause se limite elle-même** à la part esthétique. Tout ravalement mettant en jeu la structure, les
-   enduits porteurs ou l'étanchéité de façade sort du périmètre contractuel et retombe sur le bailleur.
-2. **R.145-35 exclut de la refacturation les dépenses relatives aux grosses réparations de l'article 606.**
-   Pour un bail postérieur au 5 novembre 2014, une clause contraire est **inopposable au preneur** dans
-   cette mesure. À faire valider par votre avocat : la portée exacte de cette inopposabilité (clause réputée
-   non écrite ou simplement écartée) et l'articulation avec la distinction esthétique/structurel.
+Vos locaux sont un commerce en **rez-de-chaussée** et deux **caves en sous-sol**. **L'ascenseur ne les
+dessert pas.** La condition contractuelle n'est pas remplie.
 
-### 3.3 « Sans que cette liste soit limitative » — le point de droit le plus intéressant
+Cette lecture est confirmée par la structure des clés de répartition de la copropriété : les charges de
+*fonctionnement* de l'ascenseur sont réparties sur des clés spéciales (« ASCENSEUR 30/06/2021 (40) à
+répartir en **1009 parts** », « ASCENSEUR 01/07/21 (41) à répartir en **1208 parts** »), tandis que la
+*modernisation* a été répartie « en **1000 parts** », c'est-à-dire sur les tantièmes généraux. **Un lot de
+rez-de-chaussée se retrouve ainsi à financer 183/1000 d'un ascenseur qu'il n'utilise pas**, alors que la
+copropriété dispose d'une clé ascenseur dédiée. À faire vérifier au regard du règlement de copropriété et du
+procès-verbal de l'AG ayant voté ces travaux.
 
-Le § 13.2.2 introduit la liste des travaux mis à votre charge par :
+**Honoraires du syndic sur travaux.** Le RGD 2024 fait apparaître 955,32 € d'honoraires sur l'étanchéité
+(1 139,40 € moins un avoir de 184,08 €) et 1 090,00 € sur la modernisation de l'ascenseur. Ces honoraires
+suivent le sort du principal : **si les travaux ne sont pas récupérables, les honoraires qui s'y rapportent
+ne le sont pas davantage.**
 
-> « Ces travaux représentent, **sans que cette liste soit limitative** : […] »
+### 3.3 Position restituée pour 2024
 
-Or **L.145-40-2 impose que le bail comporte un inventaire *précis et limitatif* des catégories de charges,
-impôts, taxes et redevances liés au bail, avec l'indication de leur répartition entre bailleur et
-preneur.** Une clause qui se déclare expressément **non limitative** heurte de front cette exigence.
+| | Facturé par Fiducial | Retenu comme récupérable par le syndic |
+|---|---|---|
+| Charges communes générales | 4 632,17 | 2 906,38 |
+| Assurance | 130,33 | *incluse ci-dessus* |
+| Travaux | 9 260,24 | **0,00** |
+| **Total** | **14 022,74** | **2 906,38** |
+| Provisions appelées | −4 400,00 | −4 400,00 |
+| **Solde** | **+9 622,74 € HT** *(soit 11 547,29 TTC réclamés)* | **−1 493,62 € HT** *(soit un avoir)* |
 
-**Argument à faire valider** : l'inventaire du bail ne satisfait pas à L.145-40-2, ce qui fragilise
-l'imputation de tout poste ne figurant pas explicitement au § 8. Corollaire pratique : **tout poste dont le
-libellé est trop vague pour être rattaché à une catégorie listée au § 8 est contestable** — à relever
-systématiquement dans les relevés.
+**Sur la seule base de la ventilation du syndic, l'exercice 2024 devrait se traduire par un avoir d'environ
+1 493,62 € HT en votre faveur, et non par une facture de 9 622,74 € HT.**
 
-**À vérifier également** : le PDF du bail qui m'a été remis (16 pages, articles 1 à 30 + signatures)
-**ne contient aucune annexe**. Le § 26 annonce pourtant l'annexion du dernier décompte de charges du syndic
-« à titre d'information uniquement », le § 25 un DPE, et le § 27 les trois derniers PV d'assemblée générale.
-Si ces annexes n'ont jamais été jointes, c'est un moyen supplémentaire au titre de L.145-40-2 et de
-l'obligation d'information triennale sur les travaux. **Confirmez-moi si vous détenez un exemplaire avec
-annexes.**
+### 3.4 Un écart de 1 077,15 € non expliqué
 
-### 3.4 Honoraires de gestion et frais de syndic — **nuance importante**
+La quote-part AEJB des deux chantiers ressort à **10 337,39 €** (4 464,92 + 5 872,47) dans le décompte du
+syndic. Fiducial n'a pourtant porté que **9 260,24 €** en « TRAVAUX » sur votre relevé individuel. **Écart :
+1 077,15 €**, dont je n'ai pas trouvé l'explication dans les pièces disponibles. Aucune hypothèse testée ne
+le reconstitue (exclusion des honoraires, de l'assurance dommages-ouvrage, ou des deux).
 
-Contrairement au postulat de départ, **le bail vise expressément « les honoraires de syndic » au § 8** comme
-charge remboursable. L'argument « les honoraires de syndic ne sont jamais récupérables » ne peut donc pas
-être opposé tel quel ici. La distinction à opérer :
+Je ne l'interprète pas : **c'est une explication à exiger de Fiducial**. Une différence non documentée
+entre le décompte du syndicat et le relevé individuel affaiblit la présomption d'exactitude de l'ensemble
+du décompte.
+
+Note connexe : le décompte syndic mentionne « Total des provisions appelées : −16 232,83 », c'est-à-dire que
+**FICOMMERCE a versé au syndic plus que le montant des charges (15 185,75 €)** et dispose donc d'un crédit
+d'environ 1 047,08 € — pendant qu'il vous en réclame 11 547,29.
+
+---
+
+## 4. Autres postes à surveiller
+
+### 4.1 Honoraires de syndic courants
+
+Le RGD 2024 fait apparaître **4 400,00 € d'honoraires de syndic** pour l'immeuble (douze mensualités
+d'environ 366,63 €), plus 129,60 € d'« autres honoraires syndic » et 259,20 € d'honoraires d'AGO.
+
+Contrairement à une idée reçue, **votre bail vise expressément « les honoraires de syndic » au § 8** comme
+charge remboursable. L'argument « les honoraires de syndic ne sont jamais récupérables » ne tient donc pas
+tel quel. La distinction utile :
 
 | Nature | Position |
 |---|---|
-| Honoraires du syndic de copropriété au titre de la **gestion courante des parties communes** | Contractuellement prévus au § 8 → difficilement contestables |
-| **Honoraires de gestion locative** perçus par FIDUCIAL GÉRANCE pour le compte du bailleur | **Non récupérables** — R.145-35 1° exclut les honoraires liés à la gestion des loyers ; le § 8 ne les vise pas |
-| **Honoraires du syndic sur travaux** (pourcentage sur travaux art. 606) | Suivent le sort du principal → **non récupérables** si les travaux relèvent de l'art. 606 |
+| Honoraires du syndic de copropriété, gestion courante | Prévus au § 8 → difficilement contestables |
+| **Honoraires de gestion locative** perçus par FIDUCIAL pour le bailleur | **Non récupérables** — R.145-35 1° ; non visés au § 8 |
+| **Honoraires de syndic sur travaux art. 606** | **Non récupérables** — suivent le principal (§ 3.2) |
 
-**À traquer** : toute ligne « honoraires de gestion », « frais de gestion », « honoraires sur travaux »,
-« vacation », « frais de relance », « frais de dossier ».
+### 4.2 Impôts et taxes
 
-### 3.5 Impôts et taxes — **base contractuelle solide, contestation limitée**
+Le § 9 du bail met contractuellement à votre charge la taxe foncière, ses taxes additionnelles, la TEOM, la
+taxe de déversement à l'égout et la taxe sur les bureaux. **R.145-35 3° autorise expressément l'imputation
+au locataire de la taxe foncière et des taxes liées à l'usage du local** : ces postes sont *a priori* dus.
 
-Le § 9 met contractuellement à votre charge la taxe foncière, ses taxes additionnelles, la TEOM, la taxe de
-déversement à l'égout et la taxe sur les bureaux. **R.145-35 3° autorise expressément l'imputation au
-locataire de la taxe foncière et des taxes additionnelles, ainsi que des impôts et taxes liés à l'usage du
-local ou à un service dont le locataire bénéficie.** Ces postes sont donc **a priori dus**, sous réserve du
-respect des délais du § 1.
+Restent contestables : la **CFE/CET du bailleur**, la **contribution sur les revenus locatifs** (dont le
+redevable légal est le bailleur — le § 9 la met à votre charge, ce que R.145-35 3° paraît exclure : **point
+à faire trancher**), et toute taxe refacturée sans justificatif d'assiette.
 
-**En revanche, restent contestables** :
-- la **CFE/CET du bailleur** (votre propre CFE vous incombe, pas la sienne) ;
-- la **contribution sur les revenus locatifs (CRL)** : le § 9 la met à votre charge, mais R.145-35 3° exclut
-  les impôts « dont le redevable légal est le bailleur » — la CRL est due par le bailleur. **Point à faire
-  trancher par votre avocat**, l'exception textuelle visant la taxe foncière et les taxes liées à l'usage,
-  pas la CRL ;
-- toute taxe refacturée **sans justificatif d'assiette ni clé de répartition**.
+Aucun de ces postes n'apparaît dans les relevés 2021, 2024 et 2025 examinés.
 
-### 3.6 Doublons entre exercices
+### 4.3 L'inventaire non limitatif — moyen supplémentaire
 
-Contrôle à mener mécaniquement dès réception des relevés 2021, 2022, 2023, 2024 et 2025 : identifier tout
-poste au libellé et au montant identiques ou très proches apparaissant sur deux exercices. Le risque est
-**élevé ici** pour une raison précise : les exercices 2021 et 2022 ont été régularisés en février 2026, et
-les exercices 2023-2024 n'ont jamais fait l'objet d'un état récapitulatif. Une reprise globale a posteriori,
-sur une période aussi étalée et rattrapée dans l'urgence, est un terrain favorable aux doubles imputations
-et aux reports de solde en cascade.
+Le § 13.2.2 du bail introduit la liste des travaux mis à votre charge par : « Ces travaux représentent,
+**sans que cette liste soit limitative** ». Or **L.145-40-2 impose un inventaire *précis et limitatif*** des
+catégories de charges. Une clause qui se déclare expressément non limitative heurte cette exigence.
 
-**Le rapprochement du solde reporté est prioritaire** : la facture du 05/06/2026 fait état d'un solde
-antérieur de **38 619 €**, tandis que le solde reporté qui vous est aujourd'hui opposé est de
-**10 823,17 €**. L'écart entre ces deux chiffres doit être expliqué ligne à ligne. Vous indiquez verser
-18 000 € le 1er de chaque mois sans exception : le rapprochement entre les appels de fonds, vos virements et
-les imputations retenues par Fiducial est à faire avant toute discussion sur le fond. Rappelons que le
-§ 6 du bail impose un **ordre d'imputation des paiements** (frais de recouvrement, clause pénale, dommages
-et intérêts, intérêts de retard, provisions et soldes de charges, dépôt de garantie, puis loyer) — une
-imputation non conforme à cet ordre est en soi contestable.
+**Argument à faire valider** : l'inventaire du bail ne satisfait pas à L.145-40-2, ce qui fragilise
+l'imputation de tout poste ne figurant pas explicitement au § 8 — et le § 8 ne mentionne **aucun** travaux
+d'étanchéité ni de modernisation d'ascenseur.
 
----
+**Point complémentaire** : l'exemplaire du bail communiqué (16 pages, articles 1 à 30 et signatures) **ne
+comporte aucune annexe**, alors que le § 25 annonce un DPE, le § 26 le dernier décompte de charges du syndic
+et le § 27 les trois derniers procès-verbaux d'assemblée générale. Le § 27 vise pourtant expressément
+L.145-40-2 et R.145-36 et l'obligation d'information triennale sur les travaux. **Si ces annexes n'ont
+jamais été jointes — et notamment l'information sur les travaux envisagés — c'est un moyen supplémentaire**,
+d'autant plus utile que les travaux litigieux étaient prévisibles.
 
-## 4. Synthèse
+### 4.4 Doublons
 
-### 4.1 Recevabilité par exercice
+Aucun doublon détecté entre 2021, 2024 et 2025. Contrôle à refaire dès réception de 2022 et 2023, avec une
+attention particulière à la ligne « SOLDE CHARGES AU 31/12/2023 : 0,13 € » figurant au RGD 2024.
 
-| Exercice | Réclamé | État récap. communiqué | Estimé dû | Contestable | Motif principal |
-|---|---|---|---|---|---|
-| 2021 | *à ventiler* | 11/02/2026 (~4 ans) | *n.d.* | **Totalité, sous réserve** | **Hors délai** R.145-36 (3 mois après reddition) |
-| 2022 | *à ventiler* | 17/02/2026 (~3 ans) | *n.d.* | **Totalité, sous réserve** | **Hors délai** R.145-36 |
-| 2023 | *à ventiler* | **Jamais** | *n.d.* | **Totalité** | **Aucun état récapitulatif communiqué** |
-| 2024 | *à ventiler* | **Jamais** | *n.d.* | **Totalité** | **Aucun état récapitulatif communiqué** |
-| **Total 2021-2024** | **11 332,83 € TTC** | — | *n.d.* | — | — |
-| 2025 | *hors périmètre* | 29/07/2026 (~7 mois) | *n.d.* | Analyse au fond | Délai **plausiblement respecté** — à confirmer par la date de reddition |
-| Solde reporté | **10 823,17 €** | — | *n.d.* | **À rapprocher** | Écart inexpliqué avec les 38 619 € du 05/06/2026 |
+### 4.5 Le solde reporté
 
-*n.d. = non déterminable sans les relevés détaillés.*
+La facture du 05/06/2026 fait état d'un solde antérieur de **38 619 €**, tandis que le solde reporté
+aujourd'hui opposé est de **10 823,17 €**. L'écart doit être expliqué ligne à ligne. Vous versez 18 000 €
+le 1er de chaque mois : le rapprochement appels de fonds / virements / imputations est à faire avant toute
+discussion au fond.
 
-### 4.2 Motifs de refus, par ordre de force
-
-1. **Absence totale d'état récapitulatif pour 2023 et 2024** — le plus solide. Une régularisation est
-   réclamée sur des exercices dont le décompte n'a jamais été communiqué.
-2. **Hors délai manifeste pour 2021 et 2022** — communication 3 à 4 ans après l'exercice, très au-delà des
-   trois mois suivant la reddition des comptes de copropriété (R.145-36). *Reste à produire les dates
-   exactes de reddition.*
-3. **Article 606 du code civil** — le bail réserve expressément ces travaux au bailleur (§ 13.2.1). Vigilance
-   particulière sur l'étanchéité de terrasse (travaux documentés en 2023).
-4. **Inventaire non limitatif (§ 13.2.2) contraire à L.145-40-2** — fragilise tout poste hors § 8.
-5. **Clause de ravalement** — limitée à l'esthétique par le bail lui-même, et écartée par R.145-35 pour la
-   part relevant de l'article 606.
-6. **Erreurs de clé de répartition** — vérifier l'application des 183/1000èmes et l'absence de quote-part
-   d'ascenseur/escalier pour un local en rez-de-chaussée.
-7. **Honoraires de gestion locative et honoraires de syndic sur travaux art. 606**.
-8. **CRL et CFE du bailleur** — à faire trancher.
-
-### 4.3 Ce qui ne peut pas encore être produit
-
-La **décomposition des 11 332,83 € par exercice et par poste**, la **reconstitution de la quote-part** et le
-**rapprochement relevé du syndicat / relevé individuel** exigent les relevés détaillés. Aucun de ces trois
-travaux ne peut être fait sans les PDF listés au § 0. **Aucun chiffre n'a été estimé ni interpolé** dans ce
-document.
+Le § 6 du bail impose un **ordre d'imputation des paiements** (frais de recouvrement, clause pénale,
+dommages et intérêts, intérêts de retard, provisions et soldes de charges, dépôt de garantie, puis loyer).
+Une imputation non conforme à cet ordre est contestable en elle-même — et elle a un effet mécanique : elle
+transforme un retard de charges contesté en impayé de loyer, lequel ouvre la voie au commandement et à la
+clause résolutoire.
 
 ---
 
-## 5. Points à faire valider par votre avocat
+## 5. Synthèse
 
-1. Le délai de R.145-36 en copropriété (3 mois après reddition) et sa sanction : inopposabilité de la
-   régularisation, ou simple inexigibilité jusqu'à communication ?
-2. L'articulation avec la **prescription quinquennale de L.145-60** : au 15/08/2026, quelle fraction des
-   exercices 2021 et suivants est atteinte ?
-3. La portée d'une clause d'inventaire **expressément non limitative** au regard de L.145-40-2, pour un bail
-   du 28/06/2019.
-4. Le sort de la **CRL** mise à la charge du preneur par le § 9 face à l'exclusion de R.145-35 3°.
-5. L'effet de l'absence éventuelle des annexes visées aux § 25, 26 et 27 du bail.
-6. L'opportunité d'une **contestation écrite conservatoire** avant tout paiement, pour interrompre toute
-   reconnaissance de dette implicite — étant observé que Sandrine Da Costa a écrit le 30/06/2026 « je suis
-   ok avec le solde antérieur », ce qui, selon le contexte, pourrait vous être opposé.
+| Exercice | Réclamé TTC | Estimé dû | Contestable | Motif principal |
+|---|---|---|---|---|
+| 2020 | −38,15 | avoir acquis | — | — |
+| 2021 | **−1 000,34** | **avoir acquis** | — | Exercice en votre faveur |
+| 2022 | *à obtenir* | *n.d.* | à déterminer | Hors délai (~3 ans) |
+| 2023 | *aucun document* | *n.d.* | **totalité** | Aucun état récapitulatif retrouvé |
+| **2024** | **11 547,29** | **0 — voire un avoir de ~1 493,62 € HT** | **≈ 11 547,29** | **Travaux non récupérables (art. 606, gros équipement, qualification du syndic) + hors délai documenté** |
+| 2025 | 1 794,20 | à analyser | travaux 408,84 à qualifier | Délai à vérifier |
 
----
+### Motifs de refus, par ordre de force
 
-## 6. Pour compléter l'analyse — deux voies
-
-Les PDF Fiducial ne peuvent pas être récupérés depuis cette session. Au choix :
-
-**Voie 1 — dépôt direct (le plus simple).** Téléchargez les pièces jointes depuis Gmail et déposez-les dans
-la conversation, comme vous l'avez fait pour le bail. Documents utiles, par ordre de priorité :
-
-1. Les 5 PDF du **solde 2025** (msg du 29/07/2026) : `FACTURE SOLDE CHARGES 2025`, `Relevé individuel`,
-   `RGD CHARGES ET TRAVAUX 2025`, `SDC 2025`, `V Relevé dépenses`
-2. Les **soldes charges 2021** (mail du 11/02/2026) et **2022** (mail du 17/02/2026) — *ce sont eux qui
-   portent une part des 11 332,83 €*
-3. La **facture du 05/06/2026** avec le solde antérieur de 38 619 €
-4. Le **détail des régularisations 2021-2024** s'il vous a été transmis par un autre canal (la PJ de
-   Sandrine du 30/06/2026 n'est pas ce document — voir § 0.2)
-5. Un exemplaire du **bail avec ses annexes**, si vous en disposez
-
-**Voie 2 — Google Drive.** Déposez les fichiers dans un dossier Drive : j'y ai accès en lecture et je les
-récupère directement. C'est ainsi que le solde 2020 a été obtenu.
-
-Le script `extraction.py` est prêt : il traite indifféremment les PDF texte (pdfplumber, avec export CSV des
-tableaux) et les PDF scannés (rendu 300 dpi + OCR français), et écrit les `.txt` et `.csv` dans `extraits/`.
-Dès réception, l'analyse est complétée sans délai supplémentaire.
+1. **Le syndic qualifie lui-même les deux chantiers de non récupérables** (« Locatif : 0,00 » sur les quatre
+   lots ; « Part non récupérable : 12 279,37 »). Pièce tierce, chiffrée, difficilement contournable.
+2. **Le bail réserve ces mêmes travaux au bailleur** : article 606 pour l'étanchéité, « remplacement des
+   gros équipements » pour l'ascenseur (§ 13.2.1).
+3. **L'ascenseur ne dessert pas les locaux** — la condition expresse du § 13.2.2 n'est pas remplie, et la
+   modernisation a été répartie sur les tantièmes généraux alors qu'une clé ascenseur dédiée existe.
+4. **R.145-35 1°** exclut impérativement les dépenses de l'article 606 pour un bail postérieur à 2014.
+5. **Hors délai documenté pour 2024** : AG du 10/06/2025, facturation le 26/02/2026.
+6. **Aucun état récapitulatif 2023**, et communication de l'état 2024 à vérifier.
+7. **Écart inexpliqué de 1 077,15 €** entre décompte du syndicat et relevé individuel.
+8. **Honoraires de syndic sur travaux** (2 045,32 € au total) suivant le sort du principal.
+9. **Inventaire non limitatif** (§ 13.2.2) contraire à L.145-40-2, et annexes du bail possiblement absentes.
 
 ---
 
-## Annexe — fichiers du dossier
+## 6. Points à faire valider par votre avocat
+
+1. La portée, en bail commercial, de la qualification « non récupérable » retenue par le syndic au titre du
+   décret n° 87-713 — élément de preuve, ou davantage ?
+2. La sanction du dépassement du délai de R.145-36 : inopposabilité de la régularisation, ou simple
+   inexigibilité jusqu'à communication régulière ?
+3. L'articulation avec la **prescription quinquennale de L.145-60** au 15/08/2026 pour les exercices 2021
+   et suivants.
+4. La qualification d'une **modernisation d'ascenseur** : article 606, « remplacement de gros équipement »
+   au sens du § 13.2.1, ou travaux d'amélioration ?
+5. La portée d'une clause d'inventaire **expressément non limitative** au regard de L.145-40-2.
+6. Le sort de la **CRL** mise à votre charge par le § 9 face à l'exclusion de R.145-35 3°.
+7. L'opportunité d'une **contestation écrite conservatoire immédiate**, avant tout paiement — étant observé
+   que Sandrine Da Costa a écrit le 30/06/2026 « je suis ok avec le solde antérieur », ce qui pourrait vous
+   être opposé.
+8. La stratégie face au **risque de clause résolutoire** évoqué au § 4.5 : payer sous réserve expresse de
+   contestation, consigner, ou refuser ?
+
+---
+
+## 7. Pièces encore utiles
+
+| Pièce | Pourquoi |
+|---|---|
+| **Facture + relevé + SDC/RGD 2022** (mail du 17/02/2026) | Compléter la reconstitution des 11 332,83 € |
+| **Tout document sur l'exercice 2023** | Aucun état récapitulatif retrouvé — pièce manquante du puzzle |
+| **PV de l'AG ayant voté l'étanchéité et la modernisation d'ascenseur** | Vérifier la clé de répartition votée et la qualification des travaux |
+| **Règlement de copropriété** | Confirmer l'existence d'une clé ascenseur dédiée excluant le rez-de-chaussée |
+| **Bail avec ses annexes** (§ 25, 26, 27) | Établir si l'information sur les travaux a été délivrée |
+| **Relevés du compte AEJB chez Fiducial 2021→2026** | Expliquer l'écart 38 619 € / 10 823,17 € |
+
+Dépôt dans Drive ou dans la conversation, indifféremment.
+
+---
+
+## Annexe — méthode et fichiers
 
 ```
 charges-fiducial/
-├── analyse-charges-fiducial.md      ce document
-├── extraction.py                    extraction PDF texte + OCR français
-├── pdf/                             sources (non versionné)
-│   ├── BAIL.pdf                     bail commercial du 28/06/2019, 16 p.
-│   └── SOLDE_CHARGES_2020.pdf       avoir du 19/12/2025, -38,15 € TTC
-├── img/                             pages rendues + OCR (non versionné)
-└── extraits/
-    ├── BAIL.txt                     OCR intégral du bail
-    └── SOLDE_CHARGES_2020.txt       texte du solde 2020
+├── analyse-charges-fiducial.md   ce document
+├── extraction.py                 extraction PDF texte (pdfplumber + CSV) et scanné (300 dpi + OCR fra)
+├── ingest.py                     décodage des fichiers récupérés depuis Drive
+├── pdf/                          sources (non versionné)
+├── img/                          pages rendues + OCR (non versionné)
+└── extraits/                     texte extrait de chaque pièce
 ```
 
-**Note sur l'OCR** : le bail est un scan. Le texte OCRisé comporte des imperfections de reconnaissance
-(caractères parasites, colonnes mêlées). Toutes les clauses citées dans ce document ont été relues page à
-page ; les tantièmes et les montants ont été vérifiés sur le rendu image. Aucune valeur illisible n'a été
-devinée.
+**Contrôles effectués.** Toutes les quote-parts du décompte syndic 2024 ont été recalculées et vérifiées
+lot par lot contre les tantièmes du bail : la somme des quatre lots reconstitue exactement les totaux
+imprimés (15 185,75 € de charges, 2 906,38 € de part locative, 12 279,37 € de part non récupérable). Les
+quote-parts « GENERALES » étaient partiellement illisibles à l'OCR : elles ont été recalculées par
+différence et recoupées avec le produit tantièmes × base, avec concordance au centime.
+
+**Aucun montant n'a été estimé ni interpolé.** Les postes non lus sont signalés comme tels. L'écart de
+1 077,15 € du § 3.4 est présenté comme inexpliqué, sans hypothèse déguisée en conclusion.
