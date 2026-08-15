@@ -6,7 +6,7 @@
 
 ---
 
-**Objet : IMMEUBLE 10663 — 132 rue de la Roquette 75011 PARIS — SASU AEJB — Régularisation de charges 2024 — demande de justificatifs**
+**Objet : IMMEUBLE 10663 — 132 rue de la Roquette 75011 PARIS — SASU AEJB — Régularisation de charges 2024 et application du protocole d'accord du 18 juillet 2024**
 
 Bonjour Monsieur Leroulley,
 
