@@ -56,6 +56,21 @@ Je vous remercie de joindre les factures des entreprises ITEC et MISTRAL corresp
 
 ---
 
+**Second sujet, distinct du précédent : l'indexation du loyer**
+
+Par votre courriel du 11 septembre 2023, vous m'avez confirmé qu'au titre du plafonnement de 3,5 % applicable aux PME (loi du 16 août 2022), mon loyer annuel hors taxes et hors charges serait porté à **165 600 euros** à compter du 1er septembre 2023.
+
+Sur cette base, la trajectoire contractuelle est la suivante :
+
+- 1er septembre 2024 : 165 600 × 1,035 = **171 396,00 €**, ce qui correspond exactement aux appels des premier, deuxième et troisième trimestres 2025 ;
+- 1er septembre 2025 : l'ILC du premier trimestre 2025 s'établit à 135,87 contre 134,58 un an plus tôt, soit **+0,96 %**. Le loyer aurait donc dû être porté à **173 038,90 €**.
+
+Or l'appel du quatrième trimestre 2025 correspond à un loyer annuel de **174 943,67 €**, soit une progression de 2,07 %. **Merci de me communiquer le détail du calcul retenu** : indice de référence, indice de comparaison et coefficient appliqué à chaque échéance depuis le 1er septembre 2023, ainsi que la justification de cet écart de 1 904,77 € par an.
+
+Enfin, l'ILC du premier trimestre 2026 s'établit à **135,26**, contre 135,87 au premier trimestre 2025, soit une **variation de −0,45 %**. L'article 7 du bail prévoyant une indexation « en fonction de la variation de l'indice », **je vous remercie de bien vouloir en tenir compte pour l'échéance du 1er septembre 2026** et de m'adresser le nouveau montant du loyer avant émission du prochain avis d'échéance.
+
+---
+
 Je continue naturellement à régler le loyer et les provisions de charges aux échéances habituelles.
 
 La présente demande ne vaut pas reconnaissance des sommes réclamées, dont je conteste le bien-fondé et pour lesquelles je réserve expressément l'ensemble de mes droits.
