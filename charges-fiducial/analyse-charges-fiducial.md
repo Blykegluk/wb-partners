@@ -315,11 +315,29 @@ si le 4T 2024 est concerné). Par propagation, l'indexation du 01/09/2025 devait
 (→ ~167 190 €/an avec l'ILC T1 2025 à +0,96 %), et non aboutir aux 174 943,67 €/an du 4T 2025
 (+2 326,17 € TTC/trimestre depuis).
 
-**Réserves** : le texte du protocole n'a pas encore été lu (lecture « annulation définitive » vs
-« suspension avec reprise » à trancher sur pièce) ; vérifier l'existence d'un exemplaire contresigné par
-Ficommerce — leur rédaction du texte, le courriel du 12/12/2024 et l'encaissement des versements rendant
-toutefois l'accord difficilement contestable. Une partie du « solde » réclamé correspond mécaniquement à
-cette indexation annulée puis refacturée.
+**Texte du protocole lu et vérifié sur pièce** (`pdf/PROTOCOLE_SIGNE.pdf`, courrier LRAR
+n° 2C 186 678 6985 4 du 18/07/2024, réf. FD/RL-10663-1174/2024). L'article 1 tranche tout :
+
+> « le Bailleur accepte de renoncer à l'application de l'indexation annuelle à effet du 1er septembre
+> 2024 […] le loyer principal annuel hors taxes et hors charges s'élève à la somme de 165 600 € […] pour
+> la période allant du 1er septembre 2024 au 31 août 2025. L'indexation annuelle reprendra de plein droit
+> le 1er septembre 2025 sur la base des indices ci-dessous : […] **Indice de base : 1er trimestre 2024 —
+> Indice d'indexation : 1er trimestre 2025** »
+
+La reprise est donc verrouillée par les indices stipulés : loyer dû au 01/09/2025 = 165 600 × 135,87/134,58
+= **167 187,34 €/an** (51 476,20 € TTC/trimestre, contre 53 803,10 € facturés). Le courrier
+d'accompagnement du 18/07/2024 ajoute : « Nous effectuerons par la suite les régularisations
+nécessaires » — jamais faites. Trop-facturé documenté (1T-4T 2025) : **7 543,30 € TTC** ; probable en
+incluant le 4T 2024 et les trimestres 2026 : **~16 263 € TTC**. Au 01/09/2026, l'ILC T1 2026 (135,26,
+−0,45 %) ramène le loyer dû à **~166 437 €/an**.
+
+**Réserve restante** : l'exemplaire en notre possession ne porte que la signature du preneur (bloc bailleur
+vide — c'est la copie renvoyée par AEJB le 30/12/2024) ; l'exemplaire contresigné n'a apparemment jamais
+été retourné. L'offre écrite du bailleur (LRAR + courriels), sa confirmation du 12/12/2024 au conseil
+d'AEJB et l'encaissement des versements convenus rendent toutefois l'accord difficilement contestable — à
+faire confirmer par l'avocat. L'article 2 (confidentialité) autorise expressément la production du
+protocole en justice en cas de non-respect par une partie. Une partie du « solde » réclamé correspond
+mécaniquement à cette indexation annulée puis refacturée.
 
 ### 4.5 Le solde reporté
 
