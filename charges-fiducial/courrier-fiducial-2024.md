@@ -8,7 +8,7 @@
 
 **Objet : IMMEUBLE 10663 — 132 rue de la Roquette 75011 PARIS — SASU AEJB — Régularisation de charges 2024 — demande de justificatifs**
 
-Bonjour Romain,
+Bonjour Monsieur Leroulley,
 
 Je reviens vers vous au sujet de la régularisation de charges de l'exercice 2024 qui m'est réclamée, d'un montant de 11 547,29 € TTC (facture n° 3000003-26000768 du 26 février 2026).
 
@@ -58,7 +58,7 @@ Je vous remercie de joindre les factures des entreprises ITEC et MISTRAL corresp
 
 **Second sujet, distinct du précédent : le non-respect du protocole d'accord du 18 juillet 2024**
 
-Par courrier recommandé du 18 juillet 2024 (réf. FD/RL-10663-1174/2024, LRAR n° 2C 186 678 6985 4), transmis également par courriel de M. Leroulley le 25 juillet 2024, le bailleur m'a adressé un protocole d'accord dont l'article 1 stipule :
+Par courrier recommandé du 18 juillet 2024 (réf. FD/RL-10663-1174/2024, LRAR n° 2C 186 678 6985 4), que vous m'avez également transmis par courriel le 25 juillet 2024, le bailleur m'a adressé un protocole d'accord dont l'article 1 stipule :
 
 - la **renonciation à l'indexation annuelle à effet du 1er septembre 2024**, le loyer principal annuel étant fixé à **165 600 € HT et hors charges du 1er septembre 2024 au 31 août 2025** ;
 - la **reprise de l'indexation le 1er septembre 2025** sur la base des indices stipulés : indice de base **ILC 1er trimestre 2024**, indice d'indexation **ILC 1er trimestre 2025**.
