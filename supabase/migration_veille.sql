@@ -50,6 +50,22 @@ alter table public.opportunites add column latitude numeric;
 alter table public.opportunites add column longitude numeric;
 alter table public.opportunites add column geo_approx boolean not null default false;
 
+-- Recherches R4 (locaux neufs en banlieue) puis R5 (BODACC alimentaire)
+alter table public.opportunites drop constraint opportunites_recherche_check;
+alter table public.opportunites add constraint opportunites_recherche_check
+  check (recherche in ('R1','R2','R3','R4','R5'));
+
+-- Migration opportunites_bodacc (2026-08-21) : recherche R5 — annonces BODACC
+-- de procédures collectives sur des commerces alimentaires. Ces lignes n'ont
+-- ni prix ni surface : le dossier tient dans `bodacc_detail` (siren, tribunal,
+-- nature, date de jugement, complément) et son complément est aussi recopié
+-- dans `points_vigilance`. `candidat_lab` est l'arbitrage manuel des associés
+-- (« ce dossier est-il un candidat pour le laboratoire ? »), utilisé sur R3
+-- comme sur R5.
+alter table public.opportunites add column bodacc_detail jsonb;
+alter table public.opportunites add column candidat_lab text
+  check (candidat_lab is null or candidat_lab in ('oui','non','a_etudier'));
+
 create index opportunites_recherche_idx on public.opportunites (recherche);
 create index opportunites_statut_idx on public.opportunites (statut);
 create index opportunites_score_idx on public.opportunites (score desc);
@@ -90,7 +106,11 @@ revoke all on public.commentaires from anon, authenticated;
 revoke all on public.runs from anon, authenticated;
 
 grant select on public.opportunites to authenticated;
+-- Les deux seules colonnes que les associés modifient depuis la fiche du
+-- dashboard (migration opportunites_update_candidat_lab, 2026-08-21 pour la
+-- seconde) : le privilège colonne borne la policy d'update ci-dessous.
 grant update (statut) on public.opportunites to authenticated;
+grant update (candidat_lab) on public.opportunites to authenticated;
 grant select on public.runs to authenticated;
 grant select, insert on public.commentaires to authenticated;
 grant update, delete on public.commentaires to authenticated;
@@ -98,7 +118,7 @@ grant update, delete on public.commentaires to authenticated;
 create policy "opportunites_select_authenticated" on public.opportunites
   for select to authenticated using (true);
 
--- Le privilège colonne ci-dessus limite cette policy à la seule colonne statut
+-- Les privilèges colonne ci-dessus limitent cette policy à statut et candidat_lab
 create policy "opportunites_update_statut_authenticated" on public.opportunites
   for update to authenticated using (true) with check (true);
 

@@ -5,6 +5,7 @@ import {
   Radar, ExternalLink, MessageSquare, Send, MapPin, Sparkles,
   SlidersHorizontal, Store, Hotel, KeyRound, FileText, ChevronLeft,
   LayoutGrid, Map as MapIcon, Building2, Table2, ArrowUpDown, ArrowUp, ArrowDown,
+  Gavel,
 } from 'lucide-react'
 import { marked } from 'marked'
 import { supabase } from '../lib/supabase'
@@ -19,10 +20,36 @@ const RECHERCHES = {
   R2: { label: 'Conversion hôtelière', sub: 'Immeubles à rénover', I: Hotel },
   R3: { label: 'Supermarché', sub: 'Bio ou conventionnel', I: Store },
   R4: { label: 'Neuf banlieue', sub: 'Locaux neufs ≥ 10 %', I: Building2 },
+  R5: { label: 'BODACC alimentaire', sub: 'Procédures collectives — commerces alimentaires', I: Gavel },
 }
 
 // Seuil de rendement brut « satisfaisant » par recherche, pour la couleur.
 const SEUIL_RENDEMENT = { R1: 8, R4: 10 }
+
+// Tri par défaut de chaque recherche. Sur R5 les scores sont provisoires
+// (tous à 50) : c'est la fraîcheur de la détection qui trie utilement.
+const TRI_DEFAUT_LISTE = { R5: 'date' }
+const TRI_DEFAUT_DETAILS = { R5: { k: 'detecte', desc: true } }
+
+// Candidat pour le laboratoire — arbitrage manuel des associés (R3, R5).
+const CANDIDAT_LAB = [
+  { v: 'oui', l: 'Oui', cls: 'bg-green-100 text-green-700' },
+  { v: 'a_etudier', l: 'À étudier', cls: 'bg-amber-100 text-amber-700' },
+  { v: 'non', l: 'Non', cls: 'bg-gray-100 text-gray-500' },
+]
+const CANDIDAT_LAB_RECHERCHES = ['R3', 'R5']
+const candidatCfg = (v) => CANDIDAT_LAB.find(c => c.v === v) || null
+
+// ── BODACC (R5) ──────────────────────────────────────────────
+// Les annonces BODACC n'ont ni prix ni surface : l'identité du dossier,
+// c'est la société, la nature du jugement et le tribunal.
+// Une ligne BODACC n'est pas une annonce à vendre : c'est un dossier judiciaire.
+const nomLigne = (recherche) => recherche === 'R5' ? 'dossier' : 'opportunité'
+
+const bodacc = (o) => o.bodacc_detail || {}
+const societe = (o) => o.locataire || bodacc(o).denomination || null
+// `type_offre` est préfixé « BODACC — » ; la nature seule suffit à l'affichage.
+const natureJugement = (o) => bodacc(o).nature || (o.type_offre || '').replace(/^BODACC\s*[—–-]\s*/, '') || null
 
 const STATUTS = [
   { v: 'active', l: 'Active', cls: 'bg-blue-100 text-blue-700' },
@@ -90,6 +117,12 @@ function VerdictBadge({ verdict }) {
   return <span className={`${cls} px-2 py-0.5 rounded-full text-[11px] font-semibold`}>{verdict.split(/[—:-]/)[0].trim()}</span>
 }
 
+function CandidatBadge({ valeur }) {
+  const c = candidatCfg(valeur)
+  if (!c) return null
+  return <span className={`${c.cls} px-2 py-0.5 rounded-full text-[10px] font-bold`}>Labo : {c.l}</span>
+}
+
 function Row({ label, children }) {
   if (children == null || children === '' || children === '—') return null
   return (
@@ -104,10 +137,15 @@ function Row({ label, children }) {
 
 function OppCard({ o, onOpen, commentaires = [] }) {
   const s = statutCfg(o.statut)
+  const estBodacc = o.recherche === 'R5'
+  const B = bodacc(o)
   return (
     <Card className="p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => onOpen(o)}>
       <div className="flex items-start gap-3">
-        <ScoreBadge score={o.score} />
+        {/* Sur R5 les scores sont provisoires : l'arbitrage labo dit mieux où en est le dossier. */}
+        {estBodacc
+          ? <span className="w-10 h-10 rounded-full bg-purple-50 text-purple-600 inline-flex items-center justify-center shrink-0"><Gavel size={18} /></span>
+          : <ScoreBadge score={o.score} />}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-0.5">
             {isNouveau(o) && (
@@ -120,29 +158,54 @@ function OppCard({ o, onOpen, commentaires = [] }) {
             )}
             {o.statut !== 'active' && <span className={`${s.cls} px-1.5 py-0.5 rounded text-[10px] font-semibold`}>{s.l}</span>}
             {o.recherche === 'R2' && <VerdictBadge verdict={o.verdict_reglementaire} />}
+            {estBodacc && <CandidatBadge valeur={o.candidat_lab} />}
           </div>
-          <p className="font-bold text-navy text-sm truncate">{o.adresse || 'Adresse à confirmer'}</p>
+          <p className="font-bold text-navy text-sm truncate">
+            {estBodacc ? (societe(o) || 'Société non communiquée') : (o.adresse || 'Adresse à confirmer')}
+          </p>
           <p className="text-gray-400 text-xs flex items-center gap-1">
             <MapPin size={11} className="shrink-0" />{o.code_postal} {o.ville}
-            {o.type_offre === 'location' && <span className="ml-1 text-indigo-500 font-semibold">· Location</span>}
+            {!estBodacc && o.type_offre === 'location' && <span className="ml-1 text-indigo-500 font-semibold">· Location</span>}
           </p>
+          {estBodacc && o.adresse && <p className="text-gray-400 text-xs truncate">{o.adresse}</p>}
         </div>
       </div>
 
-      <div className="mt-3 flex items-baseline justify-between gap-2">
-        <span className="text-navy font-extrabold">
-          {o.type_offre === 'location'
-            ? (o.loyer_annuel ? `${fmtNum(o.loyer_annuel)} €/an` : (o.hors_critere ? 'Loyer : nous consulter' : '—'))
-            : (o.prix ? fmtNum(o.prix) + ' €' : (o.hors_critere ? 'Prix : nous consulter' : '—'))}
-        </span>
-        <span className="text-gray-400 text-xs">
-          {o.surface_totale ? `${fmtNum(o.surface_totale)} m²` : ''}
-          {o.prix_m2 ? ` · ${fmtNum(o.prix_m2)} €/m²` : ''}
-        </span>
-      </div>
+      {estBodacc ? (
+        <div className="mt-3 space-y-1.5">
+          {natureJugement(o) && (
+            <p className="m-0 text-[11px] font-semibold text-purple-700 bg-purple-50 rounded px-2 py-1">{natureJugement(o)}</p>
+          )}
+          <p className="m-0 text-xs text-gray-500">
+            {B.date_jugement ? `Jugé le ${fmtDate(B.date_jugement)}` : 'Date de jugement à vérifier'}
+            {B.siren ? ` · SIREN ${B.siren}` : ''}
+          </p>
+          {B.tribunal && <p className="m-0 text-xs text-gray-400 truncate" title={B.tribunal}>{B.tribunal}</p>}
+        </div>
+      ) : (
+        <div className="mt-3 flex items-baseline justify-between gap-2">
+          <span className="text-navy font-extrabold">
+            {o.type_offre === 'location'
+              ? (o.loyer_annuel ? `${fmtNum(o.loyer_annuel)} €/an` : (o.hors_critere ? 'Loyer : nous consulter' : '—'))
+              : (o.prix ? fmtNum(o.prix) + ' €' : (o.hors_critere ? 'Prix : nous consulter' : '—'))}
+          </span>
+          <span className="text-gray-400 text-xs">
+            {o.surface_totale ? `${fmtNum(o.surface_totale)} m²` : ''}
+            {o.prix_m2 ? ` · ${fmtNum(o.prix_m2)} €/m²` : ''}
+          </span>
+        </div>
+      )}
 
       {/* Infos clés par recherche */}
       <div className="mt-2 text-xs text-gray-500 space-y-0.5">
+        {estBodacc && (
+          <>
+            {o.occupation && <p className="line-clamp-2" title={o.occupation}>Activité : {o.occupation}</p>}
+            {o.points_vigilance && (
+              <p className="text-amber-700 line-clamp-2" title={o.points_vigilance}>{o.points_vigilance}</p>
+            )}
+          </>
+        )}
         {(o.recherche === 'R1' || o.recherche === 'R4') && (
           <>
             {o.rendement_brut != null && (
@@ -172,13 +235,17 @@ function OppCard({ o, onOpen, commentaires = [] }) {
       )}
 
       <div className="mt-3 pt-2 border-t border-gray-50 flex items-center justify-between">
-        <span className="text-gray-300 text-[11px]">{o.source} · détecté le {fmtDate(o.detecte_le)}</span>
+        <span className="text-gray-300 text-[11px]">
+          {o.source}
+          {estBodacc && o.date_publication_annonce ? ` · publié le ${fmtDate(o.date_publication_annonce)}` : ''}
+          {' · détecté le '}{fmtDate(o.detecte_le)}
+        </span>
         <a
           href={o.lien} target="_blank" rel="noopener noreferrer"
           onClick={e => e.stopPropagation()}
           className="text-blue-600 hover:text-blue-800 inline-flex items-center gap-1 text-xs font-semibold"
         >
-          Annonce <ExternalLink size={11} />
+          {estBodacc ? 'Annonce BODACC' : 'Annonce'} <ExternalLink size={11} />
         </a>
       </div>
     </Card>
@@ -191,45 +258,199 @@ function OppCard({ o, onOpen, commentaires = [] }) {
 // Toutes les informations lisibles d'un coup, tri par clic sur les
 // en-têtes comme dans un tableur. Le clic sur une ligne ouvre la fiche.
 
-// Colonnes propres à R3 : les deux scénarios d'exploitation estimés par la
-// veille — CA si enseigne bio (Naturalia), CA si conventionnel (G20). Le
-// format recommandé est affiché en gras.
-const COLONNES_R3 = [
-  { k: 'ca_naturalia', l: 'CA Naturalia', num: true, get: o => o.ca_potentiel?.ca_naturalia != null ? Number(o.ca_potentiel.ca_naturalia) : null },
-  { k: 'ca_g20', l: 'CA G20', num: true, get: o => o.ca_potentiel?.ca_g20 != null ? Number(o.ca_potentiel.ca_g20) : null },
-]
+// Une colonne : `get` sert au tri (et au rendu par défaut), `cell` au rendu
+// quand il demande du balisage. `td` complète les classes de la cellule.
+const ms = (d) => d ? new Date(d).getTime() : null
+
+const C = {
+  score: {
+    k: 'score', l: 'Score', num: true, get: o => o.score,
+    cell: o => (
+      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full text-white text-xs font-bold"
+        style={{ background: scoreColor(o.score) }}>{o.score ?? '—'}</span>
+    ),
+  },
+  statut: {
+    k: 'statut', l: 'Statut', get: o => statutCfg(o.statut).l, td: 'whitespace-nowrap',
+    cell: o => (
+      <>
+        <span className={`${statutCfg(o.statut).cls} px-1.5 py-0.5 rounded text-[10px] font-semibold`}>{statutCfg(o.statut).l}</span>
+        {o.hors_critere && <span className="block mt-1 text-[9px] font-bold text-amber-600">HORS CRITÈRES</span>}
+      </>
+    ),
+  },
+  adresse: {
+    k: 'adresse', l: 'Adresse', get: o => o.adresse || '',
+    td: 'text-sm font-semibold text-navy', style: { minWidth: 170 },
+    cell: o => (
+      <>
+        {o.adresse || 'Adresse à confirmer'}
+        <span className="block text-[10px] font-normal text-gray-400">{o.recherche} · {RECHERCHES[o.recherche]?.label}</span>
+      </>
+    ),
+  },
+  ville: {
+    k: 'ville', l: 'Ville', get: o => o.ville || '',
+    td: 'text-sm text-gray-600 whitespace-nowrap', cell: o => `${o.code_postal || ''} ${o.ville || ''}`.trim() || '—',
+  },
+  montant: {
+    k: 'montant', l: 'Prix / Loyer', num: true, get: o => o.prix ?? o.loyer_annuel,
+    td: 'text-sm font-bold text-navy text-right whitespace-nowrap',
+    cell: o => o.type_offre === 'location'
+      ? (o.loyer_annuel ? `${fmtNum(o.loyer_annuel)} €/an` : '—')
+      : (o.prix ? `${fmtNum(o.prix)} €` : '—'),
+  },
+  prix_m2: {
+    k: 'prix_m2', l: '€/m²', num: true, get: o => o.prix_m2,
+    td: 'text-sm text-right text-gray-600 whitespace-nowrap', cell: o => o.prix_m2 ? fmtNum(o.prix_m2) : '—',
+  },
+  surface: {
+    k: 'surface', l: 'Surface', num: true, get: o => o.surface_totale,
+    td: 'text-sm text-right text-gray-600 whitespace-nowrap', cell: o => o.surface_totale ? `${fmtNum(o.surface_totale)} m²` : '—',
+  },
+  rendement: {
+    k: 'rendement', l: 'Rdt brut', num: true, get: o => o.rendement_brut,
+    td: 'text-sm text-right font-semibold whitespace-nowrap',
+    cell: o => {
+      if (o.rendement_brut == null) return '—'
+      const seuil = SEUIL_RENDEMENT[o.recherche]
+      return <span className={seuil && o.rendement_brut >= seuil ? 'text-green-600' : 'text-orange-500'}>{String(o.rendement_brut).replace('.', ',')} %</span>
+    },
+  },
+  // R3 : les deux scénarios d'exploitation estimés par la veille — CA si
+  // enseigne bio (Naturalia), CA si conventionnel (G20). Le format
+  // recommandé est affiché en gras.
+  ca_naturalia: {
+    k: 'ca_naturalia', l: 'CA Naturalia', num: true,
+    get: o => o.ca_potentiel?.ca_naturalia != null ? Number(o.ca_potentiel.ca_naturalia) : null,
+    td: 'text-sm text-right whitespace-nowrap',
+    cellClass: o => String(o.ca_potentiel?.recommandation || '').startsWith('bio') ? 'font-bold text-emerald-700' : 'text-gray-600',
+    cell: o => o.ca_potentiel?.ca_naturalia != null ? `${fmtNum(o.ca_potentiel.ca_naturalia)} €/an` : '—',
+  },
+  ca_g20: {
+    k: 'ca_g20', l: 'CA G20', num: true,
+    get: o => o.ca_potentiel?.ca_g20 != null ? Number(o.ca_potentiel.ca_g20) : null,
+    td: 'text-sm text-right whitespace-nowrap',
+    cellClass: o => String(o.ca_potentiel?.recommandation || '').startsWith('conventionnel') ? 'font-bold text-emerald-700' : 'text-gray-600',
+    cell: o => o.ca_potentiel?.ca_g20 != null ? `${fmtNum(o.ca_potentiel.ca_g20)} €/an` : '—',
+  },
+  forts: {
+    k: 'forts', l: 'Points forts', get: o => o.points_forts || '',
+    td: 'text-xs text-green-700', style: { minWidth: 200, maxWidth: 280 },
+    cell: o => <span className="line-clamp-3" title={o.points_forts || ''}>{o.points_forts || '—'}</span>,
+  },
+  vigilance: {
+    k: 'vigilance', l: 'Points de vigilance', get: o => o.points_vigilance || '',
+    td: 'text-xs text-amber-700', style: { minWidth: 200, maxWidth: 280 },
+    cell: o => <span className="line-clamp-3" title={o.points_vigilance || ''}>{o.points_vigilance || '—'}</span>,
+  },
+  commentaire: {
+    k: 'commentaire', l: 'Dernier commentaire', get: (o, cm) => dernierCommentaire(cm)?.contenu || '',
+    td: 'text-xs', style: { minWidth: 180, maxWidth: 260 },
+    cell: (o, cm) => {
+      const dernier = dernierCommentaire(cm)
+      if (!dernier) return <span className="text-gray-300">—</span>
+      return (
+        <span className="block bg-blue-50/80 border-l-2 border-blue-400 rounded-r px-2 py-1">
+          <span className="font-semibold text-blue-800">{nomAuteur(dernier)}</span>
+          <span className="block text-gray-700 line-clamp-2" title={dernier.contenu}>{dernier.contenu}</span>
+        </span>
+      )
+    },
+  },
+  detecte: {
+    k: 'detecte', l: 'Détecté le', num: true, get: o => ms(o.detecte_le),
+    td: 'text-xs text-gray-400 whitespace-nowrap', cell: o => fmtDate(o.detecte_le),
+  },
+
+  // ── Colonnes BODACC (R5) ───────────────────────────────────
+  candidat: {
+    k: 'candidat', l: 'Labo', get: o => candidatCfg(o.candidat_lab)?.l || '', td: 'whitespace-nowrap',
+    cell: o => candidatCfg(o.candidat_lab)
+      ? <span className={`${candidatCfg(o.candidat_lab).cls} px-1.5 py-0.5 rounded text-[10px] font-bold`}>{candidatCfg(o.candidat_lab).l}</span>
+      : <span className="text-gray-300">—</span>,
+  },
+  societe: {
+    k: 'societe', l: 'Société', get: o => societe(o) || '',
+    td: 'text-sm font-semibold text-navy', style: { minWidth: 160 },
+    cell: o => (
+      <>
+        {societe(o) || 'Non communiquée'}
+        {o.adresse && <span className="block text-[10px] font-normal text-gray-400">{o.adresse}</span>}
+      </>
+    ),
+  },
+  code_postal: {
+    k: 'code_postal', l: 'CP', get: o => o.code_postal || '',
+    td: 'text-sm text-gray-600 whitespace-nowrap',
+  },
+  ville_seule: {
+    k: 'ville_seule', l: 'Ville', get: o => o.ville || '', td: 'text-sm text-gray-600 whitespace-nowrap',
+  },
+  nature: {
+    k: 'nature', l: 'Nature du jugement', get: o => natureJugement(o) || '',
+    td: 'text-xs', style: { minWidth: 190, maxWidth: 260 },
+    cell: o => natureJugement(o)
+      ? <span className="text-purple-700 bg-purple-50 rounded px-2 py-1 inline-block" title={natureJugement(o)}>{natureJugement(o)}</span>
+      : <span className="text-gray-300">—</span>,
+  },
+  activite: {
+    k: 'activite', l: 'Activité', get: o => o.occupation || '',
+    td: 'text-xs text-gray-600', style: { minWidth: 220, maxWidth: 320 },
+    cell: o => <span className="line-clamp-3" title={o.occupation || ''}>{o.occupation || '—'}</span>,
+  },
+  jugement: {
+    k: 'jugement', l: 'Jugé le', num: true, get: o => ms(bodacc(o).date_jugement),
+    td: 'text-xs text-gray-500 whitespace-nowrap',
+    cell: o => bodacc(o).date_jugement ? fmtDate(bodacc(o).date_jugement) : '—',
+  },
+  publication: {
+    k: 'publication', l: 'Publié le', num: true, get: o => ms(o.date_publication_annonce),
+    td: 'text-xs text-gray-500 whitespace-nowrap',
+    cell: o => o.date_publication_annonce ? fmtDate(o.date_publication_annonce) : '—',
+  },
+  complement: {
+    k: 'complement', l: 'Complément du jugement', get: o => o.points_vigilance || '',
+    td: 'text-xs text-amber-700', style: { minWidth: 240, maxWidth: 340 },
+    cell: o => <span className="line-clamp-3" title={o.points_vigilance || ''}>{o.points_vigilance || '—'}</span>,
+  },
+}
 
 const COLONNES_DETAILS = [
-  { k: 'score', l: 'Score', num: true, get: o => o.score },
-  { k: 'statut', l: 'Statut', get: o => statutCfg(o.statut).l },
-  { k: 'adresse', l: 'Adresse', get: o => o.adresse || '' },
-  { k: 'ville', l: 'Ville', get: o => o.ville || '' },
-  { k: 'montant', l: 'Prix / Loyer', num: true, get: o => o.prix ?? o.loyer_annuel },
-  { k: 'prix_m2', l: '€/m²', num: true, get: o => o.prix_m2 },
-  { k: 'surface', l: 'Surface', num: true, get: o => o.surface_totale },
-  { k: 'rendement', l: 'Rdt brut', num: true, get: o => o.rendement_brut },
-  { k: 'forts', l: 'Points forts', get: o => o.points_forts || '' },
-  { k: 'vigilance', l: 'Points de vigilance', get: o => o.points_vigilance || '' },
-  { k: 'commentaire', l: 'Dernier commentaire', get: (o, cm) => dernierCommentaire(cm)?.contenu || '' },
-  { k: 'detecte', l: 'Détecté le', num: true, get: o => o.detecte_le ? new Date(o.detecte_le).getTime() : null, aff: o => fmtDate(o.detecte_le) },
+  C.score, C.statut, C.adresse, C.ville, C.montant, C.prix_m2, C.surface,
+  C.rendement, C.forts, C.vigilance, C.commentaire, C.detecte,
 ]
 
+// R3 : les deux scénarios de CA après le rendement.
+const COLONNES_R3 = [
+  C.score, C.statut, C.adresse, C.ville, C.montant, C.prix_m2, C.surface,
+  C.rendement, C.ca_naturalia, C.ca_g20, C.forts, C.vigilance, C.commentaire, C.detecte,
+]
+
+// R5 : ni prix, ni surface, ni rendement — un dossier BODACC se lit par la
+// société, la nature du jugement et l'activité.
+const COLONNES_R5 = [
+  C.statut, C.candidat, C.societe, C.ville_seule, C.code_postal, C.nature,
+  C.activite, C.jugement, C.publication, C.complement, C.commentaire, C.detecte,
+]
+
+const colonnesDe = (recherche) =>
+  recherche === 'R3' ? COLONNES_R3 : recherche === 'R5' ? COLONNES_R5 : COLONNES_DETAILS
+
+const triDefautDetails = (recherche) => TRI_DEFAUT_DETAILS[recherche] || { k: 'score', desc: true }
+
 function VueDetails({ opps, commentairesParOpp, onOpen, recherche }) {
-  const [tri, setTri] = useState({ k: 'score', desc: true })
+  const [tri, setTri] = useState(() => triDefautDetails(recherche))
+
+  // Chaque recherche a ses colonnes : le tri en cours n'y survit pas.
+  useEffect(() => { setTri(triDefautDetails(recherche)) }, [recherche])
 
   const cliquer = (k) => setTri(t => t.k === k ? { k, desc: !t.desc } : { k, desc: true })
 
-  // Les colonnes de CA n'ont de sens que pour la recherche supermarché.
-  const colonnes = useMemo(() => {
-    if (recherche !== 'R3') return COLONNES_DETAILS
-    const cols = [...COLONNES_DETAILS]
-    const apres = cols.findIndex(c => c.k === 'rendement')
-    cols.splice(apres + 1, 0, ...COLONNES_R3)
-    return cols
-  }, [recherche])
+  const colonnes = colonnesDe(recherche)
 
   const lignes = useMemo(() => {
-    const col = colonnes.find(c => c.k === tri.k) || COLONNES_DETAILS[0]
+    const col = colonnes.find(c => c.k === tri.k) || colonnes[0]
     const val = (o) => col.get(o, commentairesParOpp.get(o.id) || [])
     return [...opps].sort((a, b) => {
       const va = val(a), vb = val(b)
@@ -267,62 +488,18 @@ function VueDetails({ opps, commentairesParOpp, onOpen, recherche }) {
         <tbody>
           {lignes.map(o => {
             const cm = commentairesParOpp.get(o.id) || []
-            const dernier = dernierCommentaire(cm)
-            const st = statutCfg(o.statut)
-            const seuil = SEUIL_RENDEMENT[o.recherche]
             return (
               <tr key={o.id} onClick={() => onOpen(o)}
                 className="border-t border-gray-50 hover:bg-blue-50/40 cursor-pointer align-top">
-                <td className="px-3 py-2.5">
-                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-full text-white text-xs font-bold"
-                    style={{ background: scoreColor(o.score) }}>{o.score ?? '—'}</span>
-                </td>
-                <td className="px-3 py-2.5 whitespace-nowrap">
-                  <span className={`${st.cls} px-1.5 py-0.5 rounded text-[10px] font-semibold`}>{st.l}</span>
-                  {o.hors_critere && <span className="block mt-1 text-[9px] font-bold text-amber-600">HORS CRITÈRES</span>}
-                </td>
-                <td className="px-3 py-2.5 text-sm font-semibold text-navy" style={{ minWidth: 170 }}>
-                  {o.adresse || 'Adresse à confirmer'}
-                  <span className="block text-[10px] font-normal text-gray-400">{o.recherche} · {RECHERCHES[o.recherche]?.label}</span>
-                </td>
-                <td className="px-3 py-2.5 text-sm text-gray-600 whitespace-nowrap">{o.code_postal} {o.ville}</td>
-                <td className="px-3 py-2.5 text-sm font-bold text-navy text-right whitespace-nowrap">
-                  {o.type_offre === 'location'
-                    ? (o.loyer_annuel ? `${fmtNum(o.loyer_annuel)} €/an` : '—')
-                    : (o.prix ? `${fmtNum(o.prix)} €` : '—')}
-                </td>
-                <td className="px-3 py-2.5 text-sm text-right text-gray-600 whitespace-nowrap">{o.prix_m2 ? fmtNum(o.prix_m2) : '—'}</td>
-                <td className="px-3 py-2.5 text-sm text-right text-gray-600 whitespace-nowrap">{o.surface_totale ? `${fmtNum(o.surface_totale)} m²` : '—'}</td>
-                <td className="px-3 py-2.5 text-sm text-right font-semibold whitespace-nowrap">
-                  {o.rendement_brut != null
-                    ? <span className={seuil && o.rendement_brut >= seuil ? 'text-green-600' : 'text-orange-500'}>{String(o.rendement_brut).replace('.', ',')} %</span>
-                    : '—'}
-                </td>
-                {recherche === 'R3' && (
-                  <>
-                    <td className={`px-3 py-2.5 text-sm text-right whitespace-nowrap ${String(o.ca_potentiel?.recommandation || '').startsWith('bio') ? 'font-bold text-emerald-700' : 'text-gray-600'}`}>
-                      {o.ca_potentiel?.ca_naturalia != null ? `${fmtNum(o.ca_potentiel.ca_naturalia)} €/an` : '—'}
+                {colonnes.map(c => {
+                  const contenu = c.cell ? c.cell(o, cm) : (c.get(o, cm) || '—')
+                  return (
+                    <td key={c.k} style={c.style}
+                      className={`px-3 py-2.5 ${c.td || ''} ${c.cellClass ? c.cellClass(o) : ''}`}>
+                      {contenu}
                     </td>
-                    <td className={`px-3 py-2.5 text-sm text-right whitespace-nowrap ${String(o.ca_potentiel?.recommandation || '').startsWith('conventionnel') ? 'font-bold text-emerald-700' : 'text-gray-600'}`}>
-                      {o.ca_potentiel?.ca_g20 != null ? `${fmtNum(o.ca_potentiel.ca_g20)} €/an` : '—'}
-                    </td>
-                  </>
-                )}
-                <td className="px-3 py-2.5 text-xs text-green-700" style={{ minWidth: 200, maxWidth: 280 }}>
-                  <span className="line-clamp-3" title={o.points_forts || ''}>{o.points_forts || '—'}</span>
-                </td>
-                <td className="px-3 py-2.5 text-xs text-amber-700" style={{ minWidth: 200, maxWidth: 280 }}>
-                  <span className="line-clamp-3" title={o.points_vigilance || ''}>{o.points_vigilance || '—'}</span>
-                </td>
-                <td className="px-3 py-2.5 text-xs" style={{ minWidth: 180, maxWidth: 260 }}>
-                  {dernier ? (
-                    <span className="block bg-blue-50/80 border-l-2 border-blue-400 rounded-r px-2 py-1">
-                      <span className="font-semibold text-blue-800">{nomAuteur(dernier)}</span>
-                      <span className="block text-gray-700 line-clamp-2" title={dernier.contenu}>{dernier.contenu}</span>
-                    </span>
-                  ) : <span className="text-gray-300">—</span>}
-                </td>
-                <td className="px-3 py-2.5 text-xs text-gray-400 whitespace-nowrap">{fmtDate(o.detecte_le)}</td>
+                  )
+                })}
                 <td className="px-3 py-2.5">
                   {o.lien && (
                     <a href={o.lien} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
@@ -342,12 +519,13 @@ function VueDetails({ opps, commentairesParOpp, onOpen, recherche }) {
 
 // ── Fiche détail ─────────────────────────────────────────────
 
-function DetailModal({ opp, onClose, onStatutChange, onCommentAdded }) {
+function DetailModal({ opp, onClose, onStatutChange, onCandidatChange, onCommentAdded }) {
   const { user } = useAuth()
   const [comments, setComments] = useState(null)
   const [newComment, setNewComment] = useState('')
   const [saving, setSaving] = useState(false)
   const [statut, setStatut] = useState(opp.statut)
+  const [candidat, setCandidat] = useState(opp.candidat_lab)
 
   const loadComments = async () => {
     const { data } = await supabase
@@ -387,19 +565,38 @@ function DetailModal({ opp, onClose, onStatutChange, onCommentAdded }) {
     else onStatutChange(opp.id, v)
   }
 
+  const changeCandidat = async (v) => {
+    setCandidat(v)
+    const { error } = await supabase.from('opportunites').update({ candidat_lab: v }).eq('id', opp.id)
+    if (error) { setCandidat(opp.candidat_lab); alert('Impossible de changer le candidat labo : ' + error.message) }
+    else onCandidatChange?.(opp.id, v)
+  }
+
   const R = RECHERCHES[opp.recherche]
+  const estBodacc = opp.recherche === 'R5'
+  const B = bodacc(opp)
+  // Sur R5, `points_vigilance` reprend le complément du jugement : on ne
+  // l'affiche une seconde fois que s'il apporte autre chose.
+  const complementRepris = estBodacc && (B.complement || '').trim() === (opp.points_vigilance || '').trim()
 
   return (
-    <Modal title={opp.adresse || `${opp.ville} — ${R.label}`} onClose={onClose} width="max-w-2xl">
+    <Modal
+      title={estBodacc
+        ? (societe(opp) || `${opp.ville} — ${R.label}`)
+        : (opp.adresse || `${opp.ville} — ${R.label}`)}
+      onClose={onClose} width="max-w-2xl">
       <div className="flex items-center gap-3 mb-5 flex-wrap">
-        <ScoreBadge score={opp.score} size="lg" />
+        {estBodacc
+          ? <span className="w-14 h-14 rounded-full bg-purple-50 text-purple-600 inline-flex items-center justify-center shrink-0"><Gavel size={24} /></span>
+          : <ScoreBadge score={opp.score} size="lg" />}
         <div className="flex-1 min-w-[140px]">
           <p className="text-gray-400 text-xs">{opp.recherche} · {R.label}</p>
           <p className="text-navy font-bold">{opp.code_postal} {opp.ville}</p>
+          {estBodacc && opp.adresse && <p className="text-gray-400 text-xs">{opp.adresse}</p>}
         </div>
         <a href={opp.lien} target="_blank" rel="noopener noreferrer"
           className="bg-navy text-white hover:bg-navy-light px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5">
-          Voir l'annonce <ExternalLink size={12} />
+          {estBodacc ? "Voir l'annonce BODACC" : "Voir l'annonce"} <ExternalLink size={12} />
         </a>
       </div>
 
@@ -425,7 +622,61 @@ function DetailModal({ opp, onClose, onStatutChange, onCommentAdded }) {
         </div>
       </div>
 
+      {/* Candidat laboratoire — arbitrage manuel des associés */}
+      {CANDIDAT_LAB_RECHERCHES.includes(opp.recherche) && (
+        <div className="mb-5">
+          <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wide">Candidat laboratoire</label>
+          <div className="flex gap-1.5 flex-wrap">
+            {CANDIDAT_LAB.map(c => (
+              <button key={c.v} onClick={() => changeCandidat(c.v)}
+                className={`px-2.5 py-1 rounded-full text-xs font-semibold cursor-pointer transition-all ${
+                  candidat === c.v ? c.cls + ' ring-2 ring-offset-1 ring-navy/30' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'
+                }`}>
+                {c.l}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Annonce BODACC */}
+      {estBodacc && (
+        <div className="mb-5 bg-purple-50/60 border border-purple-100 rounded-lg p-3">
+          <p className="text-xs font-bold text-purple-700 uppercase tracking-wide mb-2">Annonce BODACC</p>
+          <div className="grid sm:grid-cols-2 gap-x-8">
+            <div>
+              <Row label="Dénomination">{societe(opp)}</Row>
+              <Row label="SIREN">{B.siren}</Row>
+              <Row label="Nature">{natureJugement(opp)}</Row>
+              <Row label="Famille">{B.famille}</Row>
+            </div>
+            <div>
+              <Row label="Tribunal">{B.tribunal}</Row>
+              <Row label="Date du jugement">{B.date_jugement ? fmtDate(B.date_jugement) : null}</Row>
+              <Row label="Publiée le">{opp.date_publication_annonce ? fmtDate(opp.date_publication_annonce) : null}</Row>
+              <Row label="Parution">{B.parution ? `${B.parution}${B.numero_annonce ? ` · annonce n° ${B.numero_annonce}` : ''}` : null}</Row>
+            </div>
+          </div>
+          {opp.occupation && (
+            <div className="mt-3">
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-0.5">Activité</p>
+              <p className="text-sm text-gray-700">{opp.occupation}</p>
+            </div>
+          )}
+          {(B.complement || opp.points_vigilance) && (
+            <div className="mt-3">
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-0.5">Complément du jugement</p>
+              <p className="text-sm text-gray-700 whitespace-pre-line">{B.complement || opp.points_vigilance}</p>
+              <p className="text-[11px] text-gray-400 mt-1">
+                Mandataire et délai de dépôt des offres figurent en général dans ce complément — à confirmer auprès du greffe.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Données */}
+      {!estBodacc && (
       <div className="grid sm:grid-cols-2 gap-x-8 mb-5">
         <div>
           <Row label="Type">{opp.type_offre}</Row>
@@ -447,6 +698,7 @@ function DetailModal({ opp, onClose, onStatutChange, onCommentAdded }) {
           <Row label="Source">{opp.source}</Row>
         </div>
       </div>
+      )}
 
       {opp.verdict_reglementaire && (
         <div className="mb-5 bg-gray-50 rounded-lg p-3 text-sm">
@@ -489,7 +741,7 @@ function DetailModal({ opp, onClose, onStatutChange, onCommentAdded }) {
         </div>
       )}
 
-      {(opp.points_forts || opp.points_vigilance) && (
+      {(opp.points_forts || (opp.points_vigilance && !complementRepris)) && (
         <div className="grid sm:grid-cols-2 gap-3 mb-5">
           {opp.points_forts && (
             <div className="bg-green-50 rounded-lg p-3 text-sm">
@@ -497,7 +749,7 @@ function DetailModal({ opp, onClose, onStatutChange, onCommentAdded }) {
               <p className="text-gray-700 whitespace-pre-line">{opp.points_forts}</p>
             </div>
           )}
-          {opp.points_vigilance && (
+          {opp.points_vigilance && !complementRepris && (
             <div className="bg-orange-50 rounded-lg p-3 text-sm">
               <p className="text-orange-700 font-bold text-xs uppercase tracking-wide mb-1">Points de vigilance</p>
               <p className="text-gray-700 whitespace-pre-line">{opp.points_vigilance}</p>
@@ -693,7 +945,7 @@ export default function Pipeline() {
   const [commentaires, setCommentaires] = useState([])
   const [tab, setTab] = useState('R1')
   const [view, setView] = useState('liste')
-  const [mapRech, setMapRech] = useState({ R1: true, R2: true, R3: true, R4: true })
+  const [mapRech, setMapRech] = useState({ R1: true, R2: true, R3: true, R4: true, R5: true })
   const [detail, setDetail] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
   const [showRapports, setShowRapports] = useState(false)
@@ -702,7 +954,8 @@ export default function Pipeline() {
   const [fVille, setFVille] = useState('')
   const [fScoreMin, setFScoreMin] = useState('')
   const [fPrixMax, setFPrixMax] = useState('')
-  const [fTri, setFTri] = useState('score')
+  // null = tri par défaut de la recherche affichée, tant que rien n'a été choisi.
+  const [fTri, setFTri] = useState(null)
 
   const load = async () => {
     const [o, r, c] = await Promise.all([
@@ -723,6 +976,11 @@ export default function Pipeline() {
 
   const onStatutChange = (id, statut) =>
     setOpps(prev => prev.map(o => o.id === id ? { ...o, statut } : o))
+
+  const onCandidatChange = (id, candidat_lab) =>
+    setOpps(prev => prev.map(o => o.id === id ? { ...o, candidat_lab } : o))
+
+  const triListe = fTri || TRI_DEFAUT_LISTE[tab] || 'score'
 
   const commentairesParOpp = useMemo(() => {
     const m = new Map()
@@ -747,20 +1005,20 @@ export default function Pipeline() {
       prix: (a, b) => (a.prix || a.loyer_annuel || 0) - (b.prix || b.loyer_annuel || 0),
       date: (a, b) => new Date(b.detecte_le) - new Date(a.detecte_le),
     }
-    return [...list].sort(tri[fTri])
+    return [...list].sort(tri[triListe])
   }
 
   const filtered = useMemo(() =>
     opps ? filterAndSort(opps.filter(o => o.recherche === tab && !o.hors_critere)) : [],
-    [opps, tab, fStatut, fVille, fScoreMin, fPrixMax, fTri])
+    [opps, tab, fStatut, fVille, fScoreMin, fPrixMax, triListe])
 
   const horsCriteres = useMemo(() =>
     opps ? filterAndSort(opps.filter(o => o.recherche === tab && o.hors_critere)) : [],
-    [opps, tab, fStatut, fVille, fScoreMin, fPrixMax, fTri])
+    [opps, tab, fStatut, fVille, fScoreMin, fPrixMax, triListe])
 
   const mapOpps = useMemo(() =>
     opps ? filterAndSort(opps.filter(o => mapRech[o.recherche])) : [],
-    [opps, mapRech, fStatut, fVille, fScoreMin, fPrixMax, fTri])
+    [opps, mapRech, fStatut, fVille, fScoreMin, fPrixMax, triListe])
 
   if (opps === null) return <Spinner />
 
@@ -774,7 +1032,7 @@ export default function Pipeline() {
 
       {/* Bandeau de synthèse */}
       <Card className="p-4 mb-6">
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-center">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4 text-center">
           <div>
             <p className="text-gray-400 text-[11px] uppercase tracking-wide font-bold">Dernier run</p>
             <p className="text-navy font-extrabold text-sm mt-1">
@@ -867,7 +1125,7 @@ export default function Pipeline() {
               options={[{ v: '', l: 'Toutes' }, ...villes.map(v => ({ v, l: v }))]} />
             <Field label="Score min" type="number" min="0" max="100" value={fScoreMin} onChange={e => setFScoreMin(e.target.value)} placeholder="0" className="!mb-0" />
             <Field label="Prix max (€)" type="number" value={fPrixMax} onChange={e => setFPrixMax(e.target.value)} placeholder="∞" className="!mb-0" />
-            <Sel label="Tri" value={fTri} onChange={e => setFTri(e.target.value)} className="!mb-0"
+            <Sel label="Tri" value={triListe} onChange={e => setFTri(e.target.value)} className="!mb-0"
               options={[{ v: 'score', l: 'Score ↓' }, { v: 'prix', l: 'Prix ↑' }, { v: 'date', l: 'Plus récent' }]} />
           </div>
         </Card>
@@ -878,7 +1136,7 @@ export default function Pipeline() {
       ) : view === 'details' ? (
         <>
           <p className="text-gray-400 text-xs mb-3">
-            {RECHERCHES[tab].sub} — {filtered.length + horsCriteres.length} opportunité{filtered.length + horsCriteres.length > 1 ? 's' : ''} ·
+            {RECHERCHES[tab].sub} — {filtered.length + horsCriteres.length} {nomLigne(tab)}{filtered.length + horsCriteres.length > 1 ? 's' : ''} ·
             cliquez sur un en-tête pour trier, sur une ligne pour ouvrir la fiche
           </p>
           <VueDetails opps={[...filtered, ...horsCriteres]} commentairesParOpp={commentairesParOpp} onOpen={setDetail} recherche={tab} />
@@ -887,7 +1145,7 @@ export default function Pipeline() {
         <>
           {/* Sous-titre de section */}
           <p className="text-gray-400 text-xs mb-3">
-            {RECHERCHES[tab].sub} — {filtered.length} opportunité{filtered.length > 1 ? 's' : ''}
+            {RECHERCHES[tab].sub} — {filtered.length} {nomLigne(tab)}{filtered.length > 1 ? 's' : ''}
           </p>
 
           {/* Cartes */}
@@ -920,6 +1178,7 @@ export default function Pipeline() {
       </p>
 
       {detail && <DetailModal opp={detail} onClose={() => setDetail(null)} onStatutChange={onStatutChange}
+        onCandidatChange={onCandidatChange}
         onCommentAdded={c => setCommentaires(prev => [c, ...prev])} />}
       {showRapports && <RapportsModal runs={runs} onClose={() => setShowRapports(false)} />}
     </div>
