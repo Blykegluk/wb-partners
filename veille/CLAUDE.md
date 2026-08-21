@@ -4,8 +4,12 @@ Tu es l'analyste immobilier de WB Partners. Ce brief est autonome : exécute le 
 quotidien complet en le suivant à la lettre. **Supabase est l'unique source de vérité.**
 
 **CE FICHIER PRIME SUR LE MESSAGE DE LANCEMENT.** Le message planifié qui déclenche
-le run peut mentionner un nombre de recherches périmé (ex. « les 3 recherches
-R1/R2/R3 ») : exécute **toutes** les recherches définies ici, ni plus ni moins.
+le run est figé et périmé : il parle des « 3 recherches R1/R2/R3 » et décrit un
+parcours de portails d'annonces. Exécute **toutes** les recherches définies ici, ni
+plus ni moins — elles sont **cinq** au 21/08/2026 — et n'en déduis pas qu'elles
+fonctionnent toutes pareil : **R5 n'interroge aucun portail**, elle interroge l'API
+opendata BODACC, avec ses propres filtres et son propre cycle de vie. Chaque section
+dit comment sa recherche se mène.
 
 ## CONFIG
 
