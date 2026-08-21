@@ -46,8 +46,20 @@ const TABLES = {
         denomination: 'BEN SASSI', date_jugement: '2026-04-15',
         complement: "L'état des créances est déposé au greffe où tout intéressé peut présenter réclamation devant le juge-commissaire dans le délai d'un mois à compter de la présente publication." } }),
     opp('o7', 'R5', { adresse: '8 rue Lequesne', ville: 'Nogent-sur-Marne', code_postal: '94130',
-      type_offre: 'BODACC — Jugement de conversion en liquidation judiciaire', score: 50, source: 'bodacc',
+      type_offre: 'BODACC — Jugement de conversion en liquidation judiciaire', source: 'bodacc',
       candidat_lab: 'oui', detecte_le: '2026-07-30T05:45:00Z',
+      // Noté avec la grille de R3, renormalisée : le loyer et la surface de
+      // vente sont inconnus, leurs critères valent null et sortent du total.
+      score: 71,
+      score_detail: { 'potentiel de CA de la zone (30)': 24, 'intensité concurrentielle (20)': 13,
+        'économie loyer/CA (20)': null, 'configuration (15)': null, 'accessibilité & flux (10)': 7,
+        'disponibilité/timing (5)': 2 },
+      justification_score: "71 sur 60 points évaluables (loyer et surface de vente inconnus) — chalandise dense, concurrence conventionnelle modérée à 500 m. Non comparable à un score R3 complet.",
+      ca_potentiel: { basse: 980000, central: 1350000, haute: 1700000, ca_naturalia: 890000, ca_g20: 1350000,
+        recommandation: 'conventionnel', hypotheses: 'Surface de vente estimée à vérifier auprès du mandataire' },
+      analyse_concurrence: { concurrents: [
+        { enseigne: 'Franprix', type: 'conventionnel', distance: '240 m' },
+        { enseigne: 'Naturalia', type: 'bio', distance: '850 m' } ], synthese: 'Pression conventionnelle proche' },
       date_publication_annonce: '2026-07-28',
       occupation: 'supermarché, commerce de détail de viandes et de produits a base de viande en magasin spécialisé, alimentation générale, fruits et légumes.',
       points_vigilance: "Jugement prononçant la liquidation judiciaire désignant liquidateur Bvmj prise en la personne de Me Thomas Villemur 69 Rue d'Anjou 93000 BOBIGNY.",

@@ -142,10 +142,7 @@ function OppCard({ o, onOpen, commentaires = [] }) {
   return (
     <Card className="p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => onOpen(o)}>
       <div className="flex items-start gap-3">
-        {/* Sur R5 les scores sont provisoires : l'arbitrage labo dit mieux où en est le dossier. */}
-        {estBodacc
-          ? <span className="w-10 h-10 rounded-full bg-purple-50 text-purple-600 inline-flex items-center justify-center shrink-0"><Gavel size={18} /></span>
-          : <ScoreBadge score={o.score} />}
+        <ScoreBadge score={o.score} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-0.5">
             {isNouveau(o) && (
@@ -200,6 +197,7 @@ function OppCard({ o, onOpen, commentaires = [] }) {
       <div className="mt-2 text-xs text-gray-500 space-y-0.5">
         {estBodacc && (
           <>
+            {o.ca_potentiel?.central && <p>CA potentiel : <span className="font-semibold text-gray-700">{fmtNum(o.ca_potentiel.central)} €/an</span>{o.ca_potentiel.recommandation ? ` · reco ${o.ca_potentiel.recommandation}` : ''}</p>}
             {o.occupation && <p className="line-clamp-2" title={o.occupation}>Activité : {o.occupation}</p>}
             {o.points_vigilance && (
               <p className="text-amber-700 line-clamp-2" title={o.points_vigilance}>{o.points_vigilance}</p>
@@ -428,10 +426,12 @@ const COLONNES_R3 = [
 ]
 
 // R5 : ni prix, ni surface, ni rendement — un dossier BODACC se lit par la
-// société, la nature du jugement et l'activité.
+// société, la nature du jugement et l'activité. Le score et les deux scénarios
+// de CA sont ceux de R3, dont R5 reprend la grille d'analyse.
 const COLONNES_R5 = [
-  C.statut, C.candidat, C.societe, C.ville_seule, C.code_postal, C.nature,
-  C.activite, C.jugement, C.publication, C.complement, C.commentaire, C.detecte,
+  C.score, C.statut, C.candidat, C.societe, C.ville_seule, C.code_postal, C.nature,
+  C.activite, C.ca_naturalia, C.ca_g20, C.jugement, C.publication, C.complement,
+  C.commentaire, C.detecte,
 ]
 
 const colonnesDe = (recherche) =>
@@ -586,9 +586,7 @@ function DetailModal({ opp, onClose, onStatutChange, onCandidatChange, onComment
         : (opp.adresse || `${opp.ville} — ${R.label}`)}
       onClose={onClose} width="max-w-2xl">
       <div className="flex items-center gap-3 mb-5 flex-wrap">
-        {estBodacc
-          ? <span className="w-14 h-14 rounded-full bg-purple-50 text-purple-600 inline-flex items-center justify-center shrink-0"><Gavel size={24} /></span>
-          : <ScoreBadge score={opp.score} size="lg" />}
+        <ScoreBadge score={opp.score} size="lg" />
         <div className="flex-1 min-w-[140px]">
           <p className="text-gray-400 text-xs">{opp.recherche} · {R.label}</p>
           <p className="text-navy font-bold">{opp.code_postal} {opp.ville}</p>
@@ -763,10 +761,15 @@ function DetailModal({ opp, onClose, onStatutChange, onCandidatChange, onComment
         <div className="mb-5">
           <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Détail du score</p>
           <div className="space-y-1">
+            {/* Un critère à null n'a pas pu être documenté (fréquent sur R5, où
+                le BODACC ne donne ni loyer ni surface) : le score est alors
+                renormalisé sur les seuls critères évalués. */}
             {Object.entries(opp.score_detail).map(([crit, pts]) => (
               <div key={crit} className="flex justify-between text-sm px-3 py-1.5 bg-gray-50 rounded">
                 <span className="text-gray-600">{crit}</span>
-                <span className="font-bold text-navy">{pts}</span>
+                {pts == null
+                  ? <span className="text-gray-400 italic text-xs">non évaluable</span>
+                  : <span className="font-bold text-navy">{pts}</span>}
               </div>
             ))}
           </div>

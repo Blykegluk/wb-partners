@@ -83,6 +83,123 @@ R1/R2/R3 ») : exécute **toutes** les recherches définies ici, ni plus ni moin
 
 **Scoring R4 (/100)** : rendement brut sur loyer soutenable 30 · réalisme du loyer vs marché local (risque « loyer promoteur ») 20 · dynamique urbaine de la zone (GPE, ZAC, livraisons de logements) 15 · qualité du local (vitrine, configuration, état de livraison, extraction) 15 · covenant & bail si loué / profondeur de la demande locative si vide 10 · liquidité & marge de négociation 10.
 
+## RECHERCHE 5 — Commerces alimentaires en procédure collective (BODACC)
+
+**Objectif** : repérer au tribunal ce que les portails n'affichent pas encore. R5 n'est
+pas une recherche à part : c'est **une autre porte d'entrée vers R3**. R3 part d'une
+annonce immobilière, R5 part d'un jugement — un commerce alimentaire en difficulté dont
+le fonds ou le bail devient reprenable. L'analyse et la notation sont **celles de R3**.
+
+**Source** : API opendata BODACC (jeu `annonces-commerciales`), interrogée **par le relais
+Supabase** comme n'importe quelle URL (`veille_fetch_start` puis `veille_fetch_result` —
+`WebFetch` échouera ici comme ailleurs). Requête testée le 21/08/2026, à url-encoder :
+
+```
+https://bodacc-datadila.opendatasoft.com/api/explore/v2.1/catalog/datasets/annonces-commerciales/records
+  ?where=familleavis in ("collective","ventes")
+     and (startswith(cp,"75") or startswith(cp,"92") or startswith(cp,"93") or startswith(cp,"94"))
+     and dateparution>=date'<date du dernier run - 1 jour>'
+  &limit=100&offset=<0, 100, …>&order_by=dateparution desc
+```
+
+Elle rend `total_count` : 101 annonces sur les quatre parutions du 18 au 21/08/2026, soit
+une trentaine par jour. C'est peu — pagine jusqu'au bout plutôt que de tronquer.
+
+**Filtrer sur `cp`, jamais sur `numerodepartement`.** Ce champ porte le département du
+**tribunal**, pas celui du commerce : mesuré le 21/08/2026, l'annonce A202601592226 vise un
+établissement d'Issy-les-Moulineaux (`cp` 92130) mais porte `numerodepartement = 94`
+(greffe de Créteil). Le premier run BODACC filtrait sur `numerodepartement` et travaillait
+donc sur une zone faussée, dans les deux sens.
+
+**Champs utiles** : `id`, `dateparution`, `parution`, `numeroannonce`, `tribunal`,
+`commercant`, `ville`, `cp`, `registre` (le SIREN), `url_complete` (**le lien à stocker**),
+plus deux blobs JSON à désérialiser : `listepersonnes` (`personne.denomination`,
+`.activite`, `.formeJuridique`, `.adresseSiegeSocial`) et `jugement` (`famille`, `nature`,
+`date`, `complementJugement`).
+
+**Dédoublonnage** : `cle_unique = 'bodacc-<publicationavis>-<parution>-<numeroannonce>'`
+(ex. `bodacc-A-20260159-2162`) — l'annonce, pas la société : une même entreprise revient
+plusieurs fois au fil de sa procédure. Une nouvelle annonce sur un SIREN déjà suivi met à
+jour la ligne existante (`bodacc_detail`, `points_vigilance`, `derniere_annonce_le`,
+re-scoring si l'étape change) plutôt que d'en créer une seconde.
+
+### Retenir ou écarter — trois filtres cumulatifs
+
+1. **Zone** : celle de R3 — Paris intra-muros + 92/93/94, lue sur `cp`.
+2. **Nature du jugement** : ne retenir que ce qui rend un fonds ou un bail reprenable —
+   ouverture de redressement ou de liquidation judiciaire, conversion en liquidation, plan
+   de cession, cession d'actifs ou appel d'offres du mandataire, et toute la famille
+   `ventes` (vente de fonds de commerce). **Écarter les avis de pure formalité** : dépôt de
+   l'état des créances, liste des créances nées après jugement d'ouverture, dépôt du compte
+   rendu de fin de mission, clôture pour insuffisance d'actif — à ce stade le fonds est
+   joué. Le 21/08/2026, **quatre des cinq lignes insérées étaient de cette nature**.
+   Nature inconnue de ces deux listes → la retenir, l'analyser, et **consigner son libellé
+   exact dans `runs.erreurs`** pour que la liste se complète au fil des runs.
+3. **Activité compatible avec 200 m² de surface de vente** — le seuil de R3, et le seul
+   critère de R3 que le BODACC ne permet pas de vérifier directement. Retenir : supermarché,
+   supérette, alimentation générale, commerce de détail alimentaire, produits biologiques,
+   primeur / fruits et légumes de format magasin. **Écarter les formats de boutique qui ne
+   l'atteignent structurellement jamais** : épicerie fine, chocolaterie, confiserie,
+   torréfaction, cave, boulangerie, boucherie de détail seule, restauration, traiteur. Le
+   21/08/2026, BELLA RAGAZZA (épicerie fine, torréfaction) et POP BOULBIL (chocolaterie)
+   sont passées à travers un filtre par simples mots-clés.
+
+### Analyser — la mini-étude d'implantation de R3, à l'identique
+
+L'adresse est connue : les points 1 à 3 de R3 se font sans rien de plus — concurrence
+nommée à 500 m et 1 km, zone de chalandise, **les deux scénarios de CA** (Naturalia et G20)
+avec recommandation bio/conventionnel. Stocke-les dans `analyse_concurrence` et
+`ca_potentiel` **au format exact de R3** : le dashboard y affiche les mêmes colonnes.
+
+Ce que le BODACC ne dit jamais : **ni surface, ni loyer, ni prix**. Cherche la surface de
+vente et l'enseigne réelle à l'adresse (WebSearch, puis la page du commerce ouverte par le
+relais) ; trouvée → renseigne-la et cite sa source dans `hypotheses` ; introuvable →
+`surface_totale` NULL et « surface de vente à vérifier » dans `points_vigilance`. Ne
+l'estime jamais au jugé : c'est le critère qui décide de la rétention.
+
+### Scoring R5 — la grille de R3, renormalisée sur ce qui est documenté
+
+Mêmes six critères, mêmes poids qu'en R3 : potentiel de CA de la zone 30 · intensité
+concurrentielle sur le format recommandé 20 · économie (loyer/CA ou coût d'occupation) 20 ·
+configuration (surface de vente, réserve, livraison, ERP, extraction/froid) 15 ·
+accessibilité & flux 10 · disponibilité/timing 5.
+
+Les trois critères de zone (30 + 20 + 10 = **60 points**) se calculent depuis la seule
+adresse, exactement comme en R3. Les deux qui dépendent du local (économie 20,
+configuration 15) sont souvent inévaluables faute de loyer et de surface.
+
+**Règle** : un critère non documenté vaut `null` dans `score_detail` — jamais 0 (ce serait
+condamner un bon emplacement pour une donnée manquante), jamais une valeur inventée. Le
+`score` est alors la part obtenue **ramenée aux seuls critères évalués** :
+`score = 100 × points obtenus ÷ somme des poids évalués`. `justification_score` dit
+toujours sur quelle part de la grille il porte (ex. « 68 sur 75 points évaluables — loyer
+et surface inconnus »). **Un score assis sur moins de 60 points de grille n'est pas
+comparable à un score R3 : écris-le.**
+
+**Disponibilité/timing (5 pts)** prend ici tout son sens : le `complementJugement` porte en
+général le mandataire et le **délai de dépôt des offres**. Délai encore ouvert → plein
+pot ; délai passé, ou introuvable → 0 à 2, et dis-le.
+
+### candidat_lab — l'arbitrage des associés, pas une sortie de la veille
+
+`candidat_lab` (`oui` / `non` / `a_etudier`) s'édite sur la fiche du dashboard. La veille le
+pose à `a_etudier` sur les nouveautés et **ne l'écrase jamais ensuite** : une valeur posée
+par un associé est définitive, au même titre qu'un `statut` manuel.
+
+### Cycle de vie — pas de contrôle d'expiration par le lien
+
+Une annonce BODACC ne disparaît jamais : son URL est permanente et répondra 200 pour
+toujours. **Les lignes R5 sont donc exclues de l'étape 5bis** — les re-fetcher chaque matin
+ne prouverait rien et coûterait des appels pour rien. Elles quittent `active` autrement :
+une annonce BODACC ultérieure sur le **même SIREN** qui clôt la procédure (clôture pour
+insuffisance d'actif, plan de cession arrêté au profit d'un tiers) → `statut='expiree'` et
+commentaire système citant l'annonce. Sinon elles restent actives et se pilotent à la main.
+
+**Au premier run sous ces règles** : les 5 lignes R5 déjà en base ont été insérées sans
+scoring (toutes à 50) par un run antérieur au présent cadre. Repasse-les dans les trois
+filtres, expire celles qui n'y survivent pas (commentaire système à l'appui), et score les
+autres selon la grille ci-dessus.
+
 ## SOURCES
 
 Classement établi par test réel (29/07/2026), re-testé à travers le relais
@@ -184,13 +301,13 @@ si tu le peux, signale-le dans ta réponse finale, et arrête-toi.
    fraîcheur d'autant : sur dix jours d'absence, une annonce publiée il y a huit
    jours est une nouveauté pour la base, pas une annonce périmée.
 2. Lire `opportunites` (clés, statuts). Dédoublonnage par `cle_unique` (adresse normalisée minuscule sans accents + surface arrondie à 5 m² + prix arrondi à 10 k€ ; fallback titre+surface+prix+source). Upsert : clé existante → mettre à jour `verifie_le` et le prix s'il a changé (ancien prix consigné en commentaire système, `auteur` NULL, ex. "Prix modifié : 590 k → 550 k").
-3. Exécuter les 4 recherches (méthode recommandée : 4 agents en parallèle, puis contre-vérification de chaque lien). **Recopie dans le prompt de chaque agent la règle d'or anti-hallucination ET le mode d'emploi du relais Supabase ci-dessus**, avec la liste des portails ouverts et bloqués : le 29/07/2026, les trois agents ont conclu chacun de leur côté à une panne d'infrastructure sur de simples refus de portails, et le run entier a été abandonné. Un agent rapporte ce qu'il a pu ouvrir et ce qui l'a refusé — il ne décrète pas l'état du réseau, et il n'utilise jamais `WebFetch`, qui échouera.
+3. Exécuter les 5 recherches (méthode recommandée : 5 agents en parallèle, puis contre-vérification de chaque lien). R5 ne cherche pas sur les portails : elle interroge l'API BODACC par le relais, avec ses propres filtres — recopie-lui sa section entière plutôt que les consignes portails. **Recopie dans le prompt de chaque agent la règle d'or anti-hallucination ET le mode d'emploi du relais Supabase ci-dessus**, avec la liste des portails ouverts et bloqués : le 29/07/2026, les trois agents ont conclu chacun de leur côté à une panne d'infrastructure sur de simples refus de portails, et le run entier a été abandonné. Un agent rapporte ce qu'il a pu ouvrir et ce qui l'a refusé — il ne décrète pas l'état du réseau, et il n'utilise jamais `WebFetch`, qui échouera.
 
    **Si un agent n'a pas accès au connecteur Supabase**, il ne peut pas ouvrir de page : qu'il te renvoie alors la liste des URL à ouvrir plutôt que de conclure quoi que ce soit, et fais les appels `veille_fetch_start` / `veille_fetch_result` toi-même avant de lui transmettre le texte. `WebSearch` reste disponible pour *trouver* les annonces — c'est seulement leur ouverture qui passe par le relais.
 4. Scorer chaque nouveauté (/100) : `score_detail` jsonb par critère + `justification_score` (1-2 phrases) + `points_forts` / `points_vigilance`.
 4bis. **Géocoder** chaque nouveauté pour la vue carte : mettre en file les URL `https://api-adresse.data.gouv.fr/search/?q=<adresse>&postcode=<CP>&limit=1` avec `veille_fetch_start`, puis lire `veille_geocode_result` qui rend directement `latitude`/`longitude`. Si l'adresse exacte n'est pas communiquée, géocoder au niveau quartier/ville et mettre `geo_approx=true`. Si rien d'exploitable, laisser lat/lng NULL.
 5. Insérer les nouveautés.
-5bis. **CONTRÔLE D'EXPIRATION — OBLIGATOIRE À CHAQUE RUN** : re-vérifier **TOUS les liens des opportunités `statut='active'`**, à chaque run — quelques dizaines d'URL par le relais, c'est bon marché, et 14 jours d'angle mort ont suffi à laisser passer des liens invalides. Deux contrôles par lien : (a) la page répond-elle encore avec le contenu de l'annonce (un prix ou une surface reconnaissables) ? (b) le lien est-il bien une FICHE et non une page de liste (motifs interdits ci-dessus) ? Un lien de liste détecté = à réparer : retrouver la fiche réelle (référence agence, ville, surface, prix) et remplacer `lien` ; introuvable → `statut='expiree'` + commentaire système expliquant. Ouvrir chaque `lien` via le relais Supabase (jamais WebFetch). Signatures de fiche morte à connaître : BureauxLocaux répond **200 avec redirection vers la liste de la ville** (`/immobilier-d-entreprise/annonces/...`) ; iad France redirige vers `/annonces/vente` — un 200 ne suffit donc pas, contrôler l'URL finale ET la présence du contenu. **Avant d'expirer une fiche morte, chercher sa REPUBLICATION** (constaté 3 fois le 06/08/2026) : les agences retirent et republient sous un nouvel identifiant — ouvrir la page de liste de la ville/catégorie et chercher le même slug ou le même trio ville+surface+prix ; trouvée → remplacer `lien`, mettre à jour `verifie_le` et le prix/loyer s'il a changé (ancien montant consigné en commentaire système auteur NULL) **et re-scorer l'opportunité si le prix ou le loyer a matériellement changé** (ex. Asnières 06/08 : loyer republié 98 004 → 134 004 €/an, le score calculé à l'ancien loyer n'était plus valable). **N'expirer (`statut='expiree'`) QUE sur disparition CONFIRMÉE sans republication trouvée** (404, « annonce expirée / plus disponible / vendu / retiré », redirection vers une liste/accueil sans le bien). Un site qui **bloque** (403, captcha, SSL, timeout) ou un cas ambigu = **on garde `active`** (ne jamais expirer sur simple échec de fetch). Annonces vivantes → `verifie_le=now()` (et prix mis à jour si changé, commentaire système auteur NULL). Ne jamais toucher un `statut` posé à la main (a_visiter, offre_deposee, en_nego, signee, abandonnee). Compter dans `runs.expirees`.
+5bis. **CONTRÔLE D'EXPIRATION — OBLIGATOIRE À CHAQUE RUN** (hors R5, dont les liens BODACC sont permanents : voir sa section) : re-vérifier **TOUS les liens des opportunités `statut='active'`**, à chaque run — quelques dizaines d'URL par le relais, c'est bon marché, et 14 jours d'angle mort ont suffi à laisser passer des liens invalides. Deux contrôles par lien : (a) la page répond-elle encore avec le contenu de l'annonce (un prix ou une surface reconnaissables) ? (b) le lien est-il bien une FICHE et non une page de liste (motifs interdits ci-dessus) ? Un lien de liste détecté = à réparer : retrouver la fiche réelle (référence agence, ville, surface, prix) et remplacer `lien` ; introuvable → `statut='expiree'` + commentaire système expliquant. Ouvrir chaque `lien` via le relais Supabase (jamais WebFetch). Signatures de fiche morte à connaître : BureauxLocaux répond **200 avec redirection vers la liste de la ville** (`/immobilier-d-entreprise/annonces/...`) ; iad France redirige vers `/annonces/vente` — un 200 ne suffit donc pas, contrôler l'URL finale ET la présence du contenu. **Avant d'expirer une fiche morte, chercher sa REPUBLICATION** (constaté 3 fois le 06/08/2026) : les agences retirent et republient sous un nouvel identifiant — ouvrir la page de liste de la ville/catégorie et chercher le même slug ou le même trio ville+surface+prix ; trouvée → remplacer `lien`, mettre à jour `verifie_le` et le prix/loyer s'il a changé (ancien montant consigné en commentaire système auteur NULL) **et re-scorer l'opportunité si le prix ou le loyer a matériellement changé** (ex. Asnières 06/08 : loyer republié 98 004 → 134 004 €/an, le score calculé à l'ancien loyer n'était plus valable). **N'expirer (`statut='expiree'`) QUE sur disparition CONFIRMÉE sans republication trouvée** (404, « annonce expirée / plus disponible / vendu / retiré », redirection vers une liste/accueil sans le bien). Un site qui **bloque** (403, captcha, SSL, timeout) ou un cas ambigu = **on garde `active`** (ne jamais expirer sur simple échec de fetch). Annonces vivantes → `verifie_le=now()` (et prix mis à jour si changé, commentaire système auteur NULL). Ne jamais toucher un `statut` posé à la main (a_visiter, offre_deposee, en_nego, signee, abandonnee). Compter dans `runs.expirees`.
 6. Mettre à jour la ligne `runs` réservée à l'étape 1 (requetes jsonb par recherche, annonces_analysees, nouvelles, expirees, erreurs, rapport) — et remplacer `RUN EN COURS`. Journalise le run **même s'il n'a rien donné** : un run vide documenté vaut mieux qu'un trou dans l'historique.
 7. Ne JAMAIS modifier/supprimer les commentaires des associés, ni écraser un `statut` posé à la main (le pipeline ne touche `statut` que pour `active`→`expiree`).
 8. Réponse finale : résumé en français — nouveautés par recherche avec scores, top du jour, expirées, erreurs, pistes hors base (ex. annonces sans prix affiché à creuser par téléphone).
@@ -200,4 +317,5 @@ si tu le peux, signale-le dans ta réponse finale, et arrête-toi.
 - `score_detail` : `{ "critère (poids)": points, ... }`
 - `analyse_concurrence` (R3) : `{ "concurrents": [ { "enseigne", "type": "bio"|"conventionnel", "distance", "adresse" } ], "synthese": "..." }`
 - `ca_potentiel` (R3) : `{ "basse": €, "central": €, "haute": €, "ca_naturalia": €, "ca_g20": €, "recommandation": "bio"|"conventionnel", "hypotheses": "..." }` — basse/centrale/haute = le format recommandé ; `ca_naturalia` et `ca_g20` = CA central de chaque scénario.
-- `runs.requetes` : `{ "R1": [...], "R2": [...], "R3": [...], "R4": [...] }`
+- `bodacc_detail` (R5) : `{ "siren", "denomination", "activite", "tribunal", "famille", "nature", "date_jugement", "complement", "parution", "numero_annonce", "derniere_annonce_le" }` — recopie fidèle de l'annonce ; `complement` est aussi repris dans `points_vigilance`, où le dashboard le lit.
+- `runs.requetes` : `{ "R1": [...], "R2": [...], "R3": [...], "R4": [...], "R5": [...] }` — pour R5, l'URL d'API interrogée et la fenêtre de parution couverte.
