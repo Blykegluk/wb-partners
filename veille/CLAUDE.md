@@ -100,7 +100,7 @@ Supabase** comme n'importe quelle URL (`veille_fetch_start` puis `veille_fetch_r
 
 ```
 https://bodacc-datadila.opendatasoft.com/api/explore/v2.1/catalog/datasets/annonces-commerciales/records
-  ?where=familleavis in ("collective","ventes")
+  ?where=familleavis in ("collective","vente")
      and (startswith(cp,"75") or startswith(cp,"92") or startswith(cp,"93") or startswith(cp,"94"))
      and dateparution>=date'<date du dernier run - 1 jour>'
   &limit=100&offset=<0, 100, …>&order_by=dateparution desc
@@ -133,7 +133,7 @@ re-scoring si l'étape change) plutôt que d'en créer une seconde.
 2. **Nature du jugement** : ne retenir que ce qui rend un fonds ou un bail reprenable —
    ouverture de redressement ou de liquidation judiciaire, conversion en liquidation, plan
    de cession, cession d'actifs ou appel d'offres du mandataire, et toute la famille
-   `ventes` (vente de fonds de commerce). **Écarter les avis de pure formalité** : dépôt de
+   `vente` (cessions de fonds de commerce — la famille s'appelle `vente` au singulier dans l'API, `"ventes"` ne matche rien). **Écarter les avis de pure formalité** : dépôt de
    l'état des créances, liste des créances nées après jugement d'ouverture, dépôt du compte
    rendu de fin de mission, clôture pour insuffisance d'actif — à ce stade le fonds est
    joué. Le 21/08/2026, **quatre des cinq lignes insérées étaient de cette nature**.
