@@ -942,13 +942,18 @@ function MapView({ opps, onOpen, commentairesParOpp }) {
 
 // ── Page ─────────────────────────────────────────────────────
 
-export default function Pipeline() {
+// `recherches` restreint l'écran à un sous-ensemble de R1-R5 : l'onglet
+// Opportunités monte deux instances — Supermarchés (R3+R5) et Immobilier
+// (R1+R2+R4) — sur les mêmes données, sans en dupliquer la logique.
+export default function Pipeline({ recherches, titre, sousTitre }) {
+  const KEYS = recherches?.length ? recherches : Object.keys(RECHERCHES)
+  const RECH = Object.fromEntries(KEYS.map(k => [k, RECHERCHES[k]]))
   const [opps, setOpps] = useState(null)
   const [runs, setRuns] = useState([])
   const [commentaires, setCommentaires] = useState([])
-  const [tab, setTab] = useState('R1')
+  const [tab, setTab] = useState(KEYS[0])
   const [view, setView] = useState('liste')
-  const [mapRech, setMapRech] = useState({ R1: true, R2: true, R3: true, R4: true, R5: true })
+  const [mapRech, setMapRech] = useState(() => Object.fromEntries(KEYS.map(k => [k, true])))
   const [detail, setDetail] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
   const [showRapports, setShowRapports] = useState(false)
@@ -995,7 +1000,7 @@ export default function Pipeline() {
   }, [commentaires])
 
   const villes = useMemo(() =>
-    [...new Set((opps || []).map(o => o.ville).filter(Boolean))].sort(), [opps])
+    [...new Set((opps || []).filter(o => KEYS.includes(o.recherche)).map(o => o.ville).filter(Boolean))].sort(), [opps])
 
   const filterAndSort = (list) => {
     if (fStatut === 'travail') list = list.filter(o => STATUTS_TRAVAIL.includes(o.statut))
@@ -1020,29 +1025,31 @@ export default function Pipeline() {
     [opps, tab, fStatut, fVille, fScoreMin, fPrixMax, triListe])
 
   const mapOpps = useMemo(() =>
-    opps ? filterAndSort(opps.filter(o => mapRech[o.recherche])) : [],
+    opps ? filterAndSort(opps.filter(o => KEYS.includes(o.recherche) && mapRech[o.recherche])) : [],
     [opps, mapRech, fStatut, fVille, fScoreMin, fPrixMax, triListe])
 
   if (opps === null) return <Spinner />
 
   const lastRun = runs[0] || null
   const actives = (r) => opps.filter(o => o.recherche === r && !o.hors_critere && STATUTS_TRAVAIL.includes(o.statut)).length
-  const nouveaux = opps.filter(o => isNouveau(o) && !o.hors_critere && o.statut === 'active').length
+  const nouveaux = opps.filter(o => KEYS.includes(o.recherche) && isNouveau(o) && !o.hors_critere && o.statut === 'active').length
 
   return (
     <div>
-      <PageHeader title="Veille immobilière" sub="Le pipeline d'acquisition, alimenté chaque matin" />
+      <PageHeader title={titre || "Veille immobilière"} sub={sousTitre || "Le pipeline d'acquisition, alimenté chaque matin"} />
 
       {/* Bandeau de synthèse */}
       <Card className="p-4 mb-6">
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4 text-center">
+        <div className={`grid grid-cols-2 sm:grid-cols-4 gap-4 text-center ${
+          KEYS.length + 2 === 4 ? 'lg:grid-cols-4' : KEYS.length + 2 === 5 ? 'lg:grid-cols-5' : 'lg:grid-cols-7'
+        }`}>
           <div>
             <p className="text-gray-400 text-[11px] uppercase tracking-wide font-bold">Dernier run</p>
             <p className="text-navy font-extrabold text-sm mt-1">
               {lastRun ? new Date(lastRun.date_run).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '—'}
             </p>
           </div>
-          {Object.entries(RECHERCHES).map(([k, R]) => (
+          {Object.entries(RECH).map(([k, R]) => (
             <div key={k}>
               <p className="text-gray-400 text-[11px] uppercase tracking-wide font-bold">{R.label}</p>
               <p className="text-navy font-extrabold text-xl">{actives(k)}</p>
@@ -1092,7 +1099,7 @@ export default function Pipeline() {
       {/* Sélecteur de recherche : onglets (liste, détails) ou cases superposables (carte) */}
       {view !== 'carte' ? (
         <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
-          {Object.entries(RECHERCHES).map(([k, { label, I }]) => (
+          {Object.entries(RECH).map(([k, { label, I }]) => (
             <button key={k} onClick={() => setTab(k)}
               className={`px-3.5 py-2 rounded-lg text-sm font-semibold cursor-pointer whitespace-nowrap inline-flex items-center gap-1.5 transition-colors ${
                 tab === k ? 'bg-navy text-white' : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'
@@ -1104,7 +1111,7 @@ export default function Pipeline() {
       ) : (
         <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1 items-center">
           <span className="text-gray-400 text-xs shrink-0 mr-1">Afficher :</span>
-          {Object.entries(RECHERCHES).map(([k, { label, I }]) => {
+          {Object.entries(RECH).map(([k, { label, I }]) => {
             const on = mapRech[k]
             return (
               <button key={k} onClick={() => setMapRech(m => ({ ...m, [k]: !m[k] }))}
