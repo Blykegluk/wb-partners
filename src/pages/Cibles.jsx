@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
+import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
 import {
   Crosshair, ExternalLink, MessageSquare, Send, ArrowUpDown, ArrowUp, ArrowDown,
-  Building2,
+  Building2, LayoutGrid, Map as MapIcon,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/Auth'
@@ -125,6 +127,87 @@ const COLONNES = [
     ) : <span className="text-gray-300">—</span>,
   },
 ]
+
+// ── Vue carte ────────────────────────────────────────────────
+
+function CartesCibles({ cibles, onOpen }) {
+  const geo = cibles.filter(c => c.latitude && c.longitude)
+  const sansGeo = cibles.length - geo.length
+  const center = geo.length
+    ? [geo.reduce((s, c) => s + Number(c.latitude), 0) / geo.length,
+       geo.reduce((s, c) => s + Number(c.longitude), 0) / geo.length]
+    : [46.6, 2.4]
+
+  return (
+    <>
+      {geo.length === 0 ? (
+        <Empty icon={<MapIcon size={40} />} text="Aucune cible géolocalisée pour cette sélection." />
+      ) : (
+        <Card className="overflow-hidden" style={{ height: 'clamp(420px, calc(100vh - 320px), 760px)', isolation: 'isolate' }}>
+          <MapContainer center={center} zoom={geo.length > 60 ? 9 : 6} style={{ height: '100%', width: '100%' }} scrollWheelZoom>
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            {geo.map(c => {
+              const col = scoreColor(c.score)
+              const a = age(c.dirigeant_naissance)
+              return (
+                <CircleMarker
+                  key={c.id}
+                  center={[Number(c.latitude), Number(c.longitude)]}
+                  radius={c.type === 'reseau_bio' ? 12 : 9}
+                  pathOptions={{
+                    color: col, fillColor: col,
+                    fillOpacity: c.geo_approx ? 0.35 : 0.75,
+                    weight: 2, dashArray: c.geo_approx ? '3 3' : null,
+                  }}
+                >
+                  <Popup>
+                    <div className="text-xs leading-relaxed min-w-[190px]">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="inline-flex items-center justify-center w-7 h-7 rounded-full text-white font-bold shrink-0" style={{ background: col }}>
+                          {c.score ?? '—'}
+                        </span>
+                        <span className="font-bold">{TYPES[c.type] || c.type}</span>
+                      </div>
+                      <p className="font-semibold">{c.denomination}</p>
+                      <p className="text-gray-500">{c.code_postal} {c.ville}</p>
+                      <p className="mt-1">
+                        {c.dirigeant_nom ? <>{c.dirigeant_nom}{a != null ? <strong> · {a} ans</strong> : null}</> : 'Dirigeant à identifier'}
+                      </p>
+                      {c.ca ? <p className="m-0">CA {fmtKE(c.ca)} ({c.annee_finances})</p> : null}
+                      <button
+                        onClick={() => onOpen(c)}
+                        className="mt-2 bg-navy text-white px-2.5 py-1 rounded font-semibold cursor-pointer"
+                      >
+                        Voir la fiche
+                      </button>
+                    </div>
+                  </Popup>
+                </CircleMarker>
+              )
+            })}
+          </MapContainer>
+        </Card>
+      )}
+
+      <div className="flex flex-wrap gap-x-5 gap-y-2 mt-4 text-xs text-gray-500">
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-green-500" /> Score ≥ 75</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-orange-500" /> 55–74</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-red-500" /> &lt; 55</span>
+        <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded-full border-2 border-gray-400" /> Gros point = réseau bio</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full border-2 border-dashed border-gray-400" /> Position approximative (commune)</span>
+      </div>
+
+      {sansGeo > 0 && (
+        <p className="text-gray-400 text-[11px] mt-2">
+          {sansGeo} cible{sansGeo > 1 ? 's' : ''} sans coordonnées — visible{sansGeo > 1 ? 's' : ''} en vue liste uniquement.
+        </p>
+      )}
+    </>
+  )
+}
 
 // ── Fiche détail ─────────────────────────────────────────────
 
@@ -318,6 +401,7 @@ export default function Cibles() {
   const [cibles, setCibles] = useState(null)
   const [commentaires, setCommentaires] = useState([])
   const [detail, setDetail] = useState(null)
+  const [vue, setVue] = useState('liste')
   const [tri, setTri] = useState({ k: 'score', desc: true })
 
   const [fType, setFType] = useState('')
@@ -412,6 +496,22 @@ export default function Cibles() {
         </div>
       </Card>
 
+      {/* Bascule Liste / Carte */}
+      <div className="inline-flex bg-white border border-gray-200 rounded-lg p-0.5 mb-4">
+        <button onClick={() => setVue('liste')}
+          className={`px-3 py-1.5 rounded-md text-sm font-semibold cursor-pointer inline-flex items-center gap-1.5 transition-colors ${
+            vue === 'liste' ? 'bg-navy text-white' : 'text-gray-500 hover:text-gray-700'
+          }`}>
+          <LayoutGrid size={14} /><span className="hidden sm:inline">Liste</span>
+        </button>
+        <button onClick={() => setVue('carte')}
+          className={`px-3 py-1.5 rounded-md text-sm font-semibold cursor-pointer inline-flex items-center gap-1.5 transition-colors ${
+            vue === 'carte' ? 'bg-navy text-white' : 'text-gray-500 hover:text-gray-700'
+          }`}>
+          <MapIcon size={14} /><span className="hidden sm:inline">Carte</span>
+        </button>
+      </div>
+
       {/* Filtres */}
       <Card className="p-4 mb-4">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -430,10 +530,14 @@ export default function Cibles() {
       </Card>
 
       <p className="text-gray-400 text-xs mb-3">
-        {filtrees.length} cible{filtrees.length > 1 ? 's' : ''} · cliquez sur un en-tête pour trier, sur une ligne pour ouvrir la fiche et suivre le contact
+        {filtrees.length} cible{filtrees.length > 1 ? 's' : ''} · {vue === 'carte'
+          ? 'les filtres s\'appliquent à la carte — cliquez sur un point pour ouvrir la fiche'
+          : 'cliquez sur un en-tête pour trier, sur une ligne pour ouvrir la fiche et suivre le contact'}
       </p>
 
-      {filtrees.length === 0 ? (
+      {vue === 'carte' ? (
+        <CartesCibles cibles={filtrees} onOpen={setDetail} />
+      ) : filtrees.length === 0 ? (
         <Empty icon={<Crosshair size={40} />} text="Aucune cible ne correspond aux filtres." />
       ) : (
         <Card className="overflow-x-auto">
