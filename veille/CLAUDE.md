@@ -184,6 +184,30 @@ comparable à un score R3 : écris-le.**
 général le mandataire et le **délai de dépôt des offres**. Délai encore ouvert → plein
 pot ; délai passé, ou introuvable → 0 à 2, et dis-le.
 
+### Remonter à l'appel d'offres du mandataire
+
+Pour chaque dossier retenu dont la procédure est actionnable (ouverture de RJ/LJ,
+conversion, plan de cession), le jugement nomme l'administrateur ou le mandataire :
+cherche son étude (WebSearch pour trouver le site, relais pour l'ouvrir) et regarde si
+un **appel d'offres de reprise** y est publié — c'est lui qui porte le périmètre, la
+date limite de dépôt des offres (DLDO) et le contact. Trouvé → recopie DLDO et lien dans
+`points_forts` et ajuste le critère timing. Introuvable → note dans `points_vigilance`
+« appel d'offres à demander à l'étude <nom> » : c'est un appel téléphonique des associés,
+pas un échec du run. État des lieux mesuré le 21/08/2026 : le portail officiel
+`ventes-actifs.cnajmj.fr` est inaccessible au relais (erreur SSL) et l'agrégateur
+`repreneurs.com` répond 200 mais réserve DLDO et contacts à un abonnement payant
+(19-34 €HT/mois — décision d'achat à laisser aux associés, jamais de contournement).
+
+### Observatoire des prix de cession (bon marché, à chaque run)
+
+La famille `vente` du BODACC publie les cessions de fonds **signées**, avec le prix dans
+l'annonce. Ce n'est pas du sourcing (l'affaire est faite) : c'est la **base de
+comparables** qui manque à toutes les négociations. À chaque run, sur la même fenêtre de
+parution et la même zone que le filtre principal, requête `familleavis="vente"` +
+`search("supermarché")` / `search("alimentation")`, et consigne dans le rapport du run
+(section « Comparables de cession ») : dénomination, ville, activité, prix s'il figure
+dans l'annonce, date. Quelques lignes par semaine — n'en fais jamais des `opportunites`.
+
 ### candidat_lab — l'arbitrage des associés, pas une sortie de la veille
 
 `candidat_lab` (`oui` / `non` / `a_etudier`) s'édite sur la fiche du dashboard. La veille le
