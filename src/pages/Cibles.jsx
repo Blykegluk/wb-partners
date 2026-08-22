@@ -24,7 +24,15 @@ const STATUTS = [
 ]
 const statutCfg = (v) => STATUTS.find(s => s.v === v) || { l: v, cls: 'bg-gray-100 text-gray-500' }
 
-const REGIONS = { 11: 'Île-de-France', 93: 'PACA' }
+const TYPES = {
+  supermarche_dirigeant: 'Supermarché 60+',
+  reseau_bio: 'Réseau bio',
+}
+const REGIONS = {
+  11: 'Île-de-France', 93: 'PACA', 84: 'Auvergne-Rhône-Alpes', 76: 'Occitanie',
+  75: 'Nouvelle-Aquitaine', 53: 'Bretagne', 52: 'Pays de la Loire', 24: 'Centre-Val de Loire',
+  27: 'Bourgogne-Franche-Comté', 44: 'Grand Est', 32: 'Hauts-de-France', 28: 'Normandie', 94: 'Corse',
+}
 const NAFS = { '47.11D': 'Supermarché', '47.11C': 'Supérette' }
 
 // Tranches d'effectif salarié INSEE
@@ -66,7 +74,7 @@ const COLONNES = [
       <>
         <span className="line-clamp-2">{c.denomination}</span>
         <span className="block text-[10px] font-normal text-gray-400">
-          {NAFS[c.naf] || c.naf}{c.via_holding ? ` · via ${c.via_holding}` : ''}
+          {c.type === 'reseau_bio' ? 'Réseau bio' : (NAFS[c.naf] || c.naf)}{c.via_holding ? ` · via ${c.via_holding}` : ''}
         </span>
       </>
     ),
@@ -175,7 +183,7 @@ function CibleModal({ cible, onClose, onStatutChange, onCommentAdded }) {
         <span className="w-14 h-14 rounded-full text-white text-xl font-extrabold inline-flex items-center justify-center shrink-0"
           style={{ background: scoreColor(cible.score) }}>{cible.score ?? '—'}</span>
         <div className="flex-1 min-w-[140px]">
-          <p className="text-gray-400 text-xs">{NAFS[cible.naf] || cible.naf} · {REGIONS[cible.region] || cible.region} · SIREN {cible.siren}</p>
+          <p className="text-gray-400 text-xs">{TYPES[cible.type] || cible.type} · {NAFS[cible.naf] || cible.naf} · {REGIONS[cible.region] || cible.region} · SIREN {cible.siren}</p>
           <p className="text-navy font-bold">{cible.code_postal} {cible.ville}</p>
           {cible.adresse && <p className="text-gray-400 text-xs">{cible.adresse}</p>}
         </div>
@@ -199,6 +207,13 @@ function CibleModal({ cible, onClose, onStatutChange, onCommentAdded }) {
           ))}
         </div>
       </div>
+
+      {cible.notes && (
+        <div className="mb-5 bg-emerald-50/60 border border-emerald-100 rounded-lg p-3 text-sm">
+          <p className="text-emerald-700 font-bold text-xs uppercase tracking-wide mb-1">Note d'étude</p>
+          <p className="m-0 text-gray-700 whitespace-pre-line">{cible.notes}</p>
+        </div>
+      )}
 
       {/* Dirigeant effectif */}
       <div className="mb-5 bg-blue-50/50 border border-blue-100 rounded-lg p-3">
@@ -305,6 +320,7 @@ export default function Cibles() {
   const [detail, setDetail] = useState(null)
   const [tri, setTri] = useState({ k: 'score', desc: true })
 
+  const [fType, setFType] = useState('')
   const [fRegion, setFRegion] = useState('')
   const [fNaf, setFNaf] = useState('')
   const [fStatut, setFStatut] = useState('actives')
@@ -340,6 +356,7 @@ export default function Cibles() {
     let list = cibles
     if (fStatut === 'actives') list = list.filter(c => c.statut !== 'ecartee')
     else if (fStatut !== 'toutes') list = list.filter(c => c.statut === fStatut)
+    if (fType) list = list.filter(c => c.type === fType)
     if (fRegion) list = list.filter(c => c.region === fRegion)
     if (fNaf) list = list.filter(c => c.naf === fNaf)
     if (fVille) list = list.filter(c => (c.ville || '').toLowerCase().includes(fVille.toLowerCase()) || (c.code_postal || '').startsWith(fVille))
@@ -353,7 +370,7 @@ export default function Cibles() {
       const cmp = col.num ? va - vb : String(va).localeCompare(String(vb), 'fr')
       return tri.desc ? -cmp : cmp
     })
-  }, [cibles, fRegion, fNaf, fStatut, fVille, fCaMin, tri, commentairesParCible])
+  }, [cibles, fType, fRegion, fNaf, fStatut, fVille, fCaMin, tri, commentairesParCible])
 
   if (cibles === null) return <Spinner />
 
@@ -362,7 +379,7 @@ export default function Cibles() {
 
   return (
     <div>
-      <PageHeader title="Cibles de reprise" sub="Supermarchés indépendants à dirigeant de 60 ans et plus — sourcing propriétaire, à démarcher" />
+      <PageHeader title="Cibles de reprise" sub="Sourcing propriétaire, à démarcher : supermarchés indépendants à dirigeant de 60 ans et plus, et réseaux de magasins bio" />
 
       <Card className="p-4 mb-6">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-center">
@@ -397,9 +414,12 @@ export default function Cibles() {
 
       {/* Filtres */}
       <Card className="p-4 mb-4">
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <Sel label="Famille" value={fType} onChange={e => setFType(e.target.value)} className="!mb-0"
+            options={[{ v: '', l: 'Toutes' }, ...Object.entries(TYPES).map(([v, l]) => ({ v, l }))]} />
           <Sel label="Région" value={fRegion} onChange={e => setFRegion(e.target.value)} className="!mb-0"
-            options={[{ v: '', l: 'Toutes' }, { v: '11', l: 'Île-de-France' }, { v: '93', l: 'PACA' }]} />
+            options={[{ v: '', l: 'Toutes' }, ...[...new Set((cibles || []).map(c => c.region).filter(Boolean))].sort()
+              .map(r => ({ v: r, l: REGIONS[r] || r }))]} />
           <Sel label="Format" value={fNaf} onChange={e => setFNaf(e.target.value)} className="!mb-0"
             options={[{ v: '', l: 'Tous' }, { v: '47.11D', l: 'Supermarchés' }, { v: '47.11C', l: 'Supérettes' }]} />
           <Sel label="Statut" value={fStatut} onChange={e => setFStatut(e.target.value)} className="!mb-0"
