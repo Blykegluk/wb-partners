@@ -43,12 +43,26 @@ const EFFECTIFS = {
   '12': '20-49', '21': '50-99', '22': '100-199', 'NN': 'n.c.',
 }
 
-// Un même dirigeant à la tête de plusieurs sociétés, c'est le plus souvent un
-// groupe en activité — la relève y est en place ailleurs dans le groupe, donc
-// invisible dans les organes de direction de chaque société prise isolément.
-// Le signalement est indicatif : certains de ces groupes se transmettent quand
-// même, l'arbitrage reste aux associés.
+// Un même dirigeant à la tête de plusieurs sociétés se lit dans les deux sens
+// selon la famille, d'où deux libellés :
+//   — supermarché 60+ : c'est le plus souvent un groupe en activité, dont la
+//     relève est en place ailleurs et donc invisible dans les organes de
+//     direction de chaque société prise isolément. Signal négatif, indicatif :
+//     certains se transmettent quand même, l'arbitrage reste aux associés.
+//   — réseau bio : un maillage constitué est justement la cible du build-up.
+//     Signal positif.
 const SEUIL_GROUPE = 3
+const groupeCfg = (c, n) => c.type === 'reseau_bio'
+  ? { court: `Réseau · ${n} magasins`, cls: 'bg-emerald-50 text-emerald-700',
+      blocCls: 'bg-emerald-50/60 border-emerald-100', titreCls: 'text-emerald-700',
+      titre: `${n} magasins exploités par ${c.dirigeant_nom}`,
+      texte: "Maillage constitué, repris d'un bloc : c'est le profil de croissance externe "
+        + 'recherché — un seul interlocuteur, une seule négociation.' }
+  : { court: `Groupe · ${n} sociétés`, cls: 'bg-purple-50 text-purple-700',
+      blocCls: 'bg-purple-50/60 border-purple-100', titreCls: 'text-purple-700',
+      titre: `${n} sociétés dirigées par ${c.dirigeant_nom}`,
+      texte: "Un seul interlocuteur pour l'ensemble — mais souvent le signe d'un groupe en activité, "
+        + 'dont la relève est en place ailleurs que dans les organes de direction de cette société.' }
 
 const fmtNum = (n) => n == null ? '—' : new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(n)
 const fmtKE = (n) => n == null ? null : `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(Math.round(n / 1000))} k€`
@@ -86,8 +100,8 @@ const COLONNES = [
           {c.type === 'reseau_bio' ? 'Réseau bio' : (NAFS[c.naf] || c.naf)}{c.via_holding ? ` · via ${c.via_holding}` : ''}
         </span>
         {ctx?.groupe?.length >= SEUIL_GROUPE && (
-          <span className="inline-block mt-1 bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-bold">
-            Groupe · {ctx.groupe.length} sociétés
+          <span className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${groupeCfg(c, ctx.groupe.length).cls}`}>
+            {groupeCfg(c, ctx.groupe.length).court}
           </span>
         )}
       </>
@@ -339,14 +353,11 @@ function CibleModal({ cible, groupe, onClose, onStatutChange, onCommentAdded }) 
       </div>
 
       {groupe && groupe.length > 1 && (
-        <div className="mb-5 bg-purple-50/60 border border-purple-100 rounded-lg p-3">
-          <p className="text-xs font-bold text-purple-700 uppercase tracking-wide mb-1">
-            {groupe.length} sociétés dirigées par {cible.dirigeant_nom}
+        <div className={`mb-5 border rounded-lg p-3 ${groupeCfg(cible, groupe.length).blocCls}`}>
+          <p className={`text-xs font-bold uppercase tracking-wide mb-1 ${groupeCfg(cible, groupe.length).titreCls}`}>
+            {groupeCfg(cible, groupe.length).titre}
           </p>
-          <p className="m-0 mb-2 text-xs text-gray-500">
-            Un seul interlocuteur pour l'ensemble — mais souvent le signe d'un groupe en activité,
-            dont la relève est en place ailleurs que dans les organes de direction de cette société.
-          </p>
+          <p className="m-0 mb-2 text-xs text-gray-500">{groupeCfg(cible, groupe.length).texte}</p>
           <div className="space-y-1">
             {groupe.map(g => (
               <div key={g.id} className={`flex justify-between gap-3 text-xs rounded px-2 py-1 ${g.id === cible.id ? 'bg-white font-semibold' : 'bg-white/60'}`}>
@@ -380,7 +391,9 @@ function CibleModal({ cible, groupe, onClose, onStatutChange, onCommentAdded }) 
       {/* Détail du score */}
       {cible.score_detail && (
         <div className="mb-5">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Score de transmissibilité</p>
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+            {cible.type === 'reseau_bio' ? "Score d'acquisibilité" : 'Score de transmissibilité'}
+          </p>
           <div className="space-y-1">
             {Object.entries(cible.score_detail).map(([crit, pts]) => (
               <div key={crit} className="flex justify-between text-sm px-3 py-1.5 bg-gray-50 rounded">
@@ -631,7 +644,8 @@ export default function Cibles() {
 
       <p className="text-gray-300 text-[11px] text-center mt-10 max-w-2xl mx-auto">
         Données issues des registres publics (annuaire-entreprises.data.gouv.fr), collectées le 21/08/2026.
-        Le score mesure une probabilité de transmissibilité, pas une valeur — chaque dossier se qualifie par un contact direct.
+        Le score mesure une probabilité — de transmissibilité pour un supermarché, d'acquisibilité pour un réseau bio —
+        et jamais une valeur : chaque dossier se qualifie par un contact direct.
         Ne constitue pas un conseil juridique, fiscal ou en investissement.
       </p>
 

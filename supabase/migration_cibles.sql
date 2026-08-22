@@ -118,3 +118,22 @@ create policy "cibles_com_delete_own" on public.cibles_commentaires
 --     'multi-établissements (5)', calc.p_multi),
 --   lien = 'https://annuaire-entreprises.data.gouv.fr/entreprise/' || c.siren
 -- from calc where c.id = calc.id;
+
+-- ── Score d'acquisibilité /100 — famille « reseau_bio » ──────────────
+-- La transmissibilité ne dit rien d'un réseau bio : ce qu'on y cherche, c'est
+-- un maillage repris d'un bloc. Barème distinct, appliqué pour la première
+-- fois au réseau PROVISENS le 22/08/2026 :
+--
+--   taille atteignable — 3 à 10 magasins (25)   au-delà, hors de portée ;
+--                                               en deçà, ce n'est pas un réseau
+--   cohérence géographique du maillage (20)     logistique et zone de chalandise communes
+--   indépendance capitalistique (15)            0 pour une coopérative ou un
+--                                               adhérent lié à sa centrale
+--   absence de relève identifiée (15)           déclencheur de cession
+--   rentabilité documentée (15)                 résultats publiés positifs
+--   chiffre d'affaires publié (10)              0 si comptes confidentiels
+--
+-- Les 15 réseaux versés par l'étude d'août 2026 portent encore des scores
+-- d'appréciation antérieurs à ce barème (38 à 75) : ils sont à recalculer sur
+-- cette grille à la prochaine passe de collecte bio, sans quoi les deux séries
+-- ne se comparent pas.
