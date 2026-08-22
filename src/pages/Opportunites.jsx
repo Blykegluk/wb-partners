@@ -3,6 +3,7 @@ import { ShoppingCart, Building2 } from 'lucide-react'
 import Pipeline from './Pipeline'
 import Simulateur from './Simulateur'
 import Cibles from './Cibles'
+import EtudesDeveloppement from './EtudesDeveloppement'
 
 // Deux univers, deux métiers : trouver un SUPERMARCHÉ à reprendre ou à
 // implanter (R3 annonces, R5 BODACC, cibles à démarcher), et investir dans
@@ -16,6 +17,7 @@ const SECTIONS = {
     tabs: [
       { key: 'veille', label: 'Veille — annonces & BODACC' },
       { key: 'cibles', label: 'Cibles de reprise' },
+      { key: 'etudes', label: 'Études développement' },
     ],
   },
   immobilier: {
@@ -73,6 +75,7 @@ export default function Opportunites({ navigate, navState, setNavState }) {
         sousTitre="Locaux à reprendre ou à implanter : annonces (R3) et procédures collectives BODACC (R5)" />
     ),
     'supermarches:cibles': () => <Cibles navigate={navigate} />,
+    'supermarches:etudes': () => <EtudesDeveloppement navigate={navigate} />,
     'immobilier:veille': () => (
       <Pipeline navigate={navigate} recherches={['R1', 'R2', 'R4']}
         titre="Veille immobilière"

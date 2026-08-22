@@ -1,0 +1,540 @@
+<title>Build-up Bio</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Archivo:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
+<style>
+  :root {
+    --paper: #fafaf7;
+    --paper-2: #f1f2ec;
+    --ink: #16241c;
+    --ink-2: #4c584f;
+    --ink-3: #79847b;
+    --line: #dde1d8;
+    --accent: #1e7a46;
+    --accent-soft: #e3efe6;
+    --gold: #8a6d1f;
+    --gold-soft: #f3ecd9;
+    --alert: #a33b2e;
+    --alert-soft: #f6e6e2;
+    --s1: #2a78d6;          /* séries : groupements / rang 2 */
+    --s2: #eb6834;          /* séries : chaînes intégrées / rang 1 */
+    --bar: #1e7a46;         /* magnitude, teinte unique */
+    --card: #ffffff;
+    --shadow: 0 1px 2px rgba(22,36,28,.06), 0 8px 28px rgba(22,36,28,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #131a15;
+      --paper-2: #1a231d;
+      --ink: #eef2ec;
+      --ink-2: #b4bfb4;
+      --ink-3: #7f8b80;
+      --line: #2b352d;
+      --accent: #4cae77;
+      --accent-soft: #1d2f24;
+      --gold: #c8a94e;
+      --gold-soft: #2b2716;
+      --alert: #d8705f;
+      --alert-soft: #33201c;
+      --s1: #3987e5;
+      --s2: #d95926;
+      --bar: #3d9e68;
+      --card: #1a231d;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 28px rgba(0,0,0,.25);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #131a15;
+    --paper-2: #1a231d;
+    --ink: #eef2ec;
+    --ink-2: #b4bfb4;
+    --ink-3: #7f8b80;
+    --line: #2b352d;
+    --accent: #4cae77;
+    --accent-soft: #1d2f24;
+    --gold: #c8a94e;
+    --gold-soft: #2b2716;
+    --alert: #d8705f;
+    --alert-soft: #33201c;
+    --s1: #3987e5;
+    --s2: #d95926;
+    --bar: #3d9e68;
+    --card: #1a231d;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 28px rgba(0,0,0,.25);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 16px/1.65 "Archivo", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 1060px; margin: 0 auto; padding: 0 24px 96px; }
+  h1, h2, h3 { font-family: "Spectral", Georgia, serif; text-wrap: balance; line-height: 1.15; }
+  h1 { font-size: clamp(2.3rem, 5vw, 3.6rem); font-weight: 600; margin: .3em 0 .2em; }
+  h2 { font-size: 1.7rem; font-weight: 600; margin: 0 0 .5em; }
+  h3 { font-size: 1.15rem; font-weight: 600; margin: 0 0 .4em; }
+  p { max-width: 68ch; }
+  a { color: var(--accent); }
+  section { margin-top: 72px; }
+
+  .eyebrow {
+    font-size: .72rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 10px;
+  }
+  .lede { font-size: 1.14rem; color: var(--ink-2); max-width: 62ch; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ── entête ── */
+  header.hero { padding: 72px 0 8px; border-bottom: 1px solid var(--line); }
+  .hero-kicker { display: flex; gap: 10px; align-items: center; color: var(--ink-3); font-size: .8rem; letter-spacing: .1em; text-transform: uppercase; font-weight: 600; }
+  .hero-kicker::before { content: ""; width: 34px; height: 2px; background: var(--accent); }
+  .these {
+    margin-top: 26px; border-left: 3px solid var(--accent);
+    padding: 4px 0 4px 20px; font-family: "Spectral", Georgia, serif;
+    font-size: 1.25rem; line-height: 1.5; max-width: 58ch; color: var(--ink);
+  }
+  .these strong { color: var(--accent); font-weight: 700; }
+
+  /* ── tuiles KPI ── */
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-top: 28px; }
+  .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 18px 20px; box-shadow: var(--shadow); }
+  .kpi b { display: block; font-family: "Spectral", Georgia, serif; font-size: 2rem; font-weight: 600; color: var(--ink); }
+  .kpi b .u { font-size: 1.05rem; color: var(--ink-2); font-weight: 500; }
+  .kpi span { font-size: .82rem; color: var(--ink-2); }
+  .kpi .up { color: var(--accent); font-weight: 700; }
+
+  /* ── frise Marcel & Fils ── */
+  .timeline { list-style: none; margin: 28px 0 0; padding: 0; position: relative; }
+  .timeline::before { content: ""; position: absolute; left: 7px; top: 8px; bottom: 8px; width: 2px; background: var(--line); }
+  .timeline li { position: relative; padding: 0 0 22px 34px; max-width: 72ch; }
+  .timeline li::before {
+    content: ""; position: absolute; left: 0; top: 6px; width: 12px; height: 12px;
+    border-radius: 50%; background: var(--paper); border: 3px solid var(--accent);
+  }
+  .timeline li.acq::before { background: var(--accent); }
+  .timeline .tag { font-size: .72rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
+  .timeline .tag .acqtag { color: var(--accent); }
+  .timeline b { font-family: "Spectral", Georgia, serif; font-size: 1.05rem; }
+  .timeline p { margin: .2em 0 0; color: var(--ink-2); font-size: .93rem; }
+
+  /* ── graphiques barres ── */
+  .fig { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 20px 22px 14px; box-shadow: var(--shadow); margin-top: 22px; overflow-x: auto; }
+  .fig h3 { font-family: "Archivo", sans-serif; font-size: .95rem; font-weight: 600; }
+  .fig .sub { font-size: .8rem; color: var(--ink-3); margin: -2px 0 14px; }
+  .hbar { display: grid; grid-template-columns: 150px 1fr; gap: 7px 12px; align-items: center; min-width: 480px; }
+  .hbar .lbl { font-size: .84rem; color: var(--ink-2); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hbar .track { display: flex; align-items: center; gap: 8px; }
+  .hbar .b { height: 16px; border-radius: 0 4px 4px 0; background: var(--bar); transition: opacity .15s; }
+  .hbar .b.s1 { background: var(--s1); }
+  .hbar .b.s2 { background: var(--s2); }
+  .hbar .v { font-size: .8rem; font-weight: 600; color: var(--ink-2); white-space: nowrap; }
+  .hbar .track:hover .b { opacity: .75; }
+  .legend { display: flex; gap: 18px; margin: 14px 0 2px; font-size: .8rem; color: var(--ink-2); flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+
+  /* ── pyramide ── */
+  .pyramide { display: grid; gap: 14px; margin-top: 26px; }
+  .rang { background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 20px 22px; display: grid; grid-template-columns: 64px 1fr; gap: 18px; }
+  .rang .n { font-family: "Spectral", Georgia, serif; font-size: 2rem; font-weight: 700; color: var(--accent); border-right: 1px solid var(--line); }
+  .rang h3 { margin-bottom: .2em; }
+  .rang .meta { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: .82rem; color: var(--ink-2); margin: 8px 0 6px; }
+  .rang .meta b { color: var(--ink); }
+  .rang p { font-size: .93rem; color: var(--ink-2); margin: .3em 0 0; }
+  .pill { display: inline-block; background: var(--accent-soft); color: var(--accent); font-size: .72rem; font-weight: 700; padding: 2px 9px; border-radius: 99px; letter-spacing: .04em; }
+  .pill.gold { background: var(--gold-soft); color: var(--gold); }
+  .pill.alert { background: var(--alert-soft); color: var(--alert); }
+
+  /* ── fiches cibles ── */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 24px; }
+  .cible { background: var(--card); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; }
+  .cible header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .cible h3 { font-size: 1.06rem; margin: 0; }
+  .cible .zone { font-size: .78rem; color: var(--ink-3); }
+  .cible dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; margin: 4px 0; font-size: .85rem; }
+  .cible dt { color: var(--ink-3); }
+  .cible dd { margin: 0; color: var(--ink); font-weight: 500; text-align: right; }
+  .cible .lecture { font-size: .87rem; color: var(--ink-2); border-top: 1px dashed var(--line); padding-top: 9px; margin-top: auto; }
+
+  /* ── tableau ── */
+  .twrap { overflow-x: auto; margin-top: 20px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; min-width: 720px; font-size: .87rem; }
+  th { text-align: left; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  td.r, th.r { text-align: right; }
+  tr:hover td { background: var(--paper-2); }
+
+  /* ── encadrés ── */
+  .note { background: var(--accent-soft); border-radius: 10px; padding: 16px 20px; font-size: .92rem; color: var(--ink); max-width: none; margin-top: 20px; }
+  .note.gold { background: var(--gold-soft); }
+  .note.alert { background: var(--alert-soft); }
+  .note b:first-child { display: block; margin-bottom: 2px; }
+
+  /* ── plan 30/60/90 ── */
+  .plan { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 24px; }
+  .phase { background: var(--card); border: 1px solid var(--line); border-top: 3px solid var(--accent); border-radius: 10px; padding: 18px 20px; box-shadow: var(--shadow); }
+  .phase .j { font-size: .72rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+  .phase ul { margin: 10px 0 0; padding-left: 18px; font-size: .9rem; color: var(--ink-2); }
+  .phase li { margin-bottom: 7px; }
+  .phase li b { color: var(--ink); }
+
+  .sources { font-size: .82rem; color: var(--ink-3); }
+  .sources li { margin-bottom: 4px; }
+  footer { margin-top: 80px; border-top: 1px solid var(--line); padding-top: 18px; font-size: .78rem; color: var(--ink-3); max-width: none; }
+  @media (max-width: 640px) {
+    .rang { grid-template-columns: 1fr; }
+    .rang .n { border-right: 0; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+    .hbar { grid-template-columns: 110px 1fr; }
+  }
+</style>
+
+<main>
+<header class="hero">
+  <div class="hero-kicker">WB Partners · Étude stratégique · 22 août 2026</div>
+  <h1>Bâtir un réseau bio par acquisitions</h1>
+  <p class="lede">Ce que Marcel&nbsp;&amp;&nbsp;Fils a fait à 160&nbsp;M€, appliqué à votre échelle : le marché, le
+  mode d'emploi, les cibles réelles — chiffrées, nommées, versées dans l'onglet Cibles du dashboard.</p>
+  <p class="these">Le bio spécialisé sort de trois ans de purge et repart (<strong>+8,5&nbsp;%</strong> en 2025). Le parc
+  reste ultra-fragmenté&nbsp;: 5&nbsp;756 sociétés pour 6&nbsp;431 magasins. Celui qui consolide vite, comme
+  Marcel&nbsp;&amp;&nbsp;Fils l'a fait, achète des réseaux entiers au prix d'un fonds — <strong>et cette fenêtre se referme
+  à mesure que le rebond se confirme.</strong></p>
+</header>
+
+<section>
+  <p class="eyebrow">01 · Le marché a tourné</p>
+  <h2>Acheter dans un marché qui repart, pas dans un marché qui meurt</h2>
+  <p>Après trois années de fermetures (2022-2024), les chiffres 2025 sont sans ambiguïté : le
+  marché bio français retrouve la croissance, et ce sont précisément <b>les magasins spécialisés</b> —
+  votre terrain — qui la tirent.</p>
+  <div class="kpis">
+    <div class="kpi"><b class="num">12,6 <span class="u">Md€</span></b><span>marché bio français 2025 · <span class="up">+3,6&nbsp;%</span> vs 2024</span></div>
+    <div class="kpi"><b class="num up">+8,5 <span class="u">%</span></b><span>croissance 2025 des magasins spécialisés — la meilleure de tous les circuits</span></div>
+    <div class="kpi"><b class="num">÷ 2</b><span>fermetures de magasins bio au T1 2025 vs T1 2024 (22 contre 44)</span></div>
+    <div class="kpi"><b class="num">30 <span class="u">%</span></b><span>part des spécialisés dans la distribution bio — ⅔ de la croissance du marché</span></div>
+  </div>
+  <div class="note gold"><b>Ce que ça change pour un acheteur.</b> La purge a mis les vendeurs à prix
+  raisonnable ; le rebond justifie d'acheter. Mais chaque trimestre de croissance confirmée renchérit
+  les cibles — L'Eau&nbsp;Vive et NaturéO, passées par la restructuration, confirment déjà leur redressement.
+  La stratégie n'est pas « attendre de meilleures affaires » : c'est <b>acheter pendant que les prix
+  reflètent encore la crise d'hier.</b></div>
+</section>
+
+<section>
+  <p class="eyebrow">02 · Le cas Marcel &amp; Fils</p>
+  <h2>La preuve que le build-up fonctionne — documentée</h2>
+  <p>Vous l'avez dit : Marcel&nbsp;&amp;&nbsp;Fils a grossi principalement par acquisitions. La presse
+  professionnelle documente la séquence — et elle est récente, régionale, et réplicable un cran en dessous.</p>
+  <ul class="timeline">
+    <li><span class="tag">2008 · Venelles (13)</span><br><b>Création</b>
+      <p>Enseigne familiale indépendante, développement organique sur l'arc Sud (13, 83, 84, 04, 06).</p></li>
+    <li class="acq"><span class="tag"><span class="acqtag">Acquisition</span></span><br><b>La Vie Saine — 16 magasins</b>
+      <p>Rachat du réseau bourguignon (Dijon) : premier saut de taille hors de la zone d'origine. La société
+      dijonnaise apparaît toujours dans nos données registre (CA 24,4&nbsp;M€ en 2024, désormais classée ETI — filiale du groupe).</p></li>
+    <li class="acq"><span class="tag"><span class="acqtag">Acquisition</span></span><br><b>Onalavie — 3 magasins</b>
+      <p>Petit réseau de Haute-Savoie : la démonstration que même un trio de magasins vaut le déplacement
+      quand il est bien situé.</p></li>
+    <li class="acq"><span class="tag"><span class="acqtag">Acquisition · octobre 2025</span></span><br><b>Bio&amp;Co — 7 magasins</b>
+      <p>Rachat du concurrent direct de Marseille/Aix : consolidation « sur ses terres », qui verrouille la
+      zone d'origine.</p></li>
+    <li><span class="tag">Aujourd'hui</span><br><b class="num">67 magasins · 160 M€ de CA consolidé (+6 %)</b>
+      <p>Objectif annoncé : ~100 magasins et 200-220&nbsp;M€. Vous évoquez 250&nbsp;M€ à date — l'ordre de grandeur
+      est en tout cas celui-là : <b>un multiplicateur ×4 en quelques années, dont l'essentiel par acquisitions
+      de réseaux de 3 à 16 magasins.</b></p></li>
+  </ul>
+  <div class="note"><b>Ce qu'il faut copier — à votre échelle.</b> Marcel&nbsp;&amp;&nbsp;Fils n'a pas acheté un géant :
+  il a empilé des réseaux de 3, 7 et 16 magasins, en commençant par sa région. La brique élémentaire de son
+  build-up — le réseau régional de 3 à 15 magasins — est exactement la taille qui vous est accessible.
+  Et un point d'appui que Marcel n'avait pas en 2008 : <b>vous exploitez déjà deux magasins bio</b> (vos deux
+  Naturalia parisiens), donc la crédibilité opérateur face à un vendeur et face à une banque.</div>
+</section>
+
+<section>
+  <p class="eyebrow">03 · Pourquoi c'est possible</p>
+  <h2>Un secteur en miettes : 5&nbsp;756 sociétés pour 6&nbsp;431 magasins</h2>
+  <p>Nous avons cartographié l'intégralité de l'annuaire officiel Agence Bio (magasins spécialisés
+  certifiés, dédoublonnés par SIRET) et croisé chaque exploitant avec le registre des entreprises.
+  Le constat structurel :</p>
+
+  <div class="fig">
+    <h3>Qui possède les magasins bio français ?</h3>
+    <p class="sub">Nombre de magasins spécialisés certifiés par société exploitante (SIREN) — données Agence Bio × registre, août 2026</p>
+    <div class="hbar" role="img" aria-label="Répartition des sociétés par nombre de magasins : 5672 sociétés mono-magasin, 63 sociétés à 2 magasins, 21 sociétés à 3 magasins ou plus">
+      <span class="lbl">1 magasin</span><span class="track"><span class="b" style="width:100%"></span><span class="v num">5 672 sociétés</span></span>
+      <span class="lbl">2 magasins</span><span class="track"><span class="b" style="width:1.5%; min-width:6px"></span><span class="v num">63</span></span>
+      <span class="lbl">3 magasins et +</span><span class="track"><span class="b" style="width:0.8%; min-width:4px"></span><span class="v num">21</span></span>
+    </div>
+    <p class="sub" style="margin-top:12px">Lecture : la quasi-totalité du parc est mono-magasin. Les vrais « réseaux » cessibles d'un bloc
+    se comptent sur les doigts — c'est ce qui les rend précieux, et c'est pour cela que Marcel &amp; Fils les achète.</p>
+  </div>
+
+  <div class="fig">
+    <h3>Les enseignes : deux mondes qui ne se vendent pas pareil</h3>
+    <p class="sub">Magasins spécialisés certifiés par enseigne — un groupement s'achète société par société, une chaîne intégrée d'un bloc (ou pas du tout)</p>
+    <div class="legend"><span><i style="background:var(--s1)"></i>Groupement / franchise — des dizaines de propriétaires indépendants</span><span><i style="background:var(--s2)"></i>Chaîne intégrée — un seul propriétaire</span></div>
+    <div class="hbar" role="img" aria-label="Biocoop 562 magasins en groupement, La Vie Claire 434 majoritairement franchisés, Naturalia 175 intégrés, Bio c'Bon et So.Bio environ 150 intégrés Carrefour, Biomonde 104 en groupement, NaturéO 55, Marcel et Fils 45 intégrés, Les Comptoirs de la Bio 23">
+      <span class="lbl">Biocoop</span><span class="track"><span class="b s1" style="width:100%"></span><span class="v num">562</span></span>
+      <span class="lbl">La Vie Claire</span><span class="track"><span class="b s1" style="width:77%"></span><span class="v num">434</span></span>
+      <span class="lbl">Naturalia</span><span class="track"><span class="b s2" style="width:31%"></span><span class="v num">175 · 1 SIREN</span></span>
+      <span class="lbl">Bio c' Bon + So.Bio</span><span class="track"><span class="b s2" style="width:27%"></span><span class="v num">~150 · Carrefour</span></span>
+      <span class="lbl">Biomonde</span><span class="track"><span class="b s1" style="width:18.5%"></span><span class="v num">104</span></span>
+      <span class="lbl">NaturéO</span><span class="track"><span class="b s1" style="width:9.8%"></span><span class="v num">55</span></span>
+      <span class="lbl">Marcel &amp; Fils</span><span class="track"><span class="b s2" style="width:8%"></span><span class="v num">45+ · le consolidateur</span></span>
+      <span class="lbl">Comptoirs de la Bio</span><span class="track"><span class="b s1" style="width:4.1%"></span><span class="v num">23</span></span>
+    </div>
+    <p class="sub" style="margin-top:12px">Lecture : les groupements (bleu) sont un <b>vivier d'acquisitions unitaires</b> — chaque magasin
+    Biocoop ou La Vie Claire appartient à un indépendant qui vieillit, vend, ou dépose le bilan. Les chaînes
+    intégrées (orange) sont soit inaccessibles (Carrefour, Monoprix), soit le modèle à imiter (Marcel &amp; Fils).</p>
+  </div>
+
+  <div class="fig">
+    <h3>Où sont les magasins</h3>
+    <p class="sub">Top 10 des départements par nombre de magasins bio spécialisés certifiés</p>
+    <div class="hbar" role="img" aria-label="Hauts-de-Seine 299, Paris 280, Gironde 269, Rhône 202, Bouches-du-Rhône 193, Loire-Atlantique 162, Haute-Garonne 157, Ille-et-Vilaine 147, Isère 125, Var 125">
+      <span class="lbl">Hauts-de-Seine (92)</span><span class="track"><span class="b" style="width:100%"></span><span class="v num">299</span></span>
+      <span class="lbl">Paris (75)</span><span class="track"><span class="b" style="width:94%"></span><span class="v num">280</span></span>
+      <span class="lbl">Gironde (33)</span><span class="track"><span class="b" style="width:90%"></span><span class="v num">269</span></span>
+      <span class="lbl">Rhône (69)</span><span class="track"><span class="b" style="width:68%"></span><span class="v num">202</span></span>
+      <span class="lbl">Bouches-du-Rhône (13)</span><span class="track"><span class="b" style="width:65%"></span><span class="v num">193</span></span>
+      <span class="lbl">Loire-Atlantique (44)</span><span class="track"><span class="b" style="width:54%"></span><span class="v num">162</span></span>
+      <span class="lbl">Haute-Garonne (31)</span><span class="track"><span class="b" style="width:53%"></span><span class="v num">157</span></span>
+      <span class="lbl">Ille-et-Vilaine (35)</span><span class="track"><span class="b" style="width:49%"></span><span class="v num">147</span></span>
+      <span class="lbl">Isère (38)</span><span class="track"><span class="b" style="width:42%"></span><span class="v num">125</span></span>
+      <span class="lbl">Var (83)</span><span class="track"><span class="b" style="width:42%"></span><span class="v num">125</span></span>
+    </div>
+    <p class="sub" style="margin-top:12px">Lecture : vos deux zones naturelles — l'Île-de-France (92 + 75 en tête) et l'axe 13/83/06 —
+    sont aussi les plus denses en cibles. Pas besoin d'aller chercher loin.</p>
+  </div>
+</section>
+
+<section>
+  <p class="eyebrow">04 · Le mode d'emploi</p>
+  <h2>La pyramide d'acquisition : trois rangs, trois façons d'acheter</h2>
+  <p>Chaque rang correspond à un volume mesuré, un type de vendeur, une fourchette de prix et un canal
+  de sourcing — et chacun est branché sur un outil déjà en place dans votre dashboard.</p>
+  <div class="pyramide">
+    <div class="rang">
+      <div class="n num">1</div>
+      <div>
+        <h3>Les réseaux constitués (3-45 magasins) <span class="pill">15 cibles en base</span></h3>
+        <div class="meta"><span>Vivier France : <b class="num">21 sociétés</b></span><span>Ticket : <b class="num">1 à 15 M€+</b></span><span>Sourcing : <b>démarchage direct</b></span></div>
+        <p>La brique Marcel &amp; Fils. Rare (21 en France), donc chaque dossier compte. Les meilleures sont
+        détaillées au §05 — Corse Bio Nature, le master-franchisé Bio c' Bon, Envithes… Une seule signature
+        peut faire passer WB Partners de 2 à 7 magasins.</p>
+      </div>
+    </div>
+    <div class="rang">
+      <div class="n num">2</div>
+      <div>
+        <h3>Les duos et multi-franchisés (2 magasins) <span class="pill">14 qualifiés Sud + IDF</span></h3>
+        <div class="meta"><span>Vivier France : <b class="num">63 sociétés</b></span><span>Ticket : <b class="num">300 k€ à 2 M€</b></span><span>Sourcing : <b>démarchage direct</b></span></div>
+        <p>Le cœur du réalisable immédiat : un propriétaire, deux magasins, souvent sans relève. Les 14 duos
+        du Sud et d'IDF sont enrichis au §06 — dont trois dirigeants de 60 ans et plus déjà versés dans
+        l'onglet Cibles. Bonus découvert dans les données : des « réseaux invisibles » éclatés en plusieurs
+        sociétés d'un même dirigeant (cas My Bio Shop, §06).</p>
+      </div>
+    </div>
+    <div class="rang">
+      <div class="n num">3</div>
+      <div>
+        <h3>Les magasins unitaires — au fil de l'eau <span class="pill gold">automatisé</span></h3>
+        <div class="meta"><span>Vivier : <b class="num">5 672 mono-magasins</b></span><span>Ticket : <b class="num">50 k€ à 600 k€</b></span><span>Sourcing : <b>R5 BODACC + cibles 60+ + R3</b></span></div>
+        <p>On ne démarche pas 5 672 sociétés : on laisse les événements les trier. Trois flux déjà en
+        production s'en chargent — les procédures collectives alimentaires (veille R5, quotidienne), les
+        dirigeants de 60 ans et plus (529 supermarchés/supérettes en base, rafraîchissable sur le périmètre
+        bio), et les locaux à reprendre (R3). La reprise à la barre, c'est le rang 3 à sa décote maximale.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <p class="eyebrow">05 · Rang 1 — les dossiers nommés</p>
+  <h2>Six réseaux, six lectures</h2>
+  <div class="cards">
+    <div class="cible">
+      <header><h3>Corse Bio Nature / CO&nbsp;BI&nbsp;NA</h3><span class="pill">priorité</span></header>
+      <span class="zone">Ajaccio · Corse · ~10 magasins via 2 sociétés</span>
+      <dl>
+        <dt>Dirigeant</dt><dd>Philippe Cristin · 59 ans</dd>
+        <dt>Relève identifiée</dt><dd>aucune</dd>
+        <dt>Résultat 2024</dt><dd class="num">+122 k€ (CO BI NA)</dd>
+        <dt>Structure</dt><dd>PME familiale, 2 SIREN</dd>
+      </dl>
+      <p class="lecture">Le dossier le plus propre du lot : taille finançable, rentable, dirigeant à l'âge
+      de la transmission, zone touristique sans consolidateur en face. Premier appel de la campagne.</p>
+    </div>
+    <div class="cible">
+      <header><h3>Master-franchisé Bio c' Bon</h3><span class="pill">complexe</span></header>
+      <span class="zone">Athis-Mons · 11 magasins (IDF + 06/13/30) via 2 sociétés</span>
+      <dl>
+        <dt>Dirigeant</dt><dd>Thierry Chouraqui · 68 ans</dd>
+        <dt>CA cumulé (2018)</dt><dd class="num">~123 M€ historique*</dd>
+        <dt>Enseigne</dt><dd>franchise Bio c' Bon (Carrefour)</dd>
+      </dl>
+      <p class="lecture">68 ans, deux sociétés, un réseau IDF + Sud d'un coup. Complexité réelle : l'accord
+      de la tête de réseau Carrefour conditionne tout. *Comptes publiés anciens (2018) — chiffres actuels à
+      obtenir en direct, le périmètre a probablement changé.</p>
+    </div>
+    <div class="cible">
+      <header><h3>Envithes</h3><span class="pill">transmission</span></header>
+      <span class="zone">Étrembières (74) · 3 magasins (01, 73, 74)</span>
+      <dl>
+        <dt>Dirigeants</dt><dd>couple de 61 et 64 ans</dd>
+        <dt>Relève identifiée</dt><dd>aucune</dd>
+        <dt>Comptes</dt><dd>non publiés — à demander</dd>
+      </dl>
+      <p class="lecture">Le profil « courtier en assurance » appliqué au bio : un couple, trois magasins
+      frontaliers (pouvoir d'achat suisse), personne pour reprendre. Hors de vos zones — pertinent seulement
+      si un manager local reste, sinon à passer.</p>
+    </div>
+    <div class="cible">
+      <header><h3>La Récolte</h3><span class="pill alert">détresse</span></header>
+      <span class="zone">Paris 3ᵉ · 4 magasins</span>
+      <dl>
+        <dt>Dirigeant</dt><dd>M. Mulliez · 43 ans</dd>
+        <dt>Résultat 2024</dt><dd class="num" style="color:var(--alert)">−2,9 M€</dd>
+        <dt>Canal probable</dt><dd>procédure / cession rapide</dd>
+      </dl>
+      <p class="lecture">Un réseau parisien premium qui perd très gros : le dossier ne se démarche pas, il
+      se surveille. La veille R5 le verra passer s'il bascule au tribunal — c'est là qu'il devient
+      intéressant, à la décote de la barre.</p>
+    </div>
+    <div class="cible">
+      <header><h3>Marcel &amp; Fils</h3><span class="pill gold">repère</span></header>
+      <span class="zone">Venelles (13) · 45+ magasins · tout l'arc Sud</span>
+      <dl>
+        <dt>CA consolidé</dt><dd class="num">160 M€ (2025, presse)</dd>
+        <dt>Résultat 2024 (registre)</dt><dd class="num" style="color:var(--alert)">−2,3 M€</dd>
+        <dt>Statut</dt><dd>ETI indépendante</dd>
+      </dl>
+      <p class="lecture">Pas une cible : le concurrent-modèle. Hors gabarit pour un achat, mais deux usages —
+      copier sa méthode, et savoir qu'il rachètera ce que vous ne prendrez pas. Chaque dossier Sud se joue
+      contre lui : arriver avant.</p>
+    </div>
+    <div class="cible">
+      <header><h3>Coopératives Biocoop (Scarabée, Le Pois Tout Vert, Aquarius…)</h3><span class="pill gold">repère</span></header>
+      <span class="zone">Rennes, Poitiers, Annecy · 4-13 magasins</span>
+      <dl>
+        <dt>Gouvernance</dt><dd>coopérative / SCIC</dd>
+        <dt>Cessibilité</dt><dd>atypique (AG des sociétaires)</dd>
+      </dl>
+      <p class="lecture">Les plus gros « réseaux » restants sont des coopératives : rachetables en théorie,
+      épuisantes en pratique. À garder comme comparables de valorisation, pas comme cibles de campagne.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <p class="eyebrow">06 · Rang 2 — le vivier qualifié</p>
+  <h2>Les 14 duos du Sud et d'Île-de-France</h2>
+  <p>Chaque ligne est une société exploitant exactement deux magasins bio certifiés, enrichie au registre
+  (dirigeant effectif, holding résolue, comptes). Les trois dirigeants de 60 ans et plus sont déjà dans
+  l'onglet Cibles avec leur fiche complète.</p>
+  <div class="twrap">
+    <table>
+      <thead><tr><th>Société</th><th>Enseigne</th><th>Magasins</th><th>Dirigeant</th><th class="r">Âge</th><th class="r">CA connu</th><th>Lecture</th></tr></thead>
+      <tbody>
+        <tr><td><b>Bionuance</b> ★</td><td>La Vie Claire</td><td>Pérols, St-Gély (34)</td><td>A. Jdira</td><td class="r num" style="color:var(--alert)"><b>66</b></td><td class="r num">n.p. · rés. −87 k€</td><td>60+, en perte : double signal</td></tr>
+        <tr><td><b>Sitebio</b> ★</td><td>Biocoop</td><td>Marseille 13ᵉ, Carnoux</td><td>T. Dite</td><td class="r num" style="color:var(--alert)"><b>64</b></td><td class="r num">rés. +34 k€</td><td>60+, rentable, cœur 13</td></tr>
+        <tr><td><b>Natur Détail II</b> ★</td><td>indépendant</td><td>Nice ×2</td><td>H. Oliva</td><td class="r num" style="color:var(--alert)"><b>61</b></td><td class="r num">1,55 M€ · rés. −131 k€</td><td>famille exploite aussi Grasse : trio réel</td></tr>
+        <tr><td>Vitalys</td><td>La Vie Claire</td><td>Vallauris, Antibes</td><td>C. Pancrazi</td><td class="r num">48</td><td class="r num">1,74 M€ · rés. +15 k€</td><td>zone 06 dense, dirigeant jeune</td></tr>
+        <tr><td>My Bio Shop (×3 sociétés)</td><td>indépendant</td><td>66, 83, 84, 88, 81</td><td>R. Chevaux</td><td class="r num">40</td><td class="r num">n.p.</td><td><b>réseau invisible</b> : ~6 magasins via 3 SIREN</td></tr>
+        <tr><td>Grain de Soleil</td><td>Biocoop</td><td>Aix, Éourres (05)</td><td>D. Arbaud</td><td class="r num">47</td><td class="r num">0,7 M€ (2015)</td><td>comptes anciens, à rafraîchir</td></tr>
+        <tr><td>Jing et Minet</td><td>Palais des Thés</td><td>Menton, Toulon</td><td>J. Minet</td><td class="r num">53</td><td class="r num">n.p.</td><td>format thé, tangent</td></tr>
+        <tr><td>La Bio en Mantois</td><td>Biocoop</td><td>Mantes, Épône (78)</td><td>M.-C. Jean-Baptiste</td><td class="r num">50</td><td class="r num">rés. +50 k€</td><td>ouest IDF, rentable</td></tr>
+        <tr><td>Bio Futur</td><td>La Vie Claire</td><td>St-Leu, Montigny (95)</td><td>B. Silva</td><td class="r num">57</td><td class="r num">rés. +55 k€</td><td>val-d'oise, rentable</td></tr>
+        <tr><td>NEAG 4</td><td>indépendant</td><td>Paris 15ᵉ, St-Berthevin</td><td>D. Defforey</td><td class="r num">55</td><td class="r num">1,5 M€ · rés. −101 k€</td><td>en perte, à surveiller</td></tr>
+        <tr><td>Perpibio / Sonbio…</td><td>divers</td><td>66, 11, 84</td><td>—</td><td class="r num">—</td><td class="r num">n.p.</td><td>reliquat à qualifier au fil de l'eau</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="sub" style="font-size:.8rem;color:var(--ink-3);margin-top:10px">★ = versé dans l'onglet Cibles du dashboard (famille « Réseau bio ») avec fiche, score et suivi de contact. n.p. = comptes non publiés.</p>
+  <div class="note"><b>Le cas My Bio Shop — pourquoi le registre seul ne suffit pas.</b> Trois sociétés distinctes
+  (Perpibio, Monteuxbio, Morieresbio), trois immatriculations, un seul dirigeant : Raphaël Chevaux, ~6 magasins
+  du Roussillon au Var. Aucune base ne montre ce réseau d'un bloc — c'est le croisement Agence Bio × registre
+  qui le révèle. Il y en a d'autres : la famille Oliva/Federzoni à Nice-Grasse en est un deuxième exemple.</div>
+</section>
+
+<section>
+  <p class="eyebrow">07 · Combien ça coûte</p>
+  <h2>Ordres de grandeur — et un exemple chiffré</h2>
+  <p>Les barèmes professionnels valorisent un fonds de commerce de magasin bio entre <b>0,25× et 0,80× le
+  CA annuel HT</b> selon rentabilité, bail et appartenance à un réseau (un Biocoop fidélisé se paie en haut
+  de fourchette). À la barre du tribunal, la décote est massive : on reprend des actifs et des salariés,
+  souvent sous 0,15× le CA.</p>
+  <div class="kpis">
+    <div class="kpi"><b class="num">0,25–0,80<span class="u">× CA</span></b><span>fonds de commerce bio, cession classique (barèmes professionnels)</span></div>
+    <div class="kpi"><b class="num">&lt; 0,15<span class="u">× CA</span></b><span>reprise à la barre — actifs + engagements sociaux, prix résiduel</span></div>
+    <div class="kpi"><b class="num">1,5–4 <span class="u">M€</span></b><span>exemple : duo rentable à 3 M€ de CA cumulé, selon négociation et murs</span></div>
+  </div>
+  <div class="note"><b>Exemple : la première marche.</b> Un duo type rang 2 (2 magasins, 3 M€ de CA cumulé,
+  rentable) se négocie autour de 1 à 2,4 M€ en fonds. Avec 30 % d'apport et un crédit adossé à votre
+  historique d'exploitant Naturalia, l'opération est bancable — et si les <b>murs</b> sont à vendre avec
+  (fréquent chez un dirigeant de 60 ans qui les détient en SCI), c'est le montage que WB Partners connaît
+  le mieux : les murs au patrimoine, le fonds à l'exploitation. Trois opérations de ce format = un réseau
+  de 8 magasins en 24 mois, soit la taille d'Onalavie + Bio&amp;Co réunis au moment où Marcel les a achetés.</div>
+</section>
+
+<section>
+  <p class="eyebrow">08 · Feuille de route</p>
+  <h2>90 jours pour tester la thèse</h2>
+  <div class="plan">
+    <div class="phase">
+      <div class="j">Jours 1–30 · Qualifier</div>
+      <ul>
+        <li><b>Corse Bio Nature</b> : premier contact (P. Cristin) — le dossier le plus propre.</li>
+        <li>Appeler les 3 duos 60+ (Bionuance, Sitebio, Natur Détail) : confirmer l'envie de vendre, obtenir les CA réels.</li>
+        <li>Statuer sur l'abonnement <b>repreneurs.com</b> (19-34 €HT/mois) pour les dates limites des cessions à la barre.</li>
+      </ul>
+    </div>
+    <div class="phase">
+      <div class="j">Jours 31–60 · Structurer</div>
+      <ul>
+        <li>Pour 1-2 dossiers confirmés : NDA, comptes détaillés, visite des magasins en client mystère.</li>
+        <li>Pré-accord bancaire sur le format type (duo à 3 M€ de CA) — votre historique Naturalia en pièce maîtresse.</li>
+        <li>Trancher la question d'enseigne : rester multi-enseignes (Biocoop/LVC gardées) ou préparer la vôtre.</li>
+      </ul>
+    </div>
+    <div class="phase">
+      <div class="j">Jours 61–90 · Offrir</div>
+      <ul>
+        <li>Première lettre d'intention sur le dossier le mieux qualifié.</li>
+        <li>La veille R5 et l'onglet Cibles tournent en tâche de fond : chaque bascule au tribunal ou nouveau 60+ arrive seul.</li>
+        <li>Point d'étape : si aucun dossier ne tient, la thèse se réoriente vers le rang 3 (unitaires à la barre) sans frais engagés.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <p class="eyebrow">09 · Lucidité</p>
+  <h2>Ce qui peut faire échouer la thèse</h2>
+  <div class="cards">
+    <div class="cible"><h3>La fenêtre se referme</h3><p class="lecture" style="border:0;padding:0;margin:0">Le rebond 2025 (+8,5 %) renchérit les cibles à chaque trimestre. Si les multiples remontent vers 0,8× CA partout, le build-up perd son avantage prix — c'est un argument pour aller vite, pas pour attendre.</p></div>
+    <div class="cible"><h3>Marcel &amp; Fils est déjà là</h3><p class="lecture" style="border:0;padding:0;margin:0">Sur tout dossier de l'arc Sud, le consolidateur naturel a plus de moyens et une machine d'intégration rodée. Votre avantage : les dossiers trop petits pour lui (rang 2), et l'IDF où il n'est pas.</p></div>
+    <div class="cible"><h3>Le métier s'apprend en exploitant</h3><p class="lecture" style="border:0;padding:0;margin:0">Deux Naturalia en franchise ≠ un réseau multi-enseignes en propre (centrale d'achat, direction de réseau). Le premier rachat doit garder son équipe en place — critère éliminatoire, pas optionnel.</p></div>
+    <div class="cible"><h3>Les données ont des angles morts</h3><p class="lecture" style="border:0;padding:0;margin:0">L'annuaire Agence Bio est déclaratif (comptes de magasins parfois absents), 40 % des sociétés ne publient pas leurs comptes, et « pas de relève identifiée » reste un proxy. Chaque chiffre clé se revalide au premier rendez-vous.</p></div>
+  </div>
+</section>
+
+<section>
+  <p class="eyebrow">10 · Méthode &amp; sources</p>
+  <h2>D'où viennent ces chiffres</h2>
+  <p style="font-size:.92rem;color:var(--ink-2)">Données propriétaires : annuaire officiel Agence Bio (33 200 opérateurs distribution → 6 431 magasins
+  spécialisés dédoublonnés par SIRET, 5 756 SIREN) croisé le 21-22/08/2026 avec l'API recherche-entreprises
+  (dirigeant effectif — gérant/président/DG personne physique, holdings résolues, commissaires aux comptes exclus —
+  comptes publiés, catégorie d'entreprise). Scripts versionnés dans le dépôt (<code>veille/cibles/</code>),
+  cibles consultables dans l'onglet <b>Opportunités → Supermarchés → Cibles de reprise</b> (listes, fiches, carte).</p>
+  <ul class="sources">
+    <li>Marché 2025 : Agence Bio / Interbio (12,6 Md€, +3,6 % ; spécialisés +8,5 %) — <a href="https://www.interbio-paysdelaloire.fr/le-marche-bio-retrouve-une-dynamique-positive-en-2025">Interbio</a>, <a href="https://www.lsa-conso.fr/bio-la-grande-distribution-renoue-avec-la-croissance-en-2025,466268">LSA</a>, <a href="https://www.biolineaires.com/marche-bio-au-1er-semestre-2025-entre-resilience-du-reseau-bio-et-defis-pour-la-gms/">Bio Linéaires</a></li>
+    <li>Marcel &amp; Fils : rachat Bio&amp;Co, 67 magasins, 160 M€, objectif 200-220 M€ — <a href="https://www.lsa-conso.fr/magasins-bio-l-enseigne-marcel-fils-portee-par-le-rachat-de-bio-co-confirme-sa-dynamique-et-vise-les-200-m-de-chiffre-d-affaires,463838">LSA</a>, <a href="https://www.swen-cp.fr/blog/2025/11/03/https-www-swen-cp-fr-wp-content-uploads-documents-communique_marcelfils-x-bioco-_-30102025-pdf/">communiqué</a> ; La Vie Saine — <a href="https://www.lsa-conso.fr/marcel-fils-s-empare-des-magasins-bio-la-vie-saine,416541">LSA</a> ; Onalavie — <a href="https://www.biolineaires.com/marcelfils-acquiert-lenseigne-onalavie/">Bio Linéaires</a></li>
+    <li>Redressements L'Eau Vive / NaturéO confirmés en sortie — <a href="https://www.circuits-bio.com/vie-des-enseignes">Circuits Bio</a></li>
+    <li>Valorisation fonds bio 0,25-0,80× CA — <a href="https://www.riviqo.com/blog/cession-magasin-bio-nutrition">Riviqo</a> ; barèmes sectoriels — <a href="https://www.ifc-expertise.fr/wp-content/uploads/2023/03/BAREMES-EVALUATION-DES-FONDS-DE-COMMERCE-PAR-ACTIVITES-FAVRE-REGUILLON-EXPERTISES.pdf">Favre-Réguillon</a></li>
+  </ul>
+</section>
+
+<footer>WB Partners — étude interne du 22 août 2026. Analyse structurée d'aide à la décision, sur données
+publiques citées et vérifiables ; les chiffres d'entreprises proviennent des registres et comptes publiés,
+parfois anciens (millésime indiqué). Ne constitue pas un conseil juridique, fiscal ou en investissement.</footer>
+</main>
