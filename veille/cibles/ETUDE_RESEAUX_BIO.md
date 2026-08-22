@@ -1,4 +1,8 @@
-# Étude — Réseaux de magasins bio à reprendre (21/08/2026)
+# Étude — Réseaux de magasins bio à reprendre (21-22/08/2026)
+
+> **Version de référence : l'étude complète et illustrée « Bâtir un réseau bio par
+> acquisitions »** (artifact partagé aux associés) — le présent fichier est l'annexe
+> de données et de méthode versionnée avec les scripts.
 
 Étude ponctuelle demandée le 21/08/2026 : identifier des réseaux de magasins bio
 susceptibles d'être repris pour se développer, en Île-de-France ou ailleurs (Sud
@@ -59,3 +63,21 @@ visibles dans l'onglet **Opportunités → Cibles de reprise** du dashboard.
 Relancer `bio_1_annuaire.py` puis `bio_2_reseaux.py` (annuaire + API publiques,
 sans clé), réinsérer via le même canal que le screening supermarchés. Cadence
 raisonnable : trimestrielle.
+
+
+## Complément du 22/08/2026 — rang 2 et cas Marcel & Fils
+
+- **Rang 2 (duos)** : 63 sociétés exploitent exactement 2 magasins bio en France, dont
+  14 dans le Sud ou en IDF, toutes enrichies au registre (`bio_duos.json` recréable via
+  le script). Les trois dirigeants de 60 ans et plus (Bionuance 66, Sitebio 64,
+  Natur Détail II 61) sont versés en base (type `reseau_bio`).
+- **Réseaux invisibles** : un même dirigeant derrière plusieurs sociétés — My Bio Shop
+  (3 SIREN, ~6 magasins, 66/83/84/88/81) et la famille Oliva/Federzoni (Nice ×2 + Grasse).
+  Seul le croisement Agence Bio × registre les révèle.
+- **Marcel & Fils, documenté par la presse** : croissance principalement par acquisitions —
+  La Vie Saine (16 magasins), Onalavie (3), Bio&Co (7, oct. 2025) → 67 magasins,
+  160 M€ consolidé (+6 %), objectif 200-220 M€ (LSA, Bio Linéaires, communiqué Swen).
+  La brique élémentaire de son build-up (réseaux de 3 à 16 magasins) est la taille
+  accessible à WB Partners.
+- **Marché 2025** : 12,6 Md€ (+3,6 %), spécialisés +8,5 %, fermetures divisées par 2 au T1 —
+  la fenêtre de prix post-crise se referme.
