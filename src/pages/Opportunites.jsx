@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import Pipeline from './Pipeline'
 import Simulateur from './Simulateur'
+import Cibles from './Cibles'
 
 const TABS = [
   { key: 'veille', label: 'Veille' },
+  { key: 'cibles', label: 'Cibles de reprise' },
   { key: 'simulateur', label: "Simulateur d'acquisition" },
 ]
 
@@ -29,6 +31,9 @@ export default function Opportunites({ navigate, navState, setNavState }) {
       </div>
       <div style={{ display: tab === 'veille' ? 'block' : 'none' }}>
         <Pipeline navigate={navigate} />
+      </div>
+      <div style={{ display: tab === 'cibles' ? 'block' : 'none' }}>
+        <Cibles navigate={navigate} />
       </div>
       <div style={{ display: tab === 'simulateur' ? 'block' : 'none' }}>
         <Simulateur navigate={navigate} />
