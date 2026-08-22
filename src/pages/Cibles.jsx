@@ -43,6 +43,13 @@ const EFFECTIFS = {
   '12': '20-49', '21': '50-99', '22': '100-199', 'NN': 'n.c.',
 }
 
+// Un même dirigeant à la tête de plusieurs sociétés, c'est le plus souvent un
+// groupe en activité — la relève y est en place ailleurs dans le groupe, donc
+// invisible dans les organes de direction de chaque société prise isolément.
+// Le signalement est indicatif : certains de ces groupes se transmettent quand
+// même, l'arbitrage reste aux associés.
+const SEUIL_GROUPE = 3
+
 const fmtNum = (n) => n == null ? '—' : new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(n)
 const fmtKE = (n) => n == null ? null : `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(Math.round(n / 1000))} k€`
 // dirigeant_naissance est au mois près (AAAA-MM), la précision du registre
@@ -72,12 +79,17 @@ const COLONNES = [
   },
   {
     k: 'societe', l: 'Société', get: c => c.denomination, td: 'text-sm font-semibold text-navy', style: { minWidth: 190, maxWidth: 280 },
-    cell: c => (
+    cell: (c, cm, ctx) => (
       <>
         <span className="line-clamp-2">{c.denomination}</span>
         <span className="block text-[10px] font-normal text-gray-400">
           {c.type === 'reseau_bio' ? 'Réseau bio' : (NAFS[c.naf] || c.naf)}{c.via_holding ? ` · via ${c.via_holding}` : ''}
         </span>
+        {ctx?.groupe?.length >= SEUIL_GROUPE && (
+          <span className="inline-block mt-1 bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded text-[10px] font-bold">
+            Groupe · {ctx.groupe.length} sociétés
+          </span>
+        )}
       </>
     ),
   },
@@ -221,7 +233,7 @@ function Row({ label, children }) {
   )
 }
 
-function CibleModal({ cible, onClose, onStatutChange, onCommentAdded }) {
+function CibleModal({ cible, groupe, onClose, onStatutChange, onCommentAdded }) {
   const { user } = useAuth()
   const [comments, setComments] = useState(null)
   const [newComment, setNewComment] = useState('')
@@ -325,6 +337,26 @@ function CibleModal({ cible, onClose, onStatutChange, onCommentAdded }) {
           </div>
         )}
       </div>
+
+      {groupe && groupe.length > 1 && (
+        <div className="mb-5 bg-purple-50/60 border border-purple-100 rounded-lg p-3">
+          <p className="text-xs font-bold text-purple-700 uppercase tracking-wide mb-1">
+            {groupe.length} sociétés dirigées par {cible.dirigeant_nom}
+          </p>
+          <p className="m-0 mb-2 text-xs text-gray-500">
+            Un seul interlocuteur pour l'ensemble — mais souvent le signe d'un groupe en activité,
+            dont la relève est en place ailleurs que dans les organes de direction de cette société.
+          </p>
+          <div className="space-y-1">
+            {groupe.map(g => (
+              <div key={g.id} className={`flex justify-between gap-3 text-xs rounded px-2 py-1 ${g.id === cible.id ? 'bg-white font-semibold' : 'bg-white/60'}`}>
+                <span className="text-gray-700">{g.denomination}<span className="text-gray-400"> · {g.code_postal} {g.ville}</span></span>
+                <span className="text-gray-500 shrink-0">{g.ca ? fmtKE(g.ca) : '—'}{g.statut === 'ecartee' ? ' · écartée' : ''}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Données société */}
       <div className="grid sm:grid-cols-2 gap-x-8 mb-5">
@@ -434,6 +466,18 @@ export default function Cibles() {
 
   const onStatutChange = (id, statut) =>
     setCibles(prev => prev.map(c => c.id === id ? { ...c, statut } : c))
+
+  // Sociétés partageant le même dirigeant effectif — écartées comprises : un
+  // groupe reste un groupe même si une partie a déjà été écartée.
+  const groupes = useMemo(() => {
+    const m = new Map()
+    for (const c of cibles || []) {
+      if (!c.dirigeant_nom) continue
+      if (!m.has(c.dirigeant_nom)) m.set(c.dirigeant_nom, [])
+      m.get(c.dirigeant_nom).push(c)
+    }
+    return m
+  }, [cibles])
 
   const filtrees = useMemo(() => {
     if (!cibles) return []
@@ -566,7 +610,7 @@ export default function Cibles() {
                     className="border-t border-gray-50 hover:bg-blue-50/40 cursor-pointer align-top">
                     {COLONNES.map(col => (
                       <td key={col.k} style={col.style} className={`px-3 py-2.5 ${col.td || ''}`}>
-                        {col.cell ? col.cell(c, cm) : (col.get(c, cm) || '—')}
+                        {col.cell ? col.cell(c, cm, { groupe: groupes.get(c.dirigeant_nom) }) : (col.get(c, cm) || '—')}
                       </td>
                     ))}
                     <td className="px-3 py-2.5">
@@ -591,7 +635,7 @@ export default function Cibles() {
         Ne constitue pas un conseil juridique, fiscal ou en investissement.
       </p>
 
-      {detail && <CibleModal cible={detail} onClose={() => setDetail(null)} onStatutChange={onStatutChange}
+      {detail && <CibleModal cible={detail} groupe={groupes.get(detail.dirigeant_nom)} onClose={() => setDetail(null)} onStatutChange={onStatutChange}
         onCommentAdded={c => setCommentaires(prev => [c, ...prev])} />}
     </div>
   )
