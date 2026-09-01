@@ -56,11 +56,7 @@ a) merci de **recalculer l'ensemble des appels de loyer émis depuis le 1er octo
 
 b) merci de me communiquer, pour chaque échéance depuis le 1er septembre 2023, le détail du calcul d'indexation retenu (indices de référence et de comparaison, coefficient) ;
 
-c) l'ILC du premier trimestre 2026 s'établit à **135,26**, soit une variation de **−0,45 %**. L'indexation du 1er septembre 2026 doit en tenir compte à partir de la base protocolaire, portant le loyer à environ **166 437 €/an** ; je vous remercie de m'adresser le nouveau montant avant émission du prochain avis d'échéance ;
-
-d) enfin, sauf erreur de ma part, **l'exemplaire du protocole contresigné par le bailleur ne m'a pas été retourné**, alors que votre courrier du 18 juillet 2024 demandait un retour signé en deux exemplaires. Merci de me le faire parvenir.
-
-Une copie du protocole signé et des échanges susvisés est à votre disposition sur simple demande. Je rappelle que l'article 2 du protocole permet sa production en cas de non-respect de ses obligations par une partie.
+c) l'ILC du premier trimestre 2026 s'établit à **135,26**, soit une variation de **−0,45 %**. L'indexation du 1er septembre 2026 doit en tenir compte à partir de la base protocolaire, portant le loyer à environ **166 437 €/an** ; je vous remercie de m'adresser le nouveau montant avant émission du prochain avis d'échéance.
 
 ---
 
