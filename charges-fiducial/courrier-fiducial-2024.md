@@ -1,7 +1,7 @@
 # Projet de courrier à FIDUCIAL GÉRANCE — version Anthony du 16/08/2026 (référence)
 
 **Destinataire** : romain.leroulley@fiducial.net — Cc : martine.selle@fiducial.net, ghyslaine.amusant@fiducial.net
-**Chiffres en attente de vérification sur pièce : 38 619 € — 10 823,17 € — 52 738,80 € — 53 803,10 € — appels 2026.**
+**Version finale du 01/09/2026 — tous les chiffres vérifiés sur les avis d'échéance originaux (cf. § 8 de l'analyse).**
 
 ---
 
@@ -11,7 +11,7 @@ Bonjour Monsieur Leroulley,
 
 Je reviens vers vous au sujet de la régularisation de charges de l'exercice 2024 qui m'est réclamée, d'un montant de 11 547,29 € TTC (facture n° 3000003-26000768 du 26 février 2026), ainsi que de l'indexation de mon loyer.
 
-Après examen des pièces transmises, j'aimerais vous faire part de quelques interrogations.
+Après examen des pièces transmises, j'aimerais vous faire part de quelques interrogations. Elles portent, en synthèse, sur trois montants : les 11 547,29 € TTC de régularisation de charges 2024, dont 9 260,24 € HT de travaux que votre propre syndic qualifie de non récupérables ; les 12 809,68 € TTC de loyers d'ores et déjà trop facturés au regard du protocole du 18 juillet 2024 ; et la composition du solde antérieur de 38 619,32 € figurant sur votre avis d'échéance du 5 juin 2026.
 
 
 PREMIER SUJET : LA REGULARISATION DE CHARGES 2024
@@ -34,7 +34,7 @@ Pourriez-vous me communiquer le procès-verbal de l'assemblée générale ayant 
 
 3. Compte locataire
 
-Pourriez-vous également me communiquer le relevé détaillé de mon compte locataire depuis 2021, afin de rapprocher le solde antérieur de 38 619 € figurant sur votre facture du 5 juin 2026 et le solde reporté de 10 823,17 € qui m'est aujourd'hui opposé.
+Pourriez-vous également me communiquer le relevé détaillé de mon compte locataire depuis 2021, ainsi que la composition du solde antérieur de 38 619,32 € figurant sur votre avis d'échéance du 5 juin 2026 ? Ce montant ne correspond pas au solde ressortant de ma comptabilité à la clôture de l'exercice 2025, sensiblement inférieur.
 
 
 SECOND SUJET : LE NON-RESPECT DU PROTOCOLE D'ACCORD DU 18 JUILLET 2024
@@ -50,11 +50,11 @@ Or la facturation n'a jamais été mise en conformité avec cet accord :
 
 - Du 1er septembre 2024 au 31 août 2025, le loyer dû était de 165 600 €/an, soit 51 000,00 € TTC par trimestre (loyer 41 400 € + provision de charges 1 100 €, TVA 20 %). Les appels des premier, deuxième et troisième trimestres 2025 s'élèvent à 52 738,80 € TTC, soit un loyer annuel de 171 396 € correspondant précisément à 165 600 × 1,035 : l'indexation annulée par le protocole a été facturée. Trop-facturé : 1 738,80 € TTC par trimestre, soit 5 216,40 € sur ces trois trimestres, à majorer le cas échéant du quatrième trimestre 2024.
 
-- À compter du 1er septembre 2025, l'application des indices stipulés à l'article 1 (ILC T1 2025 : 135,87 ; ILC T1 2024 : 134,58) porte le loyer à 165 600 × 135,87/134,58 = 167 187,34 €/an, soit 51 476,20 € TTC par trimestre. L'appel du quatrième trimestre 2025 s'élève à 53 803,10 € TTC, soit un trop-facturé de 2 326,90 € TTC par trimestre, reconduit sur les appels 2026.
+- À compter du 1er septembre 2025, l'application des indices stipulés à l'article 1 (ILC T1 2025 : 135,87 ; ILC T1 2024 : 134,58) porte le loyer à 165 600 × 135,87/134,58 = 167 187,34 €/an, soit 51 476,20 € TTC par trimestre. L'appel du quatrième trimestre 2025 s'élève à 53 803,10 € TTC, soit un trop-facturé de 2 326,90 € TTC ; les appels de l'année 2026 s'établissent à 53 231,66 € TTC par trimestre, soit un trop-facturé de 1 755,46 € TTC par trimestre.
 
 En conséquence :
 
-a) pourriez-vous recalculer l'ensemble des appels de loyer émis depuis le 1er octobre 2024 conformément au protocole, et établir l'avoir correspondant ? Les seuls trimestres documentés ci-dessus représentent déjà 7 543,30 € TTC de trop-facturé.
+a) pourriez-vous recalculer l'ensemble des appels de loyer émis depuis le 1er octobre 2024 conformément au protocole, et établir l'avoir correspondant ? Les trimestres documentés ci-dessus, du premier trimestre 2025 au troisième trimestre 2026, représentent déjà 12 809,68 € TTC de trop-facturé.
 
 b) pourriez-vous me communiquer, pour chaque échéance depuis le 1er septembre 2023, le détail du calcul d'indexation retenu (indices de référence et de comparaison, coefficient) ;
 
