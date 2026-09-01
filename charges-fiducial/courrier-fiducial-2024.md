@@ -52,11 +52,11 @@ Or la facturation n'a jamais été mise en conformité avec cet accord :
 
 En conséquence :
 
-a) merci de **recalculer l'ensemble des appels de loyer émis depuis le 1er octobre 2024** conformément au protocole, et d'établir l'avoir correspondant — les seuls trimestres documentés ci-dessus représentent déjà **7 543,30 € TTC** de trop-facturé ;
+a) pourriez-vous **recalculer l'ensemble des appels de loyer émis depuis le 1er octobre 2024** conformément au protocole, et établir l'avoir correspondant ? Les seuls trimestres documentés ci-dessus représentent déjà **7 543,30 € TTC** de trop-facturé.
 
-b) merci de me communiquer, pour chaque échéance depuis le 1er septembre 2023, le détail du calcul d'indexation retenu (indices de référence et de comparaison, coefficient) ;
+b) pourriez-vous me communiquer, pour chaque échéance depuis le 1er septembre 2023, le détail du calcul d'indexation retenu (indices de référence et de comparaison, coefficient) ;
 
-c) l'ILC du premier trimestre 2026 s'établit à **135,26**, soit une variation de **−0,45 %**. L'indexation du 1er septembre 2026 doit en tenir compte à partir de la base protocolaire, portant le loyer à environ **166 437 €/an** ; je vous remercie de m'adresser le nouveau montant avant émission du prochain avis d'échéance.
+c) l'ILC du premier trimestre 2026 s'établit à **135,26**, soit une variation de **−0,45 %**. L'indexation du 1er septembre 2026 doit en tenir compte à partir de la base protocolaire, portant le loyer à environ **166 437 €/an** ; pourriez-vous m'adresser le nouveau montant avant émission du prochain avis d'échéance ?
 
 ---
 
