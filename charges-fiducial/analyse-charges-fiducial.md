@@ -439,3 +439,39 @@ différence et recoupées avec le produit tantièmes × base, avec concordance a
 
 **Aucun montant n'a été estimé ni interpolé.** Les postes non lus sont signalés comme tels. L'écart de
 1 077,15 € du § 3.4 est présenté comme inexpliqué, sans hypothèse déguisée en conclusion.
+
+---
+
+## 8. Audit des chiffres du courrier sur les avis d'échéance originaux (01/09/2026)
+
+Les sept avis d'échéance trimestriels (PJ des mails « FACTURE ») et deux relevés de compte ont été
+récupérés et lus. Appel du trimestre = « Reste à payer » − « Solde antérieur » :
+
+| Trimestre | Avis émis le | Solde antérieur | Reste à payer | Appel | Dû (protocole) | Trop-facturé |
+|---|---|---|---|---|---|---|
+| 1T 2025 | 04/12/2024 | 36 619,42 | 89 358,22 | **52 738,80** | 51 000,00 | 1 738,80 |
+| 2T 2025 | 05/03/2025 | 20 038,22 | 72 777,02 | **52 738,80** | 51 000,00 | 1 738,80 |
+| 3T 2025 | 03/06/2025 | 23 457,02 | 76 195,82 | **52 738,80** | 51 000,00 | 1 738,80 |
+| 4T 2025 | 02/09/2025 | 23 457,02 | 77 260,12 | **53 803,10** | 51 476,20 | 2 326,90 |
+| 1T 2026 | 02/12/2025 | 28 861,32 | 82 092,98 | **53 231,66** | 51 476,20 | 1 755,46 |
+| 2T 2026 | 03/03/2026 | 39 387,66 | 92 619,32 | **53 231,66** | 51 476,20 | 1 755,46 |
+| 3T 2026 | 05/06/2026 | **38 619,32** | 91 850,98 | **53 231,66** | 51 476,20 | 1 755,46 |
+
+**Total trop-facturé documenté 1T 2025 → 3T 2026 : 12 809,68 € TTC** (hors 4T 2024, avis non détenu).
+
+Constats complémentaires :
+- Les appels 2026 (53 231,66 € = 173 038,87 €/an) appliquent le bon coefficient ILC (+0,96 %) à la
+  **mauvaise base** (171 396 au lieu de 165 600) ; le 4T 2025 comportait en outre un rattrapage ponctuel
+  (ligne « 410,72 » sur l'avis). La mention « reconduit sur les appels 2026 » du courrier est à corriger
+  en conséquence (trop-facturé 2026 : 1 755,46 €/trimestre, non 2 326,90).
+- L'avis du 1T 2025 (04/12/2024) porte encore la mention « l'ILC est plafonnée à 3,5 % » : l'indexation
+  annulée par le protocole y est appliquée en pleine période de signature.
+- **Le « 10 823,17 € » ne figure sur aucune pièce Fiducial** : c'est le solde calculé par l'expert-comptable
+  au 31/12/2025 (mail Sandrine Da Costa du 09/07/2026 : facturé 237 761,97 − réglé 226 938,80). À ne pas
+  opposer à Fiducial comme s'il émanait d'eux ; le point 3 du courrier doit viser la composition du solde
+  antérieur de 38 619,32 € (avis du 05/06/2026).
+- Le **11 332,83 €** est l'écriture « REGUL CHARGES 21/22/23/24 » de la comptabilité AEJB :
+  −1 000,34 (avoir 2021) + 11 547,29 (facture 2024) + **785,88 (exercice 2022)** ; rien au titre de 2023 —
+  hypothèse du § 2.1 confirmée au centime.
+- Solde du compte locataire Fiducial au 30/06/2026 : 92 619,32 DB (relevé 14 p.), à rapprocher en tenant
+  compte du paiement mensuel (appel 3T 2026 inclus non échu).
