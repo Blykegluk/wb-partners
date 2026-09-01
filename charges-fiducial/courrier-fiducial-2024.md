@@ -10,7 +10,7 @@
 
 Bonjour Monsieur Leroulley,
 
-Je reviens vers vous au sujet de la régularisation de charges de l'exercice 2024 qui m'est réclamée, d'un montant de 11 547,29 € TTC (facture n° 3000003-26000768 du 26 février 2026).
+Je reviens vers vous au sujet de la régularisation de charges de l'exercice 2024 qui m'est réclamée, d'un montant de 11 547,29 € TTC (facture n° 3000003-26000768 du 26 février 2026), ainsi que de l'indexation de mon loyer.
 
 Après examen des pièces transmises, plusieurs points appellent des explications avant que je puisse donner suite.
 
@@ -30,27 +30,21 @@ La modernisation de l'ascenseur a été répartie sur les 1000 tantièmes géné
 
 Merci de me communiquer le procès-verbal de l'assemblée générale ayant voté ces travaux ainsi que la clé de répartition retenue, et l'extrait du règlement de copropriété relatif aux charges d'ascenseur.
 
-**3. Écart entre le décompte du syndicat et mon relevé individuel**
-
-La quote-part des deux chantiers ressort à 10 337,39 € dans le décompte du syndic (4 464,92 € pour l'étanchéité et 5 872,47 € pour l'ascenseur), alors que mon relevé individuel porte 9 260,24 €.
-
-Pouvez-vous m'expliquer cet écart de 1 077,15 € ?
-
-**4. Date de communication de l'état récapitulatif 2024**
+**3. Date de communication de l'état récapitulatif 2024**
 
 Les comptes 2024 de la copropriété ont été approuvés lors de l'assemblée générale du 10 juin 2025, et le décompte du syndic est daté du 13 juin 2025. L'état récapitulatif ne m'a été facturé que le 26 février 2026.
 
 Merci de me confirmer la date et le mode de communication de cet état récapitulatif.
 
-**5. Exercice 2023**
+**4. Exercice 2023**
 
 Je n'ai reçu aucun état récapitulatif au titre de l'exercice 2023. Merci de me l'adresser.
 
-**6. Compte locataire**
+**5. Compte locataire**
 
 Merci enfin de me communiquer le relevé détaillé de mon compte locataire depuis 2021, afin de rapprocher le solde antérieur de 38 619 € figurant sur votre facture du 5 juin 2026 et le solde reporté de 10 823,17 € qui m'est aujourd'hui opposé.
 
-**7. Justificatifs**
+**6. Justificatifs**
 
 Je vous remercie de joindre les factures des entreprises ITEC et MISTRAL correspondant aux deux chantiers.
 

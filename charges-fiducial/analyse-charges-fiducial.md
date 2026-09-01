@@ -238,9 +238,11 @@ syndic. Fiducial n'a pourtant porté que **9 260,24 €** en « TRAVAUX » sur v
 1 077,15 €**, dont je n'ai pas trouvé l'explication dans les pièces disponibles. Aucune hypothèse testée ne
 le reconstitue (exclusion des honoraires, de l'assurance dommages-ouvrage, ou des deux).
 
-Je ne l'interprète pas : **c'est une explication à exiger de Fiducial**. Une différence non documentée
-entre le décompte du syndicat et le relevé individuel affaiblit la présomption d'exactitude de l'ensemble
-du décompte.
+Je ne l'interprète pas. **Choix tactique assumé : cet écart n'est PAS soulevé dans le courrier à
+Fiducial** — leur demander de l'expliquer reviendrait à leur signaler une sous-facturation de 1 077,15 €
+exploitable contre nous si le principe de récupérabilité était finalement admis. Le constat est réservé au
+contentieux : une différence non documentée entre le décompte du syndicat et le relevé individuel affaiblit
+la présomption d'exactitude de l'ensemble de leur facturation.
 
 Note connexe : le décompte syndic mentionne « Total des provisions appelées : −16 232,83 », c'est-à-dire que
 **FICOMMERCE a versé au syndic plus que le montant des charges (15 185,75 €)** et dispose donc d'un crédit
