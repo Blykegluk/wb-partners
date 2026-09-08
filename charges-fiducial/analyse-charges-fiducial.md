@@ -341,6 +341,22 @@ faire confirmer par l'avocat. L'article 2 (confidentialité) autorise expressém
 protocole en justice en cas de non-respect par une partie. Une partie du « solde » réclamé correspond
 mécaniquement à cette indexation annulée puis refacturée.
 
+### 4.4 ter Avis du 4T 2026 (02/09/2026) — baisse ILC appliquée, base toujours non conforme
+
+Avis n° 3000003-26002637 émis le 02/09/2026, lendemain du courriel de contestation (génération
+vraisemblablement automatique). Il applique la révision du 01/09/2026 : « ancien indice 135,870, nouveau
+135,260, variation −0,45 % », loyer trimestriel ramené de 43 259,72 à 43 065,50 € HT, avec rappel
+rétroactif de −76,00 € TTC sur septembre et remboursement de 194,22 € sur le dépôt de garantie. Le
+coefficient est exact — mais appliqué à la base non protocolaire (172 262 €/an au lieu de 166 436,74).
+
+Trop-facturé 4T 2026 : 52 998,60 − 51 251,02 = **1 747,58 € TTC** (hors rappels). **Cumul documenté
+1T 2025 → 4T 2026 : 14 557,26 € TTC.** Conséquence nouvelle : le dépôt de garantie, indexé par eux sur le
+loyer, devrait être remboursé de 1 650,54 € sur base protocolaire — complément dû de **1 456,32 €**.
+L'appel est désormais « exigible en 3 fois » (3 × ~17 576 €) ; solde antérieur affiché : 39 645,18 €
+(38 619,32 € au 05/06/2026). Vérifications internes : total facture 43 907,95 € HT et reste à payer
+92 373,56 € reconstitués au centime. Courriel du 01/09/2026 et LRE AR24 sans réponse au 08/09/2026 ;
+relance recommandée à quinzaine en citant cet avis.
+
 ### 4.5 Le solde reporté
 
 La facture du 05/06/2026 fait état d'un solde antérieur de **38 619 €**, tandis que le solde reporté
