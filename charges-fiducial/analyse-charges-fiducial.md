@@ -412,6 +412,45 @@ Le 11/09/2026, Anthony a envoyé, dans l'ordre :
 10 282,29 € sous réserve dès les avoirs constatés ; si refus maintenu sur l'étanchéité (~5 358 € TTC)
 → dossier à Me Azoulai avec le volet préjudices d'exploitation ; révision suivante du loyer 01/09/2027.
 
+### 4.4 sexies Pièces du syndic reçues le 11/09/2026 (« 0183 - 132 roquette fac + clé asc.pdf ») — la quote-part ascenseur tombe à zéro
+
+Après accord écrit de Leroulley (14h57, une minute après la demande d'autorisation du syndic), Mme Le
+Crom a transmis un PDF de 5 pages (scan, OCR intégral dans `extraits/FACTURES_CLE_ASC.txt`,
+source `pdf/FACTURES_CLE_ASC.pdf`) :
+
+1. **Facture ITEC n° 2931 2040 du 14/12/2023** : « RÉFECTION DE L'ÉTANCHÉITÉ DE LA TOITURE-TERRASSE
+   DE TYPE INACCESSIBLE **AU-DESSUS DE NATURALIA** », accord du 06/03/2023, devis 22/84270. Total réel
+   après moins-values : 19 554,67 HT + TVA 10 % = **21 510,14 TTC** (acompte 6 255,11 + solde
+   15 255,03 — concordance au centime avec le RGD 2024). La facture confirme mot pour mot : réfection
+   (pas réparation), toiture-terrasse (= couverture), inaccessible, au-dessus du local AEJB.
+2. **Trois factures MISTRAL** (S23110109 du 27/11/23, S24040155 et A24040156 du 30/04/24) : « **mise
+   en conformité et modernisation de l'ascenseur** », devis ASC220785-VD du 07/12/2022, marché
+   28 181,82 HT ; situations 30 % + 45 % + 25 % = **31 000,01 TTC** (concordance au centime avec le
+   RGD 2024). **Aucune mention d'« habillage intérieur de la cabine »** : la description contractuelle
+   contredit la réponse de Leroulley du 10/09. « Mise en conformité » + « modernisation » d'un
+   équipement collectif → arguments remplacement de gros équipement (§ 13.2.1) / travaux prescrits.
+3. **Extrait du règlement de copropriété, grille « CHARGES D'ASCENSEUR »** (page 39 du règlement) :
+   liste les lots **3 à 18 uniquement** (étages 1 à 6 : locaux, studios, appartements), quote-parts en
+   1000èmes, TOTAL 1.000 — vérifié : la somme des 16 lots fait exactement 1000. **Les lots 1, 2, 19 et
+   20 (lots FICOMMERCE loués à AEJB, rez-de-chaussée et sous-sol) ne figurent pas dans la clé.**
+   Tantièmes FICOMMERCE dans la clé ascenseur : **zéro**. La quote-part ascenseur d'AEJB, quelle que
+   soit la qualification des travaux, est donc de **0 €** — et non 5 872,47 € (facturation sur la clé
+   générale 1000). Réserve de précision : le RGD 2024 mentionne des clés de fonctionnement
+   « ASCENSEUR 30/06/2021 » en 1009 parts et « ASCENSEUR 01/07/21 » en 1208 parts (mises à jour
+   postérieures probables du règlement) ; la grille transmise par le syndic en réponse à la demande
+   « grille de la clé 61 ASCENSEUR » totalise 1000 — dans toutes les variantes, les lots du
+   rez-de-chaussée/sous-sol en sont absents sur la seule pièce produite.
+4. **L'écart de 1 077,15 € du § 3.4 est désormais expliqué** : quote-parts travaux du décompte syndic
+   (5 872,47 ascenseur + 4 464,92 étanchéité = 10 337,39) − travaux du relevé individuel Fiducial
+   (9 260,24 HT) = 1 077,15. Fiducial a facturé moins que la répartition syndic — écart en faveur
+   d'AEJB, à ne plus soulever.
+
+**Conséquence chiffrée** : sur les 11 112,29 € TTC de travaux contestés, la part ascenseur doit être
+retirée en totalité (clé : 0 tantième) ; reste la bataille étanchéité (4 464,92 € de quote-part syndic,
+~5 358 € TTC au relevé individuel), renforcée par la facture ITEC (« réfection », « au-dessus de
+Naturalia »). Les trois pièces ont été transmises par le syndic avec l'accord écrit de Leroulley :
+leur provenance et leur opposabilité sont acquises.
+
 ### 4.5 Le solde reporté
 
 La facture du 05/06/2026 fait état d'un solde antérieur de **38 619 €**, tandis que le solde reporté
