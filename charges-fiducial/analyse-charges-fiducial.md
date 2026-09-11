@@ -357,6 +357,36 @@ L'appel est désormais « exigible en 3 fois » (3 × ~17 576 €) ; solde anté
 92 373,56 € reconstitués au centime. Courriel du 01/09/2026 et LRE AR24 sans réponse au 08/09/2026 ;
 relance recommandée à quinzaine en citant cet avis.
 
+### 4.4 quater Réponse Fiducial du 10/09/2026 et pièces WeTransfer — état du rapport de force
+
+Réponse de R. Leroulley (10/09/2026) au courriel et à la LRE du 01/09/2026, accompagnée de trois pièces
+(tableau « Simulation_loyers_AEJB.xlsx », relevé de compte au 10/09/2026, PV d'AG du 18/01/2023) :
+
+- **Protocole : concession acquise.** Il reconnaît l'accord, demande copie du protocole signé (renvoyé par
+  AEJB le 30/12/2024 à M. Duarte — preuve au dossier) et promet « les avoirs correspondants ». Son tableau
+  chiffre **18 250,60 € TTC d'avoirs** (15 378,17 HT), 4T 2024 et ajustements de dépôt de garantie inclus —
+  recoupé au centime : 39 645,18 (solde au 10/09) − 18 250,60 = 21 394,58 € (son « solde après
+  correctifs »). Montant supérieur au chiffrage du courrier (12 809,68 €) : à accepter.
+- **Rebasage du loyer : acquis dans son tableau.** « Nouveaux loyers » à compter du 4T 2026 :
+  **165 833,68 €/an HT**, soit 51 070,10 € TTC/trimestre provision incluse — légèrement inférieur à la
+  cible protocolaire (166 436,74 €), sa base de recalcul étant ~165 000 € au lieu de 165 600 €. Écart en
+  faveur d'AEJB (~600 €/an) : ne pas le soulever. À faire confirmer pour l'appel du 1T 2027.
+- **Charges 2024 : il maintient (11 547,29 € TTC), mais sa propre pièce le contredit sur l'ascenseur.**
+  La résolution 23 du PV du 18/01/2023 vote la modernisation « sur la clé 61 ASCENSEUR 01/07/21 »,
+  « répartition : charges ascenseurs », 543/**1208** tantièmes (14 copropriétaires dans la clé contre 15 en
+  clé générale) — alors qu'il écrit « votés avec la clé des charges générales » et que la facturation
+  répartit sur 1000 parts. Erreur de clé établie : quote-part ascenseur (5 872,47 € HT ≈ 7 047 € TTC) à
+  rectifier selon la clé votée (tantièmes FICOMMERCE dans la clé 1208 à produire ; argument « desserte »
+  du § 13.2.2 en réserve). La résolution 22 (étanchéité : « réfection », terrasse « inaccessible »,
+  dommages-ouvrage votée, ITEC 25 020,41 € TTC) renforce la qualification art. 606 — il la conteste
+  (« ni remplacement ni 606 », « habillage intérieur de cabine » pour l'ascenseur) : bataille juridique
+  restante (~5 358 € TTC), pour Me Azoulai. Factures à demander à Mme Le Crom (Citya, 01 44 68 87 20).
+- **Menace de contentieux** si le solde de 21 394,58 € n'est pas réglé. Décomposition : 11 112,29 € TTC de
+  travaux contestés + **10 282,29 € non contestés** — stratégie : payer la part non contestée dès émission
+  des avoirs, sous réserve expresse pour le surplus.
+- Divers : son mail confirme la réception de la LRE AR24 ; son tableau est un modèle recyclé (en-tête
+  « PICARD SURGELES 11904 ») mais les chiffres sont ceux d'AEJB et se vérifient.
+
 ### 4.5 Le solde reporté
 
 La facture du 05/06/2026 fait état d'un solde antérieur de **38 619 €**, tandis que le solde reporté
