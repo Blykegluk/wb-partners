@@ -1,8 +1,8 @@
 # Projet de réponse à R. Leroulley — suite à son mail du 10/09/2026
 
 **À** : romain.leroulley@fiducial.net — en réponse dans le fil existant (objet conservé)
-**PJ à joindre** : 1) le protocole signé (`pdf/PROTOCOLE_SIGNE.pdf`) ; 2) transférer en parallèle le mail du 30/12/2024 à M. Duarte (preuve de l'envoi du protocole signé).
-**Statut** : projet à copier — ne pas envoyer tel quel sans relecture d'Anthony.
+**Pré-requis fait le 11/09/2026** : transfert à Leroulley du mail du 30/12/2024 à M. Duarte (message Gmail `19418cf9423139d3`, PJ `20240725105713011.pdf` = protocole signé ; Leroulley et M. Selle étaient déjà en copie de l'original).
+**Statut** : version finale corrigée (point 1 : renvoi au transfert, plus de pièce jointe) — validée pour envoi le 11/09/2026.
 
 Tous les montants proviennent des pièces de Fiducial elles-mêmes (tableau « Simulation_loyers_AEJB.xlsx »,
 relevé de compte au 10/09/2026, PV d'AG du 18/01/2023) — aucun chiffre nouveau n'est introduit.
@@ -16,7 +16,7 @@ Bonjour Monsieur Leroulley,
 
 Je vous remercie pour votre retour et pour les pièces transmises.
 
-1. Protocole et avoirs. Vous trouverez en pièce jointe le protocole d'accord signé, que je vous avais retourné le 30 décembre 2024 à l'attention de M. Duarte ; je vous retransfère ce message en parallèle. Pourriez-vous, comme indiqué dans votre courriel, émettre les avoirs correspondants, soit 18 250,60 € TTC conformément à votre tableau de simulation ?
+1. Protocole et avoirs. Je viens de vous retransférer mon message du 30 décembre 2024 adressé à M. Duarte, dont vous étiez déjà destinataire en copie, contenant le protocole d'accord signé. Pourriez-vous, comme indiqué dans votre courriel, émettre les avoirs correspondants, soit 18 250,60 € TTC conformément à votre tableau de simulation ?
 
 2. Appels de loyer à venir. Je note que votre tableau prévoit, à compter du quatrième trimestre 2026, des appels trimestriels de 51 070,10 € TTC, provision de charges incluse. Pourriez-vous me confirmer que l'appel du premier trimestre 2027 et les suivants seront bien émis sur cette base ?
 
