@@ -89,19 +89,25 @@ async function call(params) {
 }
 
 function printFetch(data) {
-  const files = data.files ?? data.created ?? data.results ?? []
+  const files = data.saved ?? data.files ?? []
+  const skipped = Array.isArray(data.skipped) ? data.skipped : []
   if (!Array.isArray(files) || files.length === 0) {
-    console.log('Aucune pièce jointe créée dans Drive.')
-    return
+    console.log(`Aucune pièce jointe créée dans Drive (${data.threadsScanned ?? 0} fil(s) parcouru(s)).`)
+  } else {
+    const folder = data.folder?.name ? ` dans « ${data.folder.name} »` : ''
+    console.log(`${files.length} fichier(s) créé(s)${folder} :`)
+    for (const f of files) {
+      const name = f.attachmentName ?? f.name ?? '(sans nom)'
+      const id = f.fileId ?? f.id ?? '?'
+      const extra = [f.from && `de ${f.from}`, f.date && `le ${f.date}`, f.messageId && `messageId ${f.messageId}`]
+        .filter(Boolean)
+        .join(', ')
+      console.log(`  - ${name}  fileId=${id}${extra ? `  (${extra})` : ''}`)
+    }
   }
-  console.log(`${files.length} fichier(s) créé(s) dans Drive :`)
-  for (const f of files) {
-    const name = f.name ?? f.fileName ?? f.title ?? '(sans nom)'
-    const id = f.fileId ?? f.id ?? '?'
-    const extra = [f.messageId && `message ${f.messageId}`, f.from && `de ${f.from}`, f.date && `le ${f.date}`]
-      .filter(Boolean)
-      .join(', ')
-    console.log(`  - ${name}  fileId=${id}${extra ? `  (${extra})` : ''}`)
+  if (skipped.length > 0) {
+    console.log(`${skipped.length} pièce(s) jointe(s) ignorée(s) :`)
+    for (const s of skipped) console.log(`  - ${s.attachmentName ?? s.name ?? '?'}${s.reason ? ` : ${s.reason}` : ''}`)
   }
   console.log('\nLecture : Drive read_file_content(fileId) ; renvoi : download_file_content(fileId).')
 }
