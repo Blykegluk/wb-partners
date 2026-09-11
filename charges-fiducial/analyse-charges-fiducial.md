@@ -387,6 +387,31 @@ Réponse de R. Leroulley (10/09/2026) au courriel et à la LRE du 01/09/2026, ac
 - Divers : son mail confirme la réception de la LRE AR24 ; son tableau est un modèle recyclé (en-tête
   « PICARD SURGELES 11904 ») mais les chiffres sont ceux d'AEJB et se vérifient.
 
+### 4.4 quinquies Riposte du 11/09/2026 — trois envois
+
+Le 11/09/2026, Anthony a envoyé, dans l'ordre :
+
+1. **Transfert à Leroulley du mail du 30/12/2024 à M. Duarte** (message Gmail `19418cf9423139d3`,
+   PJ `20240725105713011.pdf` = protocole signé). Le fil transféré emporte aussi le mail de Duarte du
+   12/12/2024 (« Nous ne pouvons pas envisager un autre accompagnement que celui proposé dans le
+   protocole transmis valant annulation de l'indexation ») — double preuve : envoi du signé + accord du
+   bailleur. Leroulley et M. Selle étaient déjà en copie de l'original.
+2. **Mail à Mme Le Crom** (syndic Citya), Leroulley en copie : factures ITEC/MISTRAL des deux chantiers
+   (résolutions 22 et 23), PV de réception, et grille de la clé « 61 ASCENSEUR » (1208 tantièmes) —
+   texte dans `mail-lecrom-factures.md`.
+3. **Réponse à Leroulley** en 5 points — texte final dans `reponse-leroulley-2026-09.md` : avoirs
+   18 250,60 € TTC à émettre ; confirmation demandée des appels à 51 070,10 € TTC/trim dès le 1T 2027 ;
+   ascenseur : rectification selon la clé votée (résolution 23) + tantièmes FICOMMERCE ; étanchéité :
+   contestation renforcée (résolution 22 « infiltrations […] magasin Naturalia » = le local d'AEJB,
+   confirmé par Anthony ; constat DDE avril 2024 ; obligation d'entretien + art. 606 + R.145-35 ;
+   réserve « à ce stade » sur les préjudices d'exploitation) ; engagement de régler les 10 282,29 € non
+   contestés dès émission des avoirs, sous réserve pour le surplus.
+
+**Jalons de suivi** : émission des avoirs (18 250,60 € TTC) au compte ; appel 1T 2027 attendu à
+51 070,10 € TTC (émission début 12/2026) ; relance Le Crom sous ~10 jours si silence ; virement
+10 282,29 € sous réserve dès les avoirs constatés ; si refus maintenu sur l'étanchéité (~5 358 € TTC)
+→ dossier à Me Azoulai avec le volet préjudices d'exploitation ; révision suivante du loyer 01/09/2027.
+
 ### 4.5 Le solde reporté
 
 La facture du 05/06/2026 fait état d'un solde antérieur de **38 619 €**, tandis que le solde reporté
