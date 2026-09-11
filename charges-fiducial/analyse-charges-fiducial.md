@@ -451,6 +451,12 @@ retirée en totalité (clé : 0 tantième) ; reste la bataille étanchéité (4 
 Naturalia »). Les trois pièces ont été transmises par le syndic avec l'accord écrit de Leroulley :
 leur provenance et leur opposabilité sont acquises.
 
+**Mail de suivi envoyé le 11/09/2026 en fin de journée** (texte : `mail-leroulley-suivi-pieces-syndic.md`) :
+retrait demandé de l'intégralité de la part ascenseur (5 872,47 € au décompte syndic) à intégrer aux
+avoirs — cible d'avoirs portée à ~24 123 € (18 250,60 + 5 872,47) ; contestation étanchéité confirmée
+par la facture ITEC ; rappel des trois acquis du matin (avoirs, appels 1T 2027 à 51 070,10 € TTC,
+règlement de la part non contestée). Seul poste restant en litige après ce mail : l'étanchéité.
+
 ### 4.5 Le solde reporté
 
 La facture du 05/06/2026 fait état d'un solde antérieur de **38 619 €**, tandis que le solde reporté
