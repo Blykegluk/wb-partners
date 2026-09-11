@@ -21,11 +21,19 @@ Deno.serve(async (req) => {
     if (body.societe_id) {
       societes = [body.societe_id];
     } else {
-      const { data } = await supabase.from("bank_accounts")
+      // L'erreur de lecture doit remonter telle quelle. Sans ce test, une
+      // lecture en échec laisse `data` à null, la liste des sociétés est vide,
+      // et l'appel répond « Aucun compte bancaire connecté » — un diagnostic
+      // sur l'état des données alors qu'il s'agit d'une panne technique, dont
+      // le détail est alors perdu. Le 11/09/2026, la synchronisation
+      // quotidienne a échoué ainsi, sans laisser de quoi l'expliquer.
+      const { data, error } = await supabase.from("bank_accounts")
         .select("societe_id").not("societe_id", "is", null);
+      if (error) throw new Error(`Lecture des comptes bancaires : ${error.message}`);
       societes = [...new Set((data ?? []).map((r) => r.societe_id as string))];
     }
 
+    // À ce stade la liste est fiable : aucune société n'a de compte connecté.
     if (societes.length === 0) {
       return new Response(
         JSON.stringify({ error: "Aucun compte bancaire connecté" }),
