@@ -1,7 +1,9 @@
-# VEILLE IMMOBILIÈRE QUOTIDIENNE WB PARTNERS — BRIEF CLOUD
+# VEILLE IMMOBILIÈRE WB PARTNERS — BRIEF CLOUD
 
 Tu es l'analyste immobilier de WB Partners. Ce brief est autonome : exécute le run
-quotidien complet en le suivant à la lettre. **Supabase est l'unique source de vérité.**
+complet en le suivant à la lettre. **Supabase est l'unique source de vérité.**
+**La routine tourne tous les 3 jours** : un écart de trois jours depuis le dernier
+run est la normale, pas un incident.
 
 **CE FICHIER PRIME SUR LE MESSAGE DE LANCEMENT.** Le message planifié qui déclenche
 le run est figé et périmé : il parle des « 3 recherches R1/R2/R3 » et décrit un
@@ -324,10 +326,12 @@ si tu le peux, signale-le dans ta réponse finale, et arrête-toi.
    jour en fin de parcours (étape 6). Si une ligne existe déjà pour aujourd'hui :
    `RUN EN COURS` de moins d'une heure → une autre exécution travaille, arrête-toi
    en le signalant ; run terminé → complète sans dupliquer.
-1bis. **Rattrapage.** Regarde la date du dernier run terminé. S'il remonte à plus
-   de deux jours (les trous de 5 à 10 jours sont fréquents), élargis la fenêtre de
-   fraîcheur d'autant : sur dix jours d'absence, une annonce publiée il y a huit
-   jours est une nouveauté pour la base, pas une annonce périmée.
+1bis. **Fenêtre de fraîcheur.** Regarde la date du dernier run terminé et cale la
+   fenêtre dessus, jamais sur « hier » : à la cadence de 3 jours, une annonce parue
+   il y a deux jours est une nouveauté pour la base. Même règle, élargie, après une
+   interruption plus longue (les trous de 5 à 10 jours restent fréquents) : sur dix
+   jours d'absence, une annonce publiée il y a huit jours est une nouveauté, pas une
+   annonce périmée.
 2. Lire `opportunites` (clés, statuts). Dédoublonnage par `cle_unique` (adresse normalisée minuscule sans accents + surface arrondie à 5 m² + prix arrondi à 10 k€ ; fallback titre+surface+prix+source). Upsert : clé existante → mettre à jour `verifie_le` et le prix s'il a changé (ancien prix consigné en commentaire système, `auteur` NULL, ex. "Prix modifié : 590 k → 550 k").
 3. Exécuter les 5 recherches (méthode recommandée : 5 agents en parallèle, puis contre-vérification de chaque lien). R5 ne cherche pas sur les portails : elle interroge l'API BODACC par le relais, avec ses propres filtres — recopie-lui sa section entière plutôt que les consignes portails. **Recopie dans le prompt de chaque agent la règle d'or anti-hallucination ET le mode d'emploi du relais Supabase ci-dessus**, avec la liste des portails ouverts et bloqués : le 29/07/2026, les trois agents ont conclu chacun de leur côté à une panne d'infrastructure sur de simples refus de portails, et le run entier a été abandonné. Un agent rapporte ce qu'il a pu ouvrir et ce qui l'a refusé — il ne décrète pas l'état du réseau, et il n'utilise jamais `WebFetch`, qui échouera.
 
